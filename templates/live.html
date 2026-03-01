@@ -167,6 +167,7 @@ const conversationSection = document.getElementById('conversation-section');
 const recommendationsEl = document.getElementById('recommendations');
 let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
 let timerStart, timerHandle, currentAiEntry = null;
+let transcriptEntries = [];
 let sessionMeta = null;
 
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
@@ -176,6 +177,7 @@ function formatTime(ms){const s=Math.floor(ms/1000);const m=String(Math.floor(s/
 function addEntry(role,text){
   const entry=document.createElement('div');
   entry.className=`entry ${role}`;
+  entry.dataset.role = role;
   const tag=document.createElement('div');
   tag.className='tag';
   tag.textContent=role==='ai'?'Counsellor':'Student';
@@ -185,7 +187,9 @@ function addEntry(role,text){
   entry.append(tag,body);
   transcriptEl.append(entry);
   transcriptEl.scrollTop=transcriptEl.scrollHeight;
-  return {body};
+  const data = {role: role === 'ai' ? 'counsellor' : 'student', text: text || ''};
+  transcriptEntries.push(data);
+  return {body, data};
 }
 function updateTimer(){timerEl.textContent=formatTime(Date.now()-timerStart);}
 
@@ -195,6 +199,9 @@ async function startSession(){
   const scenario=document.getElementById('case-study').value;
   sessionMeta={name,className,scenario,start:new Date()};
   recordedChunks = [];
+  transcriptEntries = [];
+  currentAiEntry = null;
+  transcriptEl.innerHTML = '';
   showScreen('live');
   setStatus('Connecting...');
   caseStudyText.textContent = scenario || 'No case study loaded.';
@@ -249,16 +256,20 @@ function handleEventMessage(ev){
       orb.classList.add('speaking');
       if (!currentAiEntry) {
         const created = addEntry('ai','');
-        currentAiEntry = created.body;
+        currentAiEntry = created;
       }
-      currentAiEntry.textContent += msg.delta || '';
+      currentAiEntry.body.textContent += msg.delta || '';
+      currentAiEntry.data.text = currentAiEntry.body.textContent;
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
       setStatus('Speaking...');
       break;
     case 'response.audio_transcript.done':
       if (currentAiEntry) {
-        currentAiEntry.textContent = msg.transcript || currentAiEntry.textContent;
+        currentAiEntry.body.textContent = msg.transcript || currentAiEntry.body.textContent;
+        currentAiEntry.data.text = currentAiEntry.body.textContent;
         currentAiEntry = null;
+      } else if (msg.transcript) {
+        addEntry('ai', msg.transcript);
       }
       break;
     case 'response.done':
@@ -402,7 +413,10 @@ async function endSession(){
 
   const duration = formatTime(Date.now()-timerStart);
   document.getElementById('summary-meta').textContent = `${sessionMeta.name} • ${sessionMeta.className} • ${duration}`;
-  document.getElementById('summary-transcript').textContent = transcriptEl.textContent.trim();
+  const summaryTranscriptEl = document.getElementById('summary-transcript');
+  const formatTranscriptForDisplay = entries => entries.map(e => `${e.role === 'counsellor' ? 'Counsellor' : 'Student'}: ${e.text}`).join('\n');
+  const safeTranscriptEntries = transcriptEntries.filter(e => e && e.text && e.text.trim());
+  summaryTranscriptEl.textContent = safeTranscriptEntries.length ? formatTranscriptForDisplay(safeTranscriptEntries) : transcriptEl.textContent.trim();
   showScreen('summary');
 
   // Show loading state
@@ -414,14 +428,18 @@ async function endSession(){
     const fd = new FormData();
     const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
     fd.append('video', safeBlob, 'session.webm');
-    // Build transcript from DOM to avoid missing data channel events.
-    const finalTranscript = [];
-    transcriptEl.querySelectorAll('.entry').forEach(el => {
-      const role = el.classList.contains('ai') ? 'counsellor' : 'student';
-      const bodyEl = el.querySelector('.body') || el.querySelector('div:last-child');
-      const text = bodyEl ? bodyEl.textContent.trim() : '';
-      if (text) finalTranscript.push({role, text});
-    });
+    // Build transcript from in-memory buffer; fallback to DOM if needed.
+    let finalTranscript = transcriptEntries
+      .filter(e => e && e.text && e.text.trim())
+      .map(e => ({role: e.role, text: e.text.trim()}));
+    if (finalTranscript.length === 0) {
+      transcriptEl.querySelectorAll('.entry').forEach(el => {
+        const role = el.classList.contains('ai') ? 'counsellor' : 'student';
+        const bodyEl = el.querySelector('.body') || el.querySelector('div:last-child');
+        const text = bodyEl ? bodyEl.textContent.trim() : '';
+        if (text) finalTranscript.push({role, text});
+      });
+    }
     const transcriptJson = JSON.stringify(finalTranscript);
     console.log('[CounselAI] transcript JSON length:', transcriptJson.length);
     console.log('[CounselAI] transcript entries:', finalTranscript.length);
