@@ -87,6 +87,9 @@ async def analyze_session(
             voice_data = voice_analyzer.analyze_audio(audio_path)
     except Exception as exc:
         print(f"Voice analysis skipped: {exc}")
+    print(f"[analyze] transcript entries received: {len(transcript_data)}")
+    if transcript_data:
+        print(f"[analyze] first transcript entry: {transcript_data[0]}")
     session_data = {
         "student_info": {"name": student_name, "class": student_class},
         "rounds": [
@@ -96,13 +99,10 @@ async def analyze_session(
         "face_data": face_data,
         "voice_data": voice_data,
     }
-    print(f"[analyze] transcript entries: {len(transcript_data)}, names: {student_name}/{student_class}")
-    print(f"[analyze] rounds: {len(session_data["rounds"])}")
-    if session_data["rounds"]:
-        print(f"[analyze] first round: {session_data["rounds"][0]}")
     try:
         import profile_generator
         profile = profile_generator.generate_profile(session_data)
+        print(f"[analyze] profile keys: {list(profile.keys())}")
         return JSONResponse({"profile": profile})
     except Exception as exc:
         return JSONResponse({"profile": {"summary": f"Analysis error: {exc}"}})
