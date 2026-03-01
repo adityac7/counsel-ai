@@ -103,13 +103,29 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
         <div class="meta" id="summary-meta"></div>
       </div>
       <div class="card" style="padding:16px;">
-        <strong>Behavioral profile</strong>
+        <strong>Score metrics</strong>
         <div class="metrics" id="profile-metrics" style="margin-top:12px;"></div>
       </div>
     </div>
     <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Summary</strong>
-      <div class="meta" id="summary-text" style="margin-top:8px;white-space:pre-wrap;"></div>
+      <strong>Personality snapshot</strong>
+      <div class="meta" id="personality-section" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>Cognitive profile</strong>
+      <div class="meta" id="cognitive-section" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>Emotional profile</strong>
+      <div class="meta" id="emotional-section" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>Behavioral insights</strong>
+      <div class="meta" id="behavioral-section" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>Conversation analysis</strong>
+      <div class="meta" id="conversation-section" style="margin-top:8px;"></div>
     </div>
     <div class="card" style="padding:16px;margin-top:16px;">
       <strong>Recommendations</strong>
@@ -138,7 +154,11 @@ const aiAudio = document.getElementById('ai-audio');
 const toast = document.getElementById('toast');
 const caseStudyText = document.getElementById('case-study-text');
 const profileMetrics = document.getElementById('profile-metrics');
-const summaryText = document.getElementById('summary-text');
+const personalitySection = document.getElementById('personality-section');
+const cognitiveSection = document.getElementById('cognitive-section');
+const emotionalSection = document.getElementById('emotional-section');
+const behavioralSection = document.getElementById('behavioral-section');
+const conversationSection = document.getElementById('conversation-section');
 const recommendationsEl = document.getElementById('recommendations');
 let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
 let timerStart, timerHandle, currentAiEntry = null, currentAiIndex = null;
@@ -184,7 +204,7 @@ async function startSession(){
 
   recorder = new MediaRecorder(mediaStream);
   recorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
-  recorder.start();
+  recorder.start(1000);
 
   pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
   const audioTransceiver = pc.addTransceiver('audio', {direction:'sendrecv'});
@@ -198,7 +218,7 @@ async function startSession(){
   dataChannel.onopen = () => {
     dataChannel.send(JSON.stringify({type:'session.update',session:{turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},input_audio_transcription:{model:'whisper-1'}}}));
     setTimeout(()=>{
-      const instructions = `Read the case study aloud, then ask: "What do you think about this? What would you do?". Keep probing with why questions. Case study: ${scenario}`;
+      const instructions = `Warmly greet ${name} by name, read the case study aloud, then ask: "Iss situation mein tum kya karte? Tell me what comes to your mind first." Case study: ${scenario}`;
       dataChannel.send(JSON.stringify({type:'response.create',response:{instructions}}));
     },300);
   };
@@ -307,10 +327,69 @@ function renderRecommendations(profile){
   recommendationsEl.appendChild(ul);
 }
 
+function renderSection(sectionEl, items){
+  sectionEl.innerHTML = '';
+  if (!items.length) {sectionEl.textContent = 'No data returned.';return;}
+  const list = document.createElement('div');
+  items.forEach(item=>{
+    const row = document.createElement('div');
+    row.style.marginBottom = '8px';
+    row.textContent = item;
+    list.appendChild(row);
+  });
+  sectionEl.appendChild(list);
+}
+
+function renderProfileSections(profile){
+  const traits = Array.isArray(profile?.personality_snapshot?.traits) ? profile.personality_snapshot.traits : [];
+  const personalityItems = [
+    traits.length ? `Traits: ${traits.join(', ')}` : '',
+    profile?.personality_snapshot?.communication_style ? `Communication style: ${profile.personality_snapshot.communication_style}` : '',
+    profile?.personality_snapshot?.decision_making ? `Decision making: ${profile.personality_snapshot.decision_making}` : '',
+  ].filter(Boolean);
+  renderSection(personalitySection, personalityItems);
+
+  const cognitiveItems = [
+    profile?.cognitive_profile?.moral_reasoning_stage ? `Moral reasoning stage: ${profile.cognitive_profile.moral_reasoning_stage}` : '',
+    profile?.cognitive_profile?.problem_solving_style ? `Problem solving: ${profile.cognitive_profile.problem_solving_style}` : '',
+  ].filter(Boolean);
+  renderSection(cognitiveSection, cognitiveItems);
+
+  const anxietyMarkers = Array.isArray(profile?.emotional_profile?.anxiety_markers) ? profile.emotional_profile.anxiety_markers : [];
+  const emotionalItems = [
+    profile?.emotional_profile?.empathy_level ? `Empathy level: ${profile.emotional_profile.empathy_level}` : '',
+    profile?.emotional_profile?.stress_response ? `Stress response: ${profile.emotional_profile.stress_response}` : '',
+    anxietyMarkers.length ? `Anxiety markers: ${anxietyMarkers.join(', ')}` : '',
+    profile?.emotional_profile?.emotional_vocabulary ? `Emotional vocabulary: ${profile.emotional_profile.emotional_vocabulary}` : '',
+  ].filter(Boolean);
+  renderSection(emotionalSection, emotionalItems);
+
+  const behavioralItems = [
+    profile?.behavioral_insights?.leadership_potential ? `Leadership potential: ${profile.behavioral_insights.leadership_potential}` : '',
+    profile?.behavioral_insights?.peer_influence ? `Peer influence: ${profile.behavioral_insights.peer_influence}` : '',
+    profile?.behavioral_insights?.academic_pressure ? `Academic pressure: ${profile.behavioral_insights.academic_pressure}` : '',
+    profile?.behavioral_insights?.resilience ? `Resilience: ${profile.behavioral_insights.resilience}` : '',
+  ].filter(Boolean);
+  renderSection(behavioralSection, behavioralItems);
+
+  const keyMoments = Array.isArray(profile?.conversation_analysis?.key_moments) ? profile.conversation_analysis.key_moments : [];
+  const conversationItems = [
+    profile?.conversation_analysis?.evolution_across_rounds ? `Evolution across rounds: ${profile.conversation_analysis.evolution_across_rounds}` : '',
+    profile?.conversation_analysis?.consistency ? `Consistency: ${profile.conversation_analysis.consistency}` : '',
+    keyMoments.length ? `Key moments: ${keyMoments.join(' | ')}` : '',
+  ].filter(Boolean);
+  renderSection(conversationSection, conversationItems);
+}
+
 async function endSession(){
   setStatus('Processing...');
   clearInterval(timerHandle);
-  if (recorder && recorder.state !== 'inactive') recorder.stop();
+  const videoBlob = await new Promise(resolve => {
+    if (!recorder || recorder.state === 'inactive') return resolve(null);
+    recorder.onstop = () => resolve(new Blob(recordedChunks, {type:'video/webm'}));
+    recorder.stop();
+  });
+  if (dataChannel) dataChannel.close();
   if (pc) pc.close();
   if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
 
@@ -321,8 +400,8 @@ async function endSession(){
 
   try{
     const fd = new FormData();
-    const blob = new Blob(recordedChunks, {type:'video/webm'});
-    fd.append('video', blob, 'session.webm');
+    const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
+    fd.append('video', safeBlob, 'session.webm');
     fd.append('transcript', JSON.stringify(transcriptData));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
@@ -331,14 +410,22 @@ async function endSession(){
       const data = await resp.json();
       const profile = data.profile || {};
       buildMetrics(profile);
-      summaryText.textContent = profile?.conversation_analysis?.evolution_across_rounds || profile?.personality_snapshot?.communication_style || JSON.stringify(profile);
+      renderProfileSections(profile);
       renderRecommendations(profile);
     } else {
-      summaryText.textContent = 'Analysis unavailable.';
+      renderSection(personalitySection, []);
+      renderSection(cognitiveSection, []);
+      renderSection(emotionalSection, []);
+      renderSection(behavioralSection, []);
+      renderSection(conversationSection, []);
       recommendationsEl.textContent = 'Analysis unavailable.';
     }
   }catch{
-    summaryText.textContent = 'Analysis unavailable.';
+    renderSection(personalitySection, []);
+    renderSection(cognitiveSection, []);
+    renderSection(emotionalSection, []);
+    renderSection(behavioralSection, []);
+    renderSection(conversationSection, []);
     recommendationsEl.textContent = 'Analysis unavailable.';
   }
 }

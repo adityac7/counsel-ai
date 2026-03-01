@@ -14,6 +14,7 @@ PROFILE_PROMPT = (
     "produce a structured student profile. Be balanced, evidence-based, and avoid diagnosis. "
     "Quote the student when relevant. Return strict JSON only.\n\n"
     "Required JSON schema: {"
+    "summary: string, "
     "personality_snapshot: {traits: [...], communication_style: string, decision_making: string}, "
     "cognitive_profile: {critical_thinking: int, perspective_taking: int, moral_reasoning_stage: string, "
     "problem_solving_style: string}, "
@@ -21,8 +22,9 @@ PROFILE_PROMPT = (
     "anxiety_markers: [string], emotional_vocabulary: string}, "
     "behavioral_insights: {confidence: int, leadership_potential: string, peer_influence: string, "
     "academic_pressure: string, resilience: string}, "
-    "conversation_analysis: {evolution_across_rounds: string, consistency: string, "
-    "key_moments: [string]}, "
+    "conversation_analysis: {evolution_across_rounds: string, consistency: string}, "
+    "key_moments: [{quote: string, insight: string}], "
+    "reasoning: {critical_thinking: string, perspective_taking: string, eq_score: string, confidence: string}, "
     "red_flags: [string], "
     "recommendations: [string]"
     "}"
@@ -69,28 +71,36 @@ def generate_profile(session_data: Dict[str, Any]) -> Dict[str, Any]:
     except Exception as exc:  # noqa: BLE001
         return {
             "error": f"GPT-5.2 call failed: {type(exc).__name__}: {exc}",
+            "summary": "",
             "personality_snapshot": {},
             "cognitive_profile": {},
             "emotional_profile": {},
             "behavioral_insights": {},
             "conversation_analysis": {},
+            "key_moments": [],
+            "reasoning": {},
             "red_flags": [],
             "recommendations": [],
         }
 
 
-def _compare_profiles(primary: Dict[str, Any], secondary: Dict[str, Any]) -> List[str]:
-    discrepancies: List[str] = []
+def _compare_profiles(primary: Dict[str, Any], secondary: Dict[str, Any]) -> Dict[str, Any]:
+    diffs: List[Dict[str, Any]] = []
+    list_diffs: List[Dict[str, Any]] = []
 
     def compare_scalar(path: str, a: Any, b: Any) -> None:
         if a is None or b is None:
             return
         if isinstance(a, (int, float, str)) and isinstance(b, (int, float, str)) and a != b:
-            discrepancies.append(f"{path} differs: primary={a} secondary={b}")
+            diffs.append({"path": path, "primary": a, "secondary": b, "match": False})
+        elif isinstance(a, (int, float, str)) and isinstance(b, (int, float, str)):
+            diffs.append({"path": path, "primary": a, "secondary": b, "match": True})
 
     def compare_list(path: str, a: Any, b: Any) -> None:
         if isinstance(a, list) and isinstance(b, list) and len(a) != len(b):
-            discrepancies.append(f"{path} length differs: primary={len(a)} secondary={len(b)}")
+            list_diffs.append(
+                {"path": path, "primary_len": len(a), "secondary_len": len(b), "match": False}
+            )
 
     compare_scalar(
         "cognitive_profile.critical_thinking",
@@ -112,14 +122,17 @@ def _compare_profiles(primary: Dict[str, Any], secondary: Dict[str, Any]) -> Lis
         primary.get("behavioral_insights", {}).get("confidence"),
         secondary.get("behavioral_insights", {}).get("confidence"),
     )
-    compare_list(
-        "conversation_analysis.key_moments",
-        primary.get("conversation_analysis", {}).get("key_moments"),
-        secondary.get("conversation_analysis", {}).get("key_moments"),
-    )
+    compare_list("key_moments", primary.get("key_moments"), secondary.get("key_moments"))
     compare_list("red_flags", primary.get("red_flags"), secondary.get("red_flags"))
 
-    return discrepancies
+    return {
+        "scalar_diffs": diffs,
+        "list_diffs": list_diffs,
+        "summary": {
+            "scalar_mismatches": sum(1 for d in diffs if not d["match"]),
+            "list_mismatches": sum(1 for d in list_diffs if not d["match"]),
+        },
+    }
 
 
 def cross_validate(session_data: Dict[str, Any], primary_profile: Dict[str, Any]) -> Dict[str, Any]:
@@ -150,11 +163,11 @@ def cross_validate(session_data: Dict[str, Any], primary_profile: Dict[str, Any]
         discrepancies = _compare_profiles(primary_profile, secondary_profile)
         return {
             "secondary_profile": secondary_profile,
-            "discrepancies": discrepancies,
+            "comparison": discrepancies,
         }
     except Exception as exc:  # noqa: BLE001
         return {
             "error": f"MiniMax call failed: {type(exc).__name__}: {exc}",
             "secondary_profile": {},
-            "discrepancies": [],
+            "comparison": {"scalar_diffs": [], "list_diffs": [], "summary": {}},
         }
