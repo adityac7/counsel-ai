@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>CounselAI Live</title>
+    <style>
+        :root { --bg:#0a1628; --teal:#46d9d1; --blue:#2f7bf6; --text:#e6eefb; --muted:rgba(230,238,251,.65); --panel:rgba(7,12,24,.7); --accent:#7fe9e3; --danger:#ff6b6b; }
+        * { box-sizing:border-box; }
+        body { margin:0; font-family:"Manrope","Segoe UI",sans-serif; background:radial-gradient(circle at top,#1f335c 0%,#0a1628 35%,#1a2744 100%); color:var(--text); min-height:100vh; overflow:hidden; }
+        .screen { display:none; min-height:100vh; padding:32px; }
+        .screen.active { display:flex; flex-direction:column; }
+        .welcome { align-items:center; justify-content:center; text-align:center; gap:24px; }
+        .title { font-size:42px; margin:0; }
+        .subtitle { margin:0; color:var(--muted); }
+        .form-card { width:min(560px,90vw); background:var(--panel); border:1px solid rgba(127,233,227,.18); border-radius:20px; padding:24px; display:grid; gap:16px; }
+        label { display:block; font-size:14px; color:var(--muted); text-align:left; margin-bottom:6px; }
+        input,select { width:100%; padding:12px 14px; border-radius:12px; border:1px solid rgba(127,233,227,.2); background:rgba(11,17,33,.9); color:var(--text); font-size:15px; }
+        button { background:linear-gradient(120deg,var(--teal),var(--blue)); color:#041425; border:none; padding:14px 18px; font-size:16px; border-radius:14px; cursor:pointer; transition:transform .2s,box-shadow .2s; }
+        button:hover { transform:translateY(-2px); box-shadow:0 12px 30px rgba(70,217,209,.25); }
+        .session { position:relative; flex:1; }
+        .orb { width:220px; height:220px; border-radius:50%; margin:60px auto 0; background:radial-gradient(circle at 30% 30%,#9ef5f0,var(--teal) 40%,var(--blue) 80%); box-shadow:0 0 40px rgba(70,217,209,.4),0 0 120px rgba(47,123,246,.35); animation:idle 3s ease-in-out infinite; }
+        .orb.speaking { animation:speak .8s ease-in-out infinite; }
+        @keyframes idle { 0%,100%{transform:scale(.98);opacity:.85} 50%{transform:scale(1.02);opacity:1} }
+        @keyframes speak { 0%,100%{transform:scale(.96)} 50%{transform:scale(1.05)} }
+        .top-bar { display:flex; justify-content:space-between; align-items:center; margin-bottom:20px; }
+        .status { font-size:14px; color:var(--muted); background:rgba(13,19,35,.8); padding:8px 14px; border-radius:999px; border:1px solid rgba(127,233,227,.2); }
+        .timer { font-size:14px; letter-spacing:1px; }
+        .video-preview { position:absolute; top:24px; right:24px; width:120px; height:120px; border-radius:50%; border:2px solid rgba(127,233,227,.6); overflow:hidden; background:#0b1424; }
+        .video-preview video { width:100%; height:100%; object-fit:cover; }
+        .transcript { position:absolute; left:24px; right:24px; bottom:24px; background:rgba(10,16,32,.9); border-radius:18px; padding:16px; max-height:32vh; overflow-y:auto; border:1px solid rgba(127,233,227,.15); }
+        .transcript p { margin:0 0 10px; line-height:1.4; }
+        .transcript p span { color:var(--muted); font-weight:600; margin-right:8px; }
+        .end-button { background:linear-gradient(120deg,#ff8787,var(--danger)); color:#2b0b0b; }
+        .summary { gap:20px; overflow-y:auto; }
+        .summary-card { background:var(--panel); border-radius:18px; padding:20px; border:1px solid rgba(127,233,227,.2); max-width:900px; margin:0 auto; }
+        .toast { position:fixed; top:20px; left:50%; transform:translateX(-50%); background:rgba(255,107,107,.95); color:#2b0b0b; padding:12px 18px; border-radius:12px; display:none; z-index:999; }
+        @media(max-width:720px) { .screen{padding:20px} .title{font-size:32px} .video-preview{width:90px;height:90px;top:18px;right:18px} .orb{width:170px;height:170px} }
+    </style>
+</head>
+<body>
+    <div class="toast" id="toast"></div>
+    <section class="screen welcome active" id="screen-welcome">
+        <h1 class="title">🧠 CounselAI Live</h1>
+        <p class="subtitle">A calm, private counselling space for real-time voice sessions.</p>
+        <div class="form-card">
+            <div><label for="student-name">Student Name</label><input id="student-name" placeholder="Enter student name" /></div>
+            <div><label for="student-class">Class</label><input id="student-class" placeholder="Class 9-12" /></div>
+            <div><label for="case-study">Case Study</label><select id="case-study"></select></div>
+            <button id="start-session">Start Live Session</button>
+        </div>
+    </section>
+    <section class="screen session" id="screen-session">
+        <div class="top-bar">
+            <div class="status" id="status">Connecting...</div>
+            <div class="timer" id="timer">00:00</div>
+        </div>
+        <div class="video-preview"><video id="video" autoplay muted playsinline></video></div>
+        <div class="orb" id="orb"></div>
+        <div style="display:flex;justify-content:center;margin-top:24px">
+            <button class="end-button" id="end-session">End Session</button>
+        </div>
+        <div class="transcript" id="transcript"></div>
+    </section>
+    <section class="screen summary" id="screen-summary">
+        <div class="summary-card">
+            <h2>Session Summary</h2>
+            <p id="summary-meta"></p>
+            <div id="summary-profile"></div>
+            <h3>Full Transcript</h3>
+            <div id="summary-transcript"></div>
+            <div style="margin-top:20px"><button id="new-session">New Session</button></div>
+        </div>
+    </section>
+    <!-- Agent3 fix: persistent audio element in DOM so it doesn't get GC'd -->
+    <audio id="ai-audio" autoplay style="display:none"></audio>
+    <script>
+    let pc, dc, mediaStream, mediaRecorder, recordedChunks = [];
+    let timerInterval, startTime;
+    let transcriptEntries = [], currentAiText = "", currentAiNode = null;
+
+    const $ = id => document.getElementById(id);
+    const esc = t => { const d=document.createElement("div"); d.textContent=t; return d.innerHTML; }; // Agent3: XSS fix
+
+    function showScreen(n) { document.querySelectorAll(".screen").forEach(s=>s.classList.remove("active")); $("screen-"+n).classList.add("active"); }
+    function toast(m) { $("toast").textContent=m; $("toast").style.display="block"; setTimeout(()=>$("toast").style.display="none",5000); }
+    function setStatus(t) { $("status").textContent=t; }
+    function updateTimer() {
+        const s=Math.floor((Date.now()-startTime)/1000);
+        $("timer").textContent=`${String(Math.floor(s/60)).padStart(2,"0")}:${String(s%60).padStart(2,"0")}`;
+    }
+
+    function cleanup() {
+        if (dc) try{dc.close()}catch{}
+        if (pc) try{pc.close()}catch{}
+        if (timerInterval) clearInterval(timerInterval);
+        if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+        $("orb").classList.remove("speaking");
+    }
+
+    async function loadCaseStudies() {
+        const data = await (await fetch("/api/case-studies")).json();
+        const sel = $("case-study"); sel.innerHTML = "";
+        data.case_studies.forEach(cs => {
+            const o = document.createElement("option");
+            o.value = cs.id; o.textContent = `${cs.id} • ${cs.title} (${cs.target_class})`;
+            o.dataset.scenario = cs.scenario_text; sel.appendChild(o);
+        });
+    }
+
+    function addTranscript(role, text, isFinal) {
+        if (!text.trim()) return;
+        const label = role === "student" ? "Student" : "Counsellor";
+        const safe = esc(text); // Agent3: XSS safe
+        if (role === "counsellor" && !isFinal) {
+            if (!currentAiNode) { currentAiNode = document.createElement("p"); $("transcript").appendChild(currentAiNode); }
+            currentAiNode.innerHTML = `<span>${label}:</span> ${safe}`;
+        } else {
+            const p = currentAiNode || document.createElement("p");
+            p.innerHTML = `<span>${label}:</span> ${safe}`;
+            if (!currentAiNode) $("transcript").appendChild(p);
+            if (role === "counsellor") currentAiNode = null;
+        }
+        if (isFinal) transcriptEntries.push({ role, text });
+        $("transcript").scrollTop = $("transcript").scrollHeight;
+    }
+
+    function startRecording(stream) {
+        recordedChunks = [];
+        const mime = MediaRecorder.isTypeSupported("video/webm;codecs=vp8,opus") ? "video/webm;codecs=vp8,opus" : "video/webm";
+        mediaRecorder = new MediaRecorder(stream, {mimeType:mime});
+        mediaRecorder.ondataavailable = e => { if(e.data.size>0) recordedChunks.push(e.data); };
+        mediaRecorder.start(1000);
+    }
+    function stopRecording() {
+        return new Promise(resolve => {
+            if (!mediaRecorder || mediaRecorder.state==="inactive") return resolve(null);
+            mediaRecorder.onstop = () => resolve(new Blob(recordedChunks, {type:"video/webm"}));
+            mediaRecorder.stop();
+        });
+    }
+
+    async function startSession() {
+        const name = $("student-name").value.trim();
+        const cls = $("student-class").value.trim();
+        const sel = $("case-study").selectedOptions[0];
+        if (!name||!cls||!sel) { toast("Please fill in all fields."); return; }
+
+        showScreen("session");
+        setStatus("Connecting...");
+        $("transcript").innerHTML = "";
+        transcriptEntries = [];
+        currentAiText = ""; currentAiNode = null;
+        const scenario = sel.dataset.scenario || "";
+
+        try {
+            // Agent3 fix: camera optional, audio required
+            try {
+                mediaStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true});
+                $("video").srcObject = mediaStream;
+            } catch {
+                mediaStream = await navigator.mediaDevices.getUserMedia({audio:true});
+                $("video").parentElement.style.display = "none";
+            }
+            startRecording(mediaStream);
+
+            // Agent3 fix: add STUN servers for NAT traversal
+            pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
+
+            const audioTrack = mediaStream.getAudioTracks()[0];
+            if (audioTrack) pc.addTrack(audioTrack, mediaStream);
+
+            // Agent3 fix: audio element persisted in DOM
+            pc.ontrack = e => { $("ai-audio").srcObject = e.streams[0]; };
+
+            dc = pc.createDataChannel("oai-events");
+            dc.onopen = () => {
+                setStatus("Connected — Listening...");
+                startTime = Date.now();
+                timerInterval = setInterval(updateTimer, 1000);
+                // Instructions already sent via SDP session config
+                // Just ask AI to start speaking
+                dc.send(JSON.stringify({type:"response.create",response:{
+                    instructions:"Read the case study aloud to the student warmly and ask what they think."
+                }}));
+            };
+
+            dc.onmessage = e => {
+                let msg; try{msg=JSON.parse(e.data)}catch{return}
+                switch(msg.type) {
+                    case "response.audio_transcript.delta":
+                        currentAiText += msg.delta;
+                        addTranscript("counsellor", currentAiText, false);
+                        $("orb").classList.add("speaking");
+                        break;
+                    case "response.audio_transcript.done":
+                        addTranscript("counsellor", msg.transcript||currentAiText, true);
+                        currentAiText = ""; currentAiNode = null;
+                        break;
+                    case "response.done":
+                        $("orb").classList.remove("speaking");
+                        setStatus("Listening...");
+                        break;
+                    case "conversation.item.input_audio_transcription.completed":
+                        addTranscript("student", msg.transcript||"", true);
+                        break;
+                    case "input_audio_buffer.speech_started":
+                        setStatus("You're speaking..."); break;
+                    case "input_audio_buffer.speech_stopped":
+                        setStatus("Processing..."); break;
+                    case "error":
+                        console.error("RT error:", msg.error);
+                        toast(msg.error?.message||"Realtime API error");
+                        break;
+                }
+            };
+
+            const offer = await pc.createOffer();
+            await pc.setLocalDescription(offer);
+
+            const res = await fetch("/api/rtc-connect?scenario=" + encodeURIComponent(scenario), {
+                method:"POST", body:offer.sdp,
+                headers:{"Content-Type":"application/sdp"}
+            });
+            if (!res.ok) throw new Error(`Server ${res.status}: ${(await res.text()).slice(0,200)}`);
+            await pc.setRemoteDescription({type:"answer", sdp:await res.text()});
+
+        } catch (err) {
+            console.error("Start error:", err);
+            cleanup(); // Agent3 fix: cleanup on error
+            toast("Error: " + (err.message||"Could not start. Check mic permissions."));
+            showScreen("welcome");
+        }
+    }
+
+    async function endSession() {
+        setStatus("Ending...");
+        cleanup();
+        const videoBlob = await stopRecording();
+        if (videoBlob && videoBlob.size > 0) {
+            setStatus("Analyzing...");
+            const fd = new FormData();
+            fd.append("video", videoBlob, "session.webm");
+            fd.append("transcript", JSON.stringify(transcriptEntries));
+            fd.append("student_name", $("student-name").value);
+            fd.append("student_class", $("student-class").value);
+            try {
+                const data = await(await fetch("/api/analyze-session",{method:"POST",body:fd})).json();
+                if (data.profile) renderProfile(data.profile);
+            } catch(e) { console.error("Analysis:", e); }
+        }
+        showSummary();
+    }
+
+    function showSummary() {
+        $("summary-meta").textContent = `Session: ${$("student-name").value||"student"} • ${$("student-class").value||""}`;
+        const te=$("summary-transcript"); te.innerHTML="";
+        transcriptEntries.forEach(({role,text})=>{
+            const p=document.createElement("p");
+            p.innerHTML=`<span>${role==="student"?"Student":"Counsellor"}:</span> ${esc(text)}`;
+            te.appendChild(p);
+        });
+        showScreen("summary");
+    }
+
+    function renderProfile(profile) {
+        const el=$("summary-profile"), scores=profile.scores||profile.metrics||{};
+        let h='<h3 style="color:var(--teal)">Behavioral Profile</h3>';
+        if(Object.keys(scores).length){
+            h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:12px 0">';
+            for(const[k,v]of Object.entries(scores)) h+=`<div style="background:rgba(70,217,209,.1);padding:12px;border-radius:12px;text-align:center"><div style="font-size:24px;font-weight:700;color:var(--teal)">${esc(String(v))}</div><div style="font-size:12px;color:var(--muted)">${esc(k)}</div></div>`;
+            h+='</div>';
+        }
+        if(profile.summary) h+=`<p>${esc(profile.summary)}</p>`;
+        const recs=profile.recommendations||[];
+        if(recs.length){h+='<h4 style="color:var(--accent)">Recommendations</h4>';recs.forEach(r=>h+=`<p style="background:rgba(127,233,227,.1);padding:10px;border-radius:10px;margin:6px 0">${esc(r)}</p>`);}
+        el.innerHTML=h;
+    }
+
+    $("start-session").addEventListener("click", startSession);
+    $("end-session").addEventListener("click", endSession);
+    $("new-session").addEventListener("click", ()=>showScreen("welcome"));
+    loadCaseStudies().catch(()=>toast("Could not load case studies."));
+    </script>
+</body>
+</html>

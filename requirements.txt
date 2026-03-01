@@ -1,0 +1,13 @@
+streamlit>=1.33.0
+streamlit-webrtc>=0.47.0
+openai>=1.0.0
+deepface>=0.0.89
+librosa>=0.10.0
+parselmouth>=0.4.3
+pydub>=0.25.1
+numpy>=1.24.0
+opencv-python-headless>=4.8.0
+plotly>=5.18.0
+fpdf2>=2.7.0
+python-dotenv>=1.0.0
+av>=11.0.0

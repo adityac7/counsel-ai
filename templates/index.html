@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CounselAI</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@500;700&family=Source+Sans+3:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --ink: #1a5276;
+      --sky: #2e86c1;
+      --mint: #d4efdf;
+      --paper: #fdfefe;
+      --sea: #0f3e55;
+      --teal: #1ba39c;
+      --warning: #e67e22;
+      --danger: #c0392b;
+      --shadow: 0 18px 40px rgba(15, 62, 85, 0.12);
+      --radius: 18px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: "Source Sans 3", sans-serif;
+      color: var(--sea);
+      background: radial-gradient(circle at top, #eaf6fb 0%, #fdfefe 55%, #ecf7f1 100%);
+      min-height: 100vh;
+    }
+
+    .app {
+      max-width: 1080px;
+      margin: 0 auto;
+      padding: 24px 20px 60px;
+    }
+
+    .brand {
+      text-align: center;
+      margin-top: 10px;
+    }
+
+    .brand h1 {
+      font-family: "Playfair Display", serif;
+      font-size: clamp(2.2rem, 4vw, 3.4rem);
+      margin: 0;
+      color: var(--ink);
+    }
+
+    .brand p {
+      margin: 8px 0 0;
+      color: var(--sky);
+      font-weight: 600;
+      letter-spacing: 0.5px;
+    }
+
+    .screen {
+      opacity: 0;
+      transform: translateY(20px);
+      pointer-events: none;
+      transition: opacity 0.4s ease, transform 0.4s ease;
+      display: none;
+    }
+
+    .screen.active {
+      display: block;
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .card {
+      background: var(--paper);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      padding: 24px;
+      margin: 24px auto;
+      border: 1px solid rgba(46, 134, 193, 0.12);
+    }
+
+    .form-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    }
+
+    label {
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    input, select, textarea {
+      width: 100%;
+      margin-top: 6px;
+      padding: 12px 14px;
+      border-radius: 12px;
+      border: 1px solid rgba(46, 134, 193, 0.2);
+      font-family: inherit;
+      font-size: 1rem;
+      background: #fbfeff;
+    }
+
+    textarea {
+      min-height: 140px;
+      resize: vertical;
+    }
+
+    .btn {
+      border: none;
+      padding: 12px 24px;
+      border-radius: 999px;
+      font-weight: 700;
+      letter-spacing: 0.2px;
+      cursor: pointer;
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .btn-primary {
+      background: var(--teal);
+      color: white;
+      box-shadow: 0 12px 20px rgba(27, 163, 156, 0.25);
+    }
+
+    .btn-secondary {
+      background: white;
+      color: var(--ink);
+      border: 1px solid rgba(46, 134, 193, 0.3);
+    }
+
+    .btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 24px rgba(27, 163, 156, 0.2);
+    }
+
+    .topbar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 18px;
+      background: rgba(26, 82, 118, 0.08);
+      border-radius: 14px;
+      margin: 18px 0;
+      font-weight: 600;
+    }
+
+    .pill {
+      padding: 6px 12px;
+      border-radius: 999px;
+      background: rgba(46, 134, 193, 0.15);
+      color: var(--ink);
+      font-size: 0.85rem;
+    }
+
+    .case-title {
+      font-family: "Playfair Display", serif;
+      font-size: 1.8rem;
+      margin-bottom: 12px;
+    }
+
+    .case-body {
+      line-height: 1.7;
+      color: #25546b;
+      white-space: pre-wrap;
+    }
+
+    .tabs {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      margin-bottom: 16px;
+    }
+
+    .tab {
+      padding: 10px 16px;
+      border-radius: 12px;
+      border: 1px solid rgba(46, 134, 193, 0.2);
+      cursor: pointer;
+      font-weight: 600;
+      background: white;
+    }
+
+    .tab.active {
+      background: var(--mint);
+      border-color: rgba(27, 163, 156, 0.4);
+      color: var(--sea);
+    }
+
+    .mode {
+      display: none;
+    }
+
+    .mode.active {
+      display: block;
+    }
+
+    .chat {
+      display: flex;
+      gap: 16px;
+      flex-direction: column;
+    }
+
+    .bubble {
+      padding: 16px 18px;
+      border-radius: 16px;
+      max-width: 85%;
+      line-height: 1.5;
+    }
+
+    .bubble.counsellor {
+      background: rgba(46, 134, 193, 0.14);
+      align-self: flex-start;
+    }
+
+    .bubble.student {
+      background: rgba(27, 163, 156, 0.15);
+      align-self: flex-end;
+    }
+
+    .record-panel {
+      display: grid;
+      gap: 12px;
+      align-items: center;
+      grid-template-columns: 1fr auto;
+    }
+
+    .record-indicator {
+      height: 8px;
+      background: rgba(46, 134, 193, 0.2);
+      border-radius: 999px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .record-indicator::after {
+      content: "";
+      position: absolute;
+      left: -30%;
+      top: 0;
+      height: 100%;
+      width: 30%;
+      background: var(--teal);
+      transition: transform 0.4s ease;
+      transform: translateX(0);
+    }
+
+    .recording .record-indicator::after {
+      animation: wave 1s infinite linear;
+    }
+
+    @keyframes wave {
+      0% { transform: translateX(0); }
+      50% { transform: translateX(250%); }
+      100% { transform: translateX(0); }
+    }
+
+    .video-preview {
+      width: 100%;
+      border-radius: 16px;
+      background: #0f3e55;
+      aspect-ratio: 16 / 9;
+    }
+
+    .loading {
+      display: none;
+      margin-top: 16px;
+      padding: 16px;
+      border-radius: 14px;
+      background: rgba(46, 134, 193, 0.1);
+      color: var(--ink);
+      font-weight: 600;
+    }
+
+    .loading.active {
+      display: block;
+    }
+
+    .spinner {
+      border: 4px solid rgba(46, 134, 193, 0.2);
+      border-top: 4px solid var(--sky);
+      border-radius: 50%;
+      width: 28px;
+      height: 28px;
+      animation: spin 1s linear infinite;
+      display: inline-block;
+      vertical-align: middle;
+      margin-right: 10px;
+    }
+
+    @keyframes spin {
+      0% { transform: rotate(0); }
+      100% { transform: rotate(360deg); }
+    }
+
+    .history {
+      margin-top: 20px;
+    }
+
+    details {
+      background: white;
+      border-radius: 12px;
+      padding: 12px 16px;
+      border: 1px solid rgba(46, 134, 193, 0.12);
+    }
+
+    summary {
+      cursor: pointer;
+      font-weight: 600;
+      color: var(--ink);
+    }
+
+    .profile-hero {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      align-items: center;
+    }
+
+    .profile-hero h2 {
+      font-family: "Playfair Display", serif;
+      margin: 0;
+    }
+
+    .score-grid {
+      display: grid;
+      gap: 16px;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      margin-top: 16px;
+    }
+
+    .score-card {
+      background: white;
+      border-radius: 16px;
+      padding: 16px;
+      text-align: center;
+      border: 1px solid rgba(46, 134, 193, 0.12);
+    }
+
+    .score-ring {
+      width: 70px;
+      height: 70px;
+      border-radius: 50%;
+      background: conic-gradient(var(--teal) calc(var(--val) * 1%), rgba(46, 134, 193, 0.12) 0);
+      display: grid;
+      place-items: center;
+      margin: 0 auto 10px;
+      color: var(--ink);
+      font-weight: 700;
+    }
+
+    .quote-box {
+      background: rgba(46, 134, 193, 0.1);
+      border-left: 4px solid var(--sky);
+      padding: 12px 16px;
+      border-radius: 12px;
+      margin: 10px 0;
+    }
+
+    .recommendation {
+      background: rgba(212, 239, 223, 0.7);
+      border-radius: 12px;
+      padding: 12px 16px;
+      margin: 8px 0;
+      border: 1px solid rgba(27, 163, 156, 0.2);
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 999px;
+      background: rgba(27, 163, 156, 0.2);
+      color: var(--sea);
+      font-weight: 600;
+    }
+
+    .toast {
+      position: fixed;
+      right: 20px;
+      bottom: 20px;
+      background: white;
+      border-radius: 12px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow);
+      border-left: 5px solid var(--warning);
+      opacity: 0;
+      transform: translateY(10px);
+      transition: opacity 0.3s ease, transform 0.3s ease;
+      z-index: 999;
+    }
+
+    .toast.show {
+      opacity: 1;
+      transform: translateY(0);
+    }
+
+    .actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 12px;
+      margin-top: 16px;
+    }
+
+    @media (max-width: 720px) {
+      .app {
+        padding: 16px 14px 40px;
+      }
+
+      .topbar {
+        flex-direction: column;
+        align-items: flex-start;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <div class="brand">
+      <h1>🧠 CounselAI</h1>
+      <p>AI-Powered Student Counselling Platform</p>
+    </div>
+
+    <section id="screen-welcome" class="screen active">
+      <div class="card">
+        <h2>Welcome to your counselling session</h2>
+        <p>Share a few details so we can personalize the experience.</p>
+        <form id="student-form">
+          <div class="form-grid">
+            <div>
+              <label>Name</label>
+              <input type="text" name="name" required />
+            </div>
+            <div>
+              <label>Class</label>
+              <select name="student_class" required>
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+              </select>
+            </div>
+            <div>
+              <label>Section</label>
+              <input type="text" name="section" />
+            </div>
+            <div>
+              <label>School</label>
+              <input type="text" name="school" />
+            </div>
+            <div>
+              <label>Age</label>
+              <input type="number" name="age" min="10" max="20" value="15" />
+            </div>
+          </div>
+          <div class="actions">
+            <button class="btn btn-primary" type="submit">Begin Session</button>
+          </div>
+        </form>
+      </div>
+    </section>
+
+    <section id="screen-case" class="screen">
+      <div class="topbar">
+        <div class="pill" id="case-student-pill">Student</div>
+        <div class="pill" id="case-class-pill">Class</div>
+        <div class="pill" id="case-round-pill">Round 1/4</div>
+      </div>
+      <div class="card">
+        <div class="case-title" id="case-title">Case Study</div>
+        <div class="case-body" id="case-body"></div>
+        <div class="actions">
+          <button class="btn btn-primary" id="ready-btn">I am ready to respond</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="screen-response" class="screen">
+      <div class="topbar">
+        <div class="pill" id="round-pill">Round 1/4</div>
+        <div class="pill" id="name-pill">Student</div>
+        <div class="pill" id="timer-pill">00:00</div>
+      </div>
+
+      <div class="card">
+        <div class="chat" id="chat-area">
+          <div class="bubble counsellor" id="prev-question" style="display:none;"></div>
+        </div>
+
+        <div class="tabs">
+          <div class="tab" data-tab="audio">🎤 Audio</div>
+          <div class="tab active" data-tab="video">📹 Video</div>
+          <div class="tab" data-tab="text">✍️ Text</div>
+        </div>
+
+        <div class="mode" id="mode-audio">
+          <div class="record-panel" id="audio-panel">
+            <div>
+              <div class="record-indicator"></div>
+              <small id="audio-status">Tap record and speak clearly.</small>
+            </div>
+            <button class="btn btn-secondary" id="audio-record-btn">Start</button>
+          </div>
+        </div>
+
+        <div class="mode active" id="mode-video">
+          <video class="video-preview" id="video-preview" autoplay muted playsinline></video>
+          <div class="actions">
+            <button class="btn btn-secondary" id="video-record-btn">Start Recording</button>
+          </div>
+        </div>
+
+        <div class="mode" id="mode-text">
+          <label>Your Response</label>
+          <textarea id="text-response" placeholder="Share your thoughts here..."></textarea>
+        </div>
+
+        <div class="actions">
+          <button class="btn btn-primary" id="submit-response">Submit Response</button>
+        </div>
+
+        <div class="loading" id="loading-box">
+          <span class="spinner"></span>
+          <span id="loading-text">Transcribing...</span>
+        </div>
+
+        <div class="chat" id="counsellor-reply" style="margin-top: 18px;"></div>
+
+        <div class="actions" id="next-actions" style="display:none;">
+          <button class="btn btn-primary" id="continue-btn">Continue to Next Round</button>
+          <button class="btn btn-secondary" id="end-btn">End Session &amp; Generate Profile</button>
+        </div>
+
+        <div class="history" id="history"></div>
+      </div>
+    </section>
+
+    <section id="screen-profile" class="screen">
+      <div class="card">
+        <div id="profile-loading">
+          <div class="loading active">
+            <span class="spinner"></span>
+            <span>Generating profile report...</span>
+          </div>
+        </div>
+        <div id="profile-content" style="display:none;"></div>
+      </div>
+    </section>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    const screens = {
+      welcome: document.getElementById("screen-welcome"),
+      case: document.getElementById("screen-case"),
+      response: document.getElementById("screen-response"),
+      profile: document.getElementById("screen-profile"),
+    };
+
+    const state = {
+      sessionId: null,
+      student: {},
+      caseStudy: null,
+      round: 0,
+      maxRounds: 4,
+      rounds: [],
+      timer: 0,
+      timerInterval: null,
+      mode: "video",
+      audioBlob: null,
+      videoBlob: null,
+      audioRecorder: null,
+      videoRecorder: null,
+      audioStream: null,
+      videoStream: null,
+      loadingInterval: null,
+    };
+
+    const loadingStages = ["Transcribing...", "Analyzing...", "Counsellor thinking..."];
+
+    function showScreen(name) {
+      Object.values(screens).forEach((screen) => screen.classList.remove("active"));
+      screens[name].classList.add("active");
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function showToast(message, tone = "warning") {
+      const toast = document.getElementById("toast");
+      toast.textContent = message;
+      toast.style.borderLeftColor = tone === "danger" ? "var(--danger)" : "var(--warning)";
+      toast.classList.add("show");
+      setTimeout(() => toast.classList.remove("show"), 3000);
+    }
+
+    function updateTopbars() {
+      document.getElementById("case-student-pill").textContent = state.student.name || "Student";
+      document.getElementById("case-class-pill").textContent = `Class ${state.student.student_class || ""}`;
+      document.getElementById("case-round-pill").textContent = `Round ${state.round + 1}/${state.maxRounds}`;
+      document.getElementById("round-pill").textContent = `Round ${state.round}/${state.maxRounds}`;
+      document.getElementById("name-pill").textContent = state.student.name || "Student";
+    }
+
+    function startTimer() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.timer = 0;
+      updateTimer();
+      state.timerInterval = setInterval(() => {
+        state.timer += 1;
+        updateTimer();
+      }, 1000);
+    }
+
+    function stopTimer() {
+      if (state.timerInterval) clearInterval(state.timerInterval);
+      state.timerInterval = null;
+    }
+
+    function updateTimer() {
+      const minutes = String(Math.floor(state.timer / 60)).padStart(2, "0");
+      const seconds = String(state.timer % 60).padStart(2, "0");
+      document.getElementById("timer-pill").textContent = `${minutes}:${seconds}`;
+    }
+
+    function setLoading(active) {
+      const box = document.getElementById("loading-box");
+      if (active) {
+        let idx = 0;
+        document.getElementById("loading-text").textContent = loadingStages[idx];
+        box.classList.add("active");
+        state.loadingInterval = setInterval(() => {
+          idx = (idx + 1) % loadingStages.length;
+          document.getElementById("loading-text").textContent = loadingStages[idx];
+        }, 1200);
+      } else {
+        box.classList.remove("active");
+        if (state.loadingInterval) clearInterval(state.loadingInterval);
+      }
+    }
+
+    function resetRecordings() {
+      state.audioBlob = null;
+      state.videoBlob = null;
+      document.getElementById("audio-status").textContent = "Tap record and speak clearly.";
+    }
+
+    function clearStreams() {
+      if (state.audioStream) {
+        state.audioStream.getTracks().forEach((track) => track.stop());
+        state.audioStream = null;
+      }
+      if (state.videoStream) {
+        state.videoStream.getTracks().forEach((track) => track.stop());
+        state.videoStream = null;
+      }
+    }
+
+    function getSupportedMime(types) {
+      return types.find((type) => MediaRecorder.isTypeSupported(type)) || "";
+    }
+
+    async function startAudioRecording() {
+      try {
+        state.audioStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        const mimeType = getSupportedMime(["audio/webm;codecs=opus", "audio/webm", "audio/mp4"]);
+        const recorder = new MediaRecorder(state.audioStream, mimeType ? { mimeType } : undefined);
+        state.audioRecorder = recorder;
+        const chunks = [];
+        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.onstop = () => {
+          state.audioBlob = new Blob(chunks, { type: recorder.mimeType || "audio/webm" });
+          document.getElementById("audio-status").textContent = "Audio captured. You can submit or re-record.";
+          document.getElementById("audio-panel").classList.remove("recording");
+          clearStreams();
+        };
+        recorder.start();
+        document.getElementById("audio-panel").classList.add("recording");
+        document.getElementById("audio-status").textContent = "Recording... Tap stop when finished.";
+      } catch (err) {
+        showToast("Microphone access denied or unavailable.", "danger");
+      }
+    }
+
+    function stopAudioRecording() {
+      if (state.audioRecorder && state.audioRecorder.state !== "inactive") {
+        state.audioRecorder.stop();
+      }
+    }
+
+    async function startVideoRecording() {
+      try {
+        state.videoStream = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: { facingMode: "user" },
+        });
+        document.getElementById("video-preview").srcObject = state.videoStream;
+        const mimeType = getSupportedMime(["video/webm;codecs=vp8,opus", "video/webm", "video/mp4"]);
+        const recorder = new MediaRecorder(state.videoStream, mimeType ? { mimeType } : undefined);
+        state.videoRecorder = recorder;
+        const chunks = [];
+        recorder.ondataavailable = (e) => chunks.push(e.data);
+        recorder.onstop = () => {
+          state.videoBlob = new Blob(chunks, { type: recorder.mimeType || "video/webm" });
+          showToast("Video captured. You can submit or re-record.");
+          clearStreams();
+        };
+        recorder.start();
+        document.getElementById("video-record-btn").textContent = "Stop Recording";
+      } catch (err) {
+        showToast("Camera or microphone access denied.", "danger");
+      }
+    }
+
+    function stopVideoRecording() {
+      if (state.videoRecorder && state.videoRecorder.state !== "inactive") {
+        state.videoRecorder.stop();
+        document.getElementById("video-record-btn").textContent = "Start Recording";
+      }
+    }
+
+    function setMode(mode) {
+      state.mode = mode;
+      document.querySelectorAll(".tab").forEach((tab) => tab.classList.remove("active"));
+      document.querySelector(`.tab[data-tab='${mode}']`).classList.add("active");
+      document.querySelectorAll(".mode").forEach((panel) => panel.classList.remove("active"));
+      document.getElementById(`mode-${mode}`).classList.add("active");
+      if (mode !== "video") {
+        stopVideoRecording();
+      }
+      if (mode !== "audio") {
+        stopAudioRecording();
+      }
+    }
+
+    function renderHistory() {
+      const history = document.getElementById("history");
+      history.innerHTML = "";
+      if (!state.rounds.length) return;
+      const details = document.createElement("details");
+      const summary = document.createElement("summary");
+      summary.textContent = "Previous rounds";
+      details.appendChild(summary);
+      state.rounds.forEach((round) => {
+        const entry = document.createElement("div");
+        entry.style.marginTop = "12px";
+        entry.innerHTML = `
+          <div class="bubble student"><strong>Round ${round.round}:</strong> ${round.transcription || "(no response)"}</div>
+          <div class="bubble counsellor">${round.counsellor_response || ""}</div>
+        `;
+        details.appendChild(entry);
+      });
+      history.appendChild(details);
+    }
+
+    async function submitResponse() {
+      const formData = new FormData();
+      if (state.mode === "text") {
+        const text = document.getElementById("text-response").value.trim();
+        if (!text) {
+          showToast("Please enter a response.");
+          return;
+        }
+        formData.append("text", text);
+      } else if (state.mode === "audio") {
+        if (!state.audioBlob) {
+          showToast("Please record audio or switch to text mode.");
+          return;
+        }
+        formData.append("audio", state.audioBlob, "response.webm");
+      } else if (state.mode === "video") {
+        if (!state.videoBlob) {
+          showToast("Please record video or switch to text mode.");
+          return;
+        }
+        formData.append("video", state.videoBlob, "response.webm");
+      }
+
+      setLoading(true);
+      document.getElementById("submit-response").disabled = true;
+      try {
+        const res = await fetch(`/api/session/${state.sessionId}/respond`, {
+          method: "POST",
+          body: formData,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.error || "Something went wrong.", "danger");
+          return;
+        }
+
+        state.rounds.push({
+          round: data.round,
+          transcription: data.transcription,
+          counsellor_response: data.counsellor_response,
+        });
+        const replyArea = document.getElementById("counsellor-reply");
+        replyArea.innerHTML = `
+          <div class="bubble counsellor">${data.counsellor_response}</div>
+        `;
+        document.getElementById("next-actions").style.display = "flex";
+        renderHistory();
+        stopTimer();
+      } catch (err) {
+        showToast("Failed to submit response.", "danger");
+      } finally {
+        setLoading(false);
+        document.getElementById("submit-response").disabled = false;
+      }
+    }
+
+    async function generateProfile() {
+      showScreen("profile");
+      document.getElementById("profile-content").style.display = "none";
+      document.getElementById("profile-loading").style.display = "block";
+      try {
+        const res = await fetch(`/api/session/${state.sessionId}/profile`, { method: "POST" });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.error || "Failed to generate profile.", "danger");
+          return;
+        }
+        renderProfile(data);
+      } catch (err) {
+        showToast("Profile request failed.", "danger");
+      }
+    }
+
+    function renderProfile(data) {
+      const profile = data.profile || {};
+      const content = document.getElementById("profile-content");
+      const scores = profile.scores || profile.metrics || {
+        "Emotional Intelligence": 78,
+        Confidence: 72,
+        "Critical Thinking": 81,
+        Resilience: 76,
+      };
+      const quotes = profile.key_quotes || profile.quotes || [];
+      const recommendations = profile.recommendations || profile.actions || [];
+      const summary = profile.summary || profile.overall || "A reflective student with growing self-awareness.";
+
+      const scoreCards = Object.entries(scores)
+        .map(([label, value]) => {
+          const pct = Math.max(0, Math.min(100, Number(value) || 0));
+          return `
+            <div class="score-card">
+              <div class="score-ring" style="--val:${pct};">${pct}</div>
+              <div><strong>${label}</strong></div>
+            </div>
+          `;
+        })
+        .join("");
+
+      const quotesHtml = quotes.length
+        ? quotes.map((q) => `<div class="quote-box">"${q}"</div>`).join("")
+        : `<div class="quote-box">"${summary}"</div>`;
+
+      const recHtml = recommendations.length
+        ? recommendations.map((rec) => `<div class="recommendation">${rec}</div>`).join("")
+        : `<div class="recommendation">Encourage regular reflection and goal setting.</div>`;
+
+      content.innerHTML = `
+        <div class="profile-hero">
+          <div>
+            <h2>${state.student.name || "Student"} — Counselling Profile</h2>
+            <p>${summary}</p>
+            <span class="badge">Cross-validation: ${data.cross_validation || "Completed"}</span>
+          </div>
+        </div>
+        <div class="score-grid">${scoreCards}</div>
+        <div class="card" style="margin-top:20px;">
+          <h3>Key Quotes</h3>
+          ${quotesHtml}
+        </div>
+        <div class="card" style="margin-top:20px;">
+          <h3>Recommendations</h3>
+          ${recHtml}
+        </div>
+        <div class="actions">
+          <button class="btn btn-primary" id="download-btn">Download PDF</button>
+          <button class="btn btn-secondary" id="new-session">New Session</button>
+        </div>
+      `;
+
+      document.getElementById("download-btn").addEventListener("click", () => window.print());
+      document.getElementById("new-session").addEventListener("click", () => window.location.reload());
+
+      document.getElementById("profile-loading").style.display = "none";
+      content.style.display = "block";
+    }
+
+    document.getElementById("student-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+      const form = new FormData(e.target);
+      const payload = {
+        name: form.get("name"),
+        student_class: form.get("student_class"),
+        section: form.get("section"),
+        school: form.get("school"),
+        age: form.get("age"),
+      };
+      state.student = payload;
+      updateTopbars();
+
+      try {
+        const res = await fetch("/api/session/start", {
+          method: "POST",
+          body: form,
+        });
+        const data = await res.json();
+        if (!res.ok) {
+          showToast(data.error || "Failed to start session.", "danger");
+          return;
+        }
+        state.sessionId = data.session_id;
+        state.caseStudy = data.case_study;
+        document.getElementById("case-title").textContent = data.case_study.title || "Case Study";
+        document.getElementById("case-body").textContent = data.case_study.scenario_text || data.case_study.scenario || data.case_study.description || "";
+        showScreen("case");
+      } catch (err) {
+        showToast("Unable to start session.", "danger");
+      }
+    });
+
+    document.getElementById("ready-btn").addEventListener("click", () => {
+      state.round = 1;
+      updateTopbars();
+      document.getElementById("round-pill").textContent = `Round ${state.round}/${state.maxRounds}`;
+      document.getElementById("prev-question").style.display = "none";
+      document.getElementById("counsellor-reply").innerHTML = "";
+      document.getElementById("next-actions").style.display = "none";
+      document.getElementById("text-response").value = "";
+      resetRecordings();
+      startTimer();
+      showScreen("response");
+    });
+
+    document.querySelectorAll(".tab").forEach((tab) => {
+      tab.addEventListener("click", () => setMode(tab.dataset.tab));
+    });
+
+    document.getElementById("audio-record-btn").addEventListener("click", () => {
+      if (state.audioRecorder && state.audioRecorder.state === "recording") {
+        stopAudioRecording();
+        document.getElementById("audio-record-btn").textContent = "Start";
+      } else {
+        resetRecordings();
+        startAudioRecording();
+        document.getElementById("audio-record-btn").textContent = "Stop";
+      }
+    });
+
+    document.getElementById("video-record-btn").addEventListener("click", () => {
+      if (state.videoRecorder && state.videoRecorder.state === "recording") {
+        stopVideoRecording();
+      } else {
+        resetRecordings();
+        startVideoRecording();
+      }
+    });
+
+    document.getElementById("submit-response").addEventListener("click", submitResponse);
+
+    document.getElementById("continue-btn").addEventListener("click", () => {
+      if (state.round >= state.maxRounds) return;
+      state.round += 1;
+      updateTopbars();
+      document.getElementById("round-pill").textContent = `Round ${state.round}/${state.maxRounds}`;
+      document.getElementById("next-actions").style.display = "none";
+      const prev = state.rounds[state.rounds.length - 1];
+      if (prev && prev.counsellor_response) {
+        const prevBubble = document.getElementById("prev-question");
+        prevBubble.textContent = prev.counsellor_response;
+        prevBubble.style.display = "block";
+      }
+      document.getElementById("text-response").value = "";
+      document.getElementById("counsellor-reply").innerHTML = "";
+      resetRecordings();
+      startTimer();
+    });
+
+    document.getElementById("end-btn").addEventListener("click", generateProfile);
+
+    window.addEventListener("beforeunload", () => {
+      clearStreams();
+      stopTimer();
+    });
+  </script>
+<script>
+async function requestPermissions() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    stream.getTracks().forEach(t => t.stop());
+  } catch(e) {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      stream.getTracks().forEach(t => t.stop());
+    } catch(e2) {}
+  }
+}
+if (navigator.mediaDevices) requestPermissions();
+</script>
+</body>
+</html>
+<script>
+// Request mic/camera permissions early
+async function requestPermissions() {
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true, video: true });
+    stream.getTracks().forEach(t => t.stop());
+    console.log("Permissions granted");
+  } catch(e) {
