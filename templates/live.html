@@ -23,14 +23,15 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
 .status{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.95rem}
 .status .dot{width:10px;height:10px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px rgba(70,217,209,.6)}
 .timer{font-variant-numeric:tabular-nums;color:var(--text)}
-.live-grid{display:grid;gap:18px;grid-template-columns:3fr 2fr;grid-template-rows:auto auto;grid-template-areas:"left right" "bottom bottom"}
+.live-grid{display:grid;gap:18px;grid-template-columns:3fr 2fr;grid-template-rows:auto 1fr auto auto;grid-template-areas:"left right" "transcript right" "orb-area orb-area" "bottom bottom"}
 .left{grid-area:left}
 .right{grid-area:right}
 .bottom{grid-area:bottom}
-.preview{width:220px;height:220px;border-radius:50%;overflow:hidden;border:2px solid rgba(70,217,209,.7);box-shadow:0 12px 30px rgba(0,0,0,.4);background:#081424;margin:8px auto 16px}
+.orb-area{grid-area:orb-area;display:flex;justify-content:center}
+.preview{width:240px;height:180px;border-radius:16px;overflow:hidden;border:2px solid rgba(70,217,209,.7);box-shadow:0 12px 30px rgba(0,0,0,.4);background:#081424;margin:8px auto 16px}
 .preview video{width:100%;height:100%;object-fit:cover}
 .orb-wrap{display:flex;align-items:center;justify-content:center;padding:18px 0 10px}
-.orb{width:170px;height:170px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7fffe9 0%,#3dc5c0 35%,#2461b8 75%);box-shadow:var(--glow);animation:orbFloat 4s ease-in-out infinite}
+.orb{width:120px;height:120px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7fffe9 0%,#3dc5c0 35%,#2461b8 75%);box-shadow:var(--glow);animation:orbFloat 4s ease-in-out infinite}
 .orb.speaking{animation:orbPulse 1.1s ease-in-out infinite;box-shadow:0 0 40px rgba(70,217,209,.9)}
 @keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
 @keyframes orbPulse{0%{transform:scale(1)}50%{transform:scale(1.08)}100%{transform:scale(1)}}
@@ -79,7 +80,6 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
     <div class="live-grid">
       <div class="left">
         <div class="preview" id="preview-wrap"><video id="preview" autoplay muted playsinline></video></div>
-        <div class="orb-wrap"><div id="orb" class="orb"></div></div>
       </div>
       <div class="right">
         <div class="case-card">
@@ -87,6 +87,7 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
           <div id="case-study-text" class="case-text">Select a case study to view the full text.</div>
         </div>
       </div>
+      <div class="orb-area"><div class="orb-wrap"><div id="orb" class="orb"></div></div></div>
       <div class="bottom">
         <div class="transcript" id="transcript"></div>
         <div style="margin-top:14px;display:flex;justify-content:flex-end;gap:12px;">
@@ -398,17 +399,38 @@ async function endSession(){
   document.getElementById('summary-transcript').textContent = transcriptEl.textContent.trim();
   showScreen('summary');
 
+  // Show loading state
+  [personalitySection, cognitiveSection, emotionalSection, behavioralSection, conversationSection].forEach(el => el.textContent = 'Analyzing...');
+  recommendationsEl.textContent = 'Generating recommendations...';
+  profileMetrics.textContent = 'Computing scores...';
+
+  console.log('[CounselAI] transcriptData at upload:', JSON.stringify(transcriptData));
+  console.log('[CounselAI] transcriptData length:', transcriptData.length);
+
   try{
     const fd = new FormData();
     const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
     fd.append('video', safeBlob, 'session.webm');
-    fd.append('transcript', JSON.stringify(transcriptData));
+    // Fallback: build transcript from DOM if array is empty
+    let finalTranscript = transcriptData;
+    if (!finalTranscript.length) {
+      console.log('[CounselAI] transcriptData empty, building from DOM');
+      finalTranscript = [];
+      transcriptEl.querySelectorAll('.entry').forEach(el => {
+        const role = el.classList.contains('ai') ? 'counsellor' : 'student';
+        const text = el.querySelector('div:last-child')?.textContent || '';
+        if (text.trim()) finalTranscript.push({role, text});
+      });
+      console.log('[CounselAI] DOM transcript:', finalTranscript.length, 'entries');
+    }
+    fd.append('transcript', JSON.stringify(finalTranscript));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
     const resp = await fetch('/api/analyze-session', {method:'POST', body: fd});
     if (resp.ok) {
       const data = await resp.json();
       const profile = data.profile || {};
+      console.log('[CounselAI] profile received:', JSON.stringify(profile).slice(0, 500));
       buildMetrics(profile);
       renderProfileSections(profile);
       renderRecommendations(profile);
@@ -420,7 +442,7 @@ async function endSession(){
       renderSection(conversationSection, []);
       recommendationsEl.textContent = 'Analysis unavailable.';
     }
-  }catch{
+  }catch(err){ console.error('[CounselAI] Analysis error:', err);
     renderSection(personalitySection, []);
     renderSection(cognitiveSection, []);
     renderSection(emotionalSection, []);

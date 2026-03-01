@@ -96,6 +96,10 @@ async def analyze_session(
         "face_data": face_data,
         "voice_data": voice_data,
     }
+    print(f"[analyze] transcript entries: {len(transcript_data)}, names: {student_name}/{student_class}")
+    print(f"[analyze] rounds: {len(session_data["rounds"])}")
+    if session_data["rounds"]:
+        print(f"[analyze] first round: {session_data["rounds"][0]}")
     try:
         import profile_generator
         profile = profile_generator.generate_profile(session_data)
