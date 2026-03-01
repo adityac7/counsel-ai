@@ -1,10 +1,8 @@
 import os
+import subprocess
 from typing import List
 
-import cv2
-import numpy as np
 from fpdf import FPDF
-from pydub import AudioSegment
 
 
 def extract_audio_from_video(video_path: str) -> str:
@@ -14,40 +12,40 @@ def extract_audio_from_video(video_path: str) -> str:
 
     audio_path = os.path.splitext(video_path)[0] + ".wav"
     try:
-        video_audio = AudioSegment.from_file(video_path)
-        video_audio.export(audio_path, format="wav")
-    except Exception:
-        # Best-effort fallback; return original if extraction fails
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", video_path, "-vn", "-acodec", "pcm_s16le",
+             "-ar", "16000", "-ac", "1", audio_path],
+            capture_output=True, check=True,
+        )
+    except FileNotFoundError:
+        print("[utils] Warning: ffmpeg not found, returning original path")
+        return video_path
+    except subprocess.CalledProcessError as exc:
+        print(f"[utils] Warning: ffmpeg failed ({exc}), returning original path")
         return video_path
     return audio_path
 
 
 def save_frames_from_video(video_path: str, output_dir: str, interval: int = 2) -> List[str]:
-    """Save frames from a video at a fixed interval (in seconds)."""
+    """Save frames from a video at a fixed interval (in seconds) using ffmpeg."""
     os.makedirs(output_dir, exist_ok=True)
-    cap = cv2.VideoCapture(video_path)
-    if not cap.isOpened():
+    try:
+        subprocess.run(
+            ["ffmpeg", "-y", "-i", video_path, "-vf", f"fps=1/{interval}",
+             "-q:v", "2", f"{output_dir}/frame_%04d.jpg"],
+            capture_output=True, check=True,
+        )
+    except FileNotFoundError:
+        print("[utils] Warning: ffmpeg not found for frame extraction")
         return []
-
-    fps = cap.get(cv2.CAP_PROP_FPS) or 25
-    frame_interval = int(fps * interval)
-    frame_paths = []
-    frame_idx = 0
-    saved_idx = 0
-
-    while True:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        if frame_idx % frame_interval == 0:
-            frame_path = os.path.join(output_dir, f"frame_{saved_idx:04d}.jpg")
-            cv2.imwrite(frame_path, frame)
-            frame_paths.append(frame_path)
-            saved_idx += 1
-        frame_idx += 1
-
-    cap.release()
-    return frame_paths
+    except subprocess.CalledProcessError as exc:
+        print(f"[utils] Warning: ffmpeg frame extraction failed ({exc})")
+        return []
+    return sorted(
+        os.path.join(output_dir, f)
+        for f in os.listdir(output_dir)
+        if f.lower().endswith(".jpg")
+    )
 
 
 def format_duration(seconds: int) -> str:

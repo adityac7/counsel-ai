@@ -52,7 +52,7 @@ def generate_profile(session_data: Dict[str, Any]) -> Dict[str, Any]:
     if not api_key:
         raise EnvironmentError("OPENAI_API_KEY is not set")
 
-    client = OpenAI(api_key=api_key)
+    client = OpenAI(api_key=api_key, timeout=60)
     user_prompt = f"Session data: {session_data}"
 
     try:
@@ -63,7 +63,7 @@ def generate_profile(session_data: Dict[str, Any]) -> Dict[str, Any]:
                 {"role": "user", "content": user_prompt},
             ],
             temperature=0.4,
-            max_completion_tokens=1200,
+            max_completion_tokens=2500,
         )
         raw = response.choices[0].message.content.strip()
         profile = _safe_json_loads(raw)

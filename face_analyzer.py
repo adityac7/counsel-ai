@@ -10,7 +10,7 @@ import numpy as np
 from deepface import DeepFace
 
 
-BLUR_THRESHOLD = 100.0
+BLUR_THRESHOLD = 25.0
 FRAME_INTERVAL_SECONDS = 2
 
 
@@ -41,6 +41,22 @@ def _normalize_confidence(value: float) -> float:
     if value > 1.0:
         return value / 100.0
     return float(max(0.0, min(1.0, value)))
+
+
+def _neutral_defaults() -> Dict[str, Any]:
+    """Return neutral face analysis when no frames are usable."""
+    return {
+        "emotion_timeline": [],
+        "summary": {
+            "dominant_emotion": "neutral",
+            "emotion_distribution": {"neutral": 100.0},
+            "micro_expressions": [],
+            "eye_contact_score": 0.5,
+            "facial_tension_score": 0.0,
+            "smile_count": 0,
+            "emotion_stability": 1.0,
+        },
+    }
 
 
 def analyze_single_frame(frame_path: str) -> Dict[str, Any]:
@@ -102,6 +118,7 @@ def analyze_frames(frames_dir: str) -> Dict[str, Any]:
     facial_tension_scores: List[float] = []
     smile_count = 0
     previous_happy = False
+    blurry_frames: List[tuple] = []
 
     for idx, filename in enumerate(frame_files):
         frame_path = os.path.join(frames_dir, filename)
@@ -111,8 +128,11 @@ def analyze_frames(frames_dir: str) -> Dict[str, Any]:
                 print(f"[face_analyzer] Warning: unreadable frame {filename}")
                 continue
 
-            if _is_blurry(image):
-                print(f"[face_analyzer] Warning: blurry frame {filename}")
+            gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
+            variance = cv2.Laplacian(gray, cv2.CV_64F).var()
+            if variance < BLUR_THRESHOLD:
+                print(f"[face_analyzer] Warning: blurry frame {filename} (var={variance:.1f})")
+                blurry_frames.append((filename, variance))
                 continue
 
             analysis = DeepFace.analyze(
@@ -177,8 +197,45 @@ def analyze_frames(frames_dir: str) -> Dict[str, Any]:
             continue
 
     if not timeline:
-        print("[face_analyzer] Error: no usable frames after analysis")
-        return {}
+        if not blurry_frames:
+            print("[face_analyzer] Error: no usable frames after analysis")
+            return _neutral_defaults()
+        # Fallback: use top 3 least-blurry frames
+        blurry_frames.sort(key=lambda x: x[1], reverse=True)
+        fallback_files = [f for f, _ in blurry_frames[:3]]
+        print(f"[face_analyzer] All frames blurry, retrying top {len(fallback_files)} by sharpness")
+        for fb_idx, fb_filename in enumerate(fallback_files):
+            fb_path = os.path.join(frames_dir, fb_filename)
+            try:
+                analysis = DeepFace.analyze(
+                    img_path=fb_path,
+                    actions=["emotion"],
+                    enforce_detection=False,
+                    detector_backend="opencv",
+                )
+                if isinstance(analysis, list):
+                    analysis = analysis[0] if analysis else {}
+                if not analysis or "emotion" not in analysis:
+                    continue
+                emotions = analysis.get("emotion", {})
+                dominant_emotion = analysis.get("dominant_emotion", "unknown")
+                confidence = _normalize_confidence(float(emotions.get(dominant_emotion, 0.0)))
+                timestamp = _frame_timestamp(fb_filename, fb_idx)
+                timeline.append({
+                    "timestamp": timestamp,
+                    "dominant_emotion": dominant_emotion,
+                    "emotions": emotions,
+                    "confidence": confidence,
+                })
+                dominant_emotions.append(dominant_emotion)
+                for emotion, value in emotions.items():
+                    emotions_sum[emotion] = emotions_sum.get(emotion, 0.0) + float(value)
+            except Exception as exc:
+                print(f"[face_analyzer] Warning: fallback failed on {fb_filename} ({exc})")
+                continue
+        if not timeline:
+            print("[face_analyzer] Error: fallback also produced no results")
+            return _neutral_defaults()
 
     emotion_distribution = {
         emotion: value / max(1, len(timeline)) for emotion, value in emotions_sum.items()

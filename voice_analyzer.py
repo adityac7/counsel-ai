@@ -1,4 +1,4 @@
-"""Voice prosody analysis using librosa and parselmouth."""
+"""Voice prosody analysis using librosa."""
 from __future__ import annotations
 
 import math
@@ -8,13 +8,6 @@ from typing import Any, Dict, List, Optional
 
 import librosa
 import numpy as np
-
-try:
-    import parselmouth
-    HAS_PARSELMOUTH = True
-except ImportError:
-    parselmouth = None
-    HAS_PARSELMOUTH = False
 
 def detect_pauses(audio_path: str, min_duration: float = 0.5) -> List[Dict[str, float]]:
     """Detect pauses in audio based on silence intervals."""
@@ -91,27 +84,25 @@ def _filler_word_stats(transcript: Optional[str], duration: float) -> Dict[str, 
     return {"count": count, "per_minute": float(per_minute), "detected": detected}
 
 
-def _pitch_metrics(sound: parselmouth.Sound) -> Dict[str, Any]:
-    pitch = sound.to_pitch()
-    f0 = pitch.selected_array["frequency"]
-    f0 = f0[f0 > 0]
-    if f0.size == 0:
+def _pitch_metrics(y: np.ndarray, sr: int) -> Dict[str, Any]:
+    f0, voiced_flag, voiced_probs = librosa.pyin(y, fmin=75, fmax=500, sr=sr)
+    f0_valid = f0[~np.isnan(f0)] if f0 is not None else np.array([])
+    if f0_valid.size == 0:
         return {"mean_hz": 0.0, "range_hz": [0.0, 0.0], "variation": 0.0, "spikes": []}
 
-    mean_hz = float(np.mean(f0))
-    min_hz = float(np.min(f0))
-    max_hz = float(np.max(f0))
-    std_hz = float(np.std(f0))
+    mean_hz = float(np.mean(f0_valid))
+    min_hz = float(np.min(f0_valid))
+    max_hz = float(np.max(f0_valid))
+    std_hz = float(np.std(f0_valid))
     variation = std_hz / mean_hz if mean_hz > 0 else 0.0
 
     spikes = []
     threshold = mean_hz + 2 * std_hz
-    frame_count = pitch.get_number_of_frames()
-    for i in range(frame_count):
-        hz = pitch.get_value_in_frame(i + 1)
-        if hz and hz > threshold:
-            time = pitch.xs(i + 1)
-            spikes.append({"timestamp": float(time), "hz": float(hz), "context": "emotional_moment"})
+    hop_length = 512
+    for i, hz in enumerate(f0):
+        if not np.isnan(hz) and hz > threshold:
+            time = float(i * hop_length / sr)
+            spikes.append({"timestamp": time, "hz": float(hz), "context": "emotional_moment"})
 
     return {
         "mean_hz": mean_hz,
@@ -148,34 +139,12 @@ def _volume_metrics(y: np.ndarray, sr: int) -> Dict[str, Any]:
     return {"mean_db": mean_db, "pattern": pattern, "drops": drops}
 
 
-def _voice_quality(sound: parselmouth.Sound) -> Dict[str, float]:
-    try:
-        point_process = parselmouth.praat.call(
-            sound, "To PointProcess (periodic, cc)", 75, 500
-        )
-        jitter = parselmouth.praat.call(
-            point_process, "Get jitter (local)", 0, 0, 0.0001, 0.02, 1.3
-        )
-        shimmer = parselmouth.praat.call(
-            [sound, point_process], "Get shimmer (local)", 0, 0, 0.0001, 0.02, 1.3, 1.6
-        )
-        harmonicity = parselmouth.praat.call(
-            sound, "To Harmonicity (cc)", 0.01, 75, 0.1, 1.0
-        )
-        hnr = parselmouth.praat.call(harmonicity, "Get mean", 0, 0)
-    except Exception:
-        jitter = 0.0
-        shimmer = 0.0
-        hnr = 20.0
-
-    tremor_score = float(min(1.0, jitter * 10.0 + shimmer * 2.0))
-    breathiness = float(min(1.0, max(0.0, (20.0 - hnr) / 20.0)))
-    steadiness_score = float(max(0.0, 1.0 - tremor_score))
-
+def _voice_quality() -> Dict[str, float]:
+    """Return neutral voice quality defaults (parselmouth not available)."""
     return {
-        "tremor_score": tremor_score,
-        "breathiness": breathiness,
-        "steadiness_score": steadiness_score,
+        "tremor_score": 0.0,
+        "breathiness": 0.0,
+        "steadiness_score": 1.0,
     }
 
 
@@ -222,13 +191,12 @@ def analyze_audio(audio_path: str, transcript: Optional[str] = None) -> Dict[str
     filler_words = _filler_word_stats(transcript, duration)
 
     try:
-        sound = parselmouth.Sound(audio_path) if HAS_PARSELMOUTH else None
-        pitch_metrics = _pitch_metrics(sound)
-        voice_quality = _voice_quality(sound)
+        pitch_metrics = _pitch_metrics(y, sr)
     except Exception as exc:
-        print(f"[voice_analyzer] Warning: parselmouth failure ({exc})")
+        print(f"[voice_analyzer] Warning: pitch analysis failure ({exc})")
         pitch_metrics = {"mean_hz": 0.0, "range_hz": [0.0, 0.0], "variation": 0.0, "spikes": []}
-        voice_quality = {"tremor_score": 0.0, "breathiness": 0.0, "steadiness_score": 0.0}
+
+    voice_quality = _voice_quality()
 
     volume_metrics = _volume_metrics(y, sr)
 

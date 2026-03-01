@@ -2,6 +2,7 @@
 import json
 import os
 import tempfile
+import traceback
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
@@ -27,7 +28,9 @@ COUNSELLOR_INSTRUCTIONS = (
 )
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
-    return templates.TemplateResponse("live.html", {"request": request})
+    response = templates.TemplateResponse("live.html", {"request": request})
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
 @app.get("/api/case-studies")
 async def get_case_studies():
     return JSONResponse({"case_studies": CASE_STUDIES})
@@ -69,6 +72,12 @@ async def analyze_session(
         transcript_data = json.loads(transcript)
     except (json.JSONDecodeError, TypeError):
         transcript_data = []
+    try:
+        with open("/tmp/counselai_last_transcript.json", "w") as f:
+            json.dump(transcript_data, f, indent=2)
+        print("[analyze] saved transcript to /tmp/counselai_last_transcript.json")
+    except Exception as exc:
+        print(f"[analyze] failed to save transcript: {exc}")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
     tmp.write(await video.read())
     tmp.close()
@@ -81,6 +90,7 @@ async def analyze_session(
         face_data = face_analyzer.analyze_frames(frames_dir)
     except Exception as exc:
         print(f"Face analysis skipped: {exc}")
+        traceback.print_exc()
     try:
         import utils
         import voice_analyzer
@@ -89,6 +99,7 @@ async def analyze_session(
             voice_data = voice_analyzer.analyze_audio(audio_path)
     except Exception as exc:
         print(f"Voice analysis skipped: {exc}")
+        traceback.print_exc()
     print(f"[analyze] transcript entries received: {len(transcript_data)}")
     if transcript_data:
         print(f"[analyze] first transcript entry: {transcript_data[0]}")
@@ -107,6 +118,8 @@ async def analyze_session(
         print(f"[analyze] profile keys: {list(profile.keys())}")
         return JSONResponse({"profile": profile})
     except Exception as exc:
+        print(f"Profile generation failed: {exc}")
+        traceback.print_exc()
         return JSONResponse({"profile": {"summary": f"Analysis error: {exc}"}})
     finally:
         os.unlink(tmp.name)

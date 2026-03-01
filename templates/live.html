@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>CounselAI Live</title>
 <style>
 :root{--bg:#0a1628;--panel:#0f1f35;--panel-2:#0c1a30;--teal:#46d9d1;--blue:#2f7bf6;--text:#e6f2ff;--muted:#9bb3d3;--danger:#ff7b7b;--glow:0 0 30px rgba(70,217,209,.45)}
@@ -137,6 +138,18 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
       <div id="recommendations" class="meta" style="margin-top:8px;"></div>
     </div>
     <div class="card" style="padding:16px;margin-top:16px;">
+      <strong style="color:#e8c547;">Key moments</strong>
+      <div class="meta" id="key-moments-section" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong style="color:#e74c3c;">Red flags</strong>
+      <div class="meta" id="red-flags-section" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>Summary</strong>
+      <div class="meta" id="summary-text" style="margin-top:8px;"></div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
       <strong>Full transcript</strong>
       <div class="meta" id="summary-transcript" style="margin-top:8px;white-space:pre-wrap;"></div>
     </div>
@@ -170,24 +183,11 @@ let timerStart, timerHandle, currentAiEntry = null;
 let transcriptEntries = [];
 let sessionMeta = null;
 
-
-function debugLog(msg) {
-  const el = document.getElementById('debug-log');
-  if (el) {
-    const line = document.createElement('div');
-    line.textContent = new Date().toISOString().substr(11,8) + ' ' + msg;
-    el.appendChild(line);
-    el.scrollTop = el.scrollHeight;
-  }
-  console.log('[DBG]', msg);
-}
-
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){statusText.textContent = text;}
 function showToast(msg){toast.textContent = msg;toast.style.display='block';setTimeout(()=>toast.style.display='none',4000);}
 function formatTime(ms){const s=Math.floor(ms/1000);const m=String(Math.floor(s/60)).padStart(2,'0');const r=String(s%60).padStart(2,'0');return `${m}:${r}`;}
 function addEntry(role,text){
-  debugLog('addEntry: ' + role + ' = ' + (text||'').substring(0,40));
   const entry=document.createElement('div');
   entry.className=`entry ${role}`;
   entry.dataset.role = role;
@@ -236,15 +236,9 @@ async function startSession(){
 
   pc.ontrack = e => {aiAudio.srcObject = e.streams[0];aiAudio.play().catch(()=>{});};
 
-  
-  pc.oniceconnectionstatechange = () => debugLog('ICE state: ' + pc.iceConnectionState);
-  pc.onconnectionstatechange = () => debugLog('PC state: ' + pc.connectionState);
-  pc.ondatachannel = (e) => debugLog('Remote data channel: ' + e.channel.label);
   dataChannel = pc.createDataChannel('oai-events');
-  debugLog('Data channel created: oai-events');
-  dataChannel.onmessage = function(e) { debugLog('DC msg: ' + e.data.substring(0, 80)); handleEventMessage(e); };
+  dataChannel.onmessage = function(e) { handleEventMessage(e); };
   dataChannel.onopen = () => {
-    debugLog('DATA CHANNEL OPENED!');
     const sessionUpdate = {type:'session.update',session:{turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},input_audio_transcription:{model:'whisper-1'}}};
     dataChannel.send(JSON.stringify(sessionUpdate));
     console.log('[CounselAI] session.update sent:', JSON.stringify(sessionUpdate.session));
@@ -295,9 +289,6 @@ function handleEventMessage(ev){
       orb.classList.remove('speaking');
       setStatus('Listening...');
       break;
-    case 'conversation.item.input_audio_transcription.completed':
-      addEntry('student', msg.transcript || '');
-      break;
     case 'input_audio_buffer.speech_started':
       setStatus('Listening...');
       break;
@@ -312,7 +303,6 @@ function handleEventMessage(ev){
       break;
     case 'conversation.item.input_audio_transcription.completed':
       if (msg.transcript) addEntry('student', msg.transcript);
-      debugLog('STUDENT transcription: ' + (msg.transcript||'').substring(0,60));
       break;
     case 'conversation.item.done':
       // Fallback: extract student audio transcription from conversation item
@@ -320,13 +310,12 @@ function handleEventMessage(ev){
         for (const part of msg.item.content) {
           if (part.type === 'input_audio' && part.transcript) {
             addEntry('student', part.transcript);
-            debugLog('STUDENT from item.done: ' + part.transcript.substring(0,60));
           }
         }
       }
       break;
     case 'error':
-      debugLog('ERROR: ' + JSON.stringify(msg.error || msg).substring(0, 120));
+      console.warn('[CounselAI] Event error:', msg.error || msg);
       break;
     default:
       break;
@@ -343,29 +332,30 @@ function waitForIce(pc){
 
 function buildMetrics(profile){
   profileMetrics.innerHTML = '';
-  const metrics = [];
-  const pick = (label, value) => { if (value === undefined || value === null || value === '') return; metrics.push({label,value}); };
-  pick('Critical Thinking', profile?.cognitive_profile?.critical_thinking);
-  pick('Perspective Taking', profile?.cognitive_profile?.perspective_taking);
-  pick('EQ Score', profile?.emotional_profile?.eq_score);
-  pick('Confidence', profile?.behavioral_insights?.confidence);
-  if (metrics.length === 0) {
-    const fallback = document.createElement('div');
-    fallback.className = 'meta';
-    fallback.textContent = 'No numeric scores available.';
-    profileMetrics.appendChild(fallback);
-    return;
-  }
+  const metrics = [
+    {label:'Critical Thinking', value: profile?.cognitive_profile?.critical_thinking},
+    {label:'Perspective Taking', value: profile?.cognitive_profile?.perspective_taking},
+    {label:'EQ Score', value: profile?.emotional_profile?.eq_score},
+    {label:'Confidence', value: profile?.behavioral_insights?.confidence},
+  ].filter(m => m.value != null);
+  if (!metrics.length) {profileMetrics.textContent = 'No scores available.'; return;}
   metrics.forEach(m=>{
-    const card=document.createElement('div');
-    card.className='metric';
-    const label=document.createElement('div');
-    label.className='label';
+    const card = document.createElement('div');
+    card.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
+    const label=document.createElement('span');
     label.textContent=m.label;
-    const value=document.createElement('div');
-    value.className='value';
-    value.textContent=m.value;
-    card.append(label,value);
+    const bar=document.createElement('div');
+    bar.style.cssText='display:flex;align-items:center;gap:8px;';
+    const track=document.createElement('div');
+    track.style.cssText='width:100px;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;';
+    const fill=document.createElement('div');
+    const pct = Math.min(100, (m.value/10)*100);
+    fill.style.cssText='height:100%;border-radius:4px;background:'+( pct>=70?'#2ecc71':pct>=40?'#f1c40f':'#e74c3c')+';width:'+pct+'%;';
+    track.appendChild(fill);
+    const num=document.createElement('strong');
+    num.textContent=m.value+'/10';
+    bar.append(track,num);
+    card.append(label,bar);
     profileMetrics.appendChild(card);
   });
 }
@@ -433,6 +423,36 @@ function renderProfileSections(profile){
     keyMoments.length ? `Key moments: ${keyMoments.join(' | ')}` : '',
   ].filter(Boolean);
   renderSection(conversationSection, conversationItems);
+
+  // Key moments
+  const keyMomentsEl = document.getElementById('key-moments-section');
+  const moments = Array.isArray(profile?.key_moments) ? profile.key_moments : [];
+  if (moments.length) {
+    keyMomentsEl.innerHTML = '';
+    moments.forEach(m => {
+      const d = document.createElement('div');
+      d.style.cssText = 'margin-bottom:12px;padding:10px;border-left:3px solid #e8c547;background:rgba(232,197,71,0.08);border-radius:4px;';
+      d.innerHTML = '<div style="font-style:italic;margin-bottom:4px;">"' + (m.quote||'').replace(/</g,'&lt;') + '"</div><div style="color:#aaa;font-size:0.9em;">' + (m.insight||'').replace(/</g,'&lt;') + '</div>';
+      keyMomentsEl.appendChild(d);
+    });
+  } else { keyMomentsEl.textContent = 'No key moments identified.'; }
+
+  // Red flags
+  const redFlagsEl = document.getElementById('red-flags-section');
+  const flags = Array.isArray(profile?.red_flags) ? profile.red_flags : [];
+  if (flags.length) {
+    redFlagsEl.innerHTML = '';
+    flags.forEach(f => {
+      const d = document.createElement('div');
+      d.style.cssText = 'margin-bottom:6px;padding:6px 10px;background:rgba(231,76,60,0.1);border-radius:4px;';
+      d.textContent = '⚠ ' + f;
+      redFlagsEl.appendChild(d);
+    });
+  } else { redFlagsEl.textContent = 'No red flags identified.'; }
+
+  // Summary text
+  const summaryTextEl = document.getElementById('summary-text');
+  summaryTextEl.textContent = profile?.summary || 'No summary available.';
 }
 
 async function endSession(){
@@ -479,7 +499,6 @@ async function endSession(){
     const transcriptJson = JSON.stringify(finalTranscript);
     console.log('[CounselAI] transcript JSON length:', transcriptJson.length);
     console.log('[CounselAI] transcript entries:', finalTranscript.length);
-    debugLog('UPLOAD: ' + finalTranscript.length + ' entries, JSON len=' + transcriptJson.length);
     fd.append('transcript', JSON.stringify(finalTranscript));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
@@ -530,6 +549,5 @@ document.getElementById('new-btn').addEventListener('click', ()=>{location.reloa
   }catch(e){showToast('Failed to load case studies');}
 })();
 </script>
-<div id="debug-log" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:rgba(0,0,0,.9);color:#0f0;font-family:monospace;font-size:11px;overflow-y:auto;padding:4px 8px;z-index:9999;display:block"></div>
 </body>
 </html>
