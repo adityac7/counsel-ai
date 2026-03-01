@@ -170,11 +170,24 @@ let timerStart, timerHandle, currentAiEntry = null;
 let transcriptEntries = [];
 let sessionMeta = null;
 
+
+function debugLog(msg) {
+  const el = document.getElementById('debug-log');
+  if (el) {
+    const line = document.createElement('div');
+    line.textContent = new Date().toISOString().substr(11,8) + ' ' + msg;
+    el.appendChild(line);
+    el.scrollTop = el.scrollHeight;
+  }
+  console.log('[DBG]', msg);
+}
+
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){statusText.textContent = text;}
 function showToast(msg){toast.textContent = msg;toast.style.display='block';setTimeout(()=>toast.style.display='none',4000);}
 function formatTime(ms){const s=Math.floor(ms/1000);const m=String(Math.floor(s/60)).padStart(2,'0');const r=String(s%60).padStart(2,'0');return `${m}:${r}`;}
 function addEntry(role,text){
+  debugLog('addEntry: ' + role + ' = ' + (text||'').substring(0,40));
   const entry=document.createElement('div');
   entry.className=`entry ${role}`;
   entry.dataset.role = role;
@@ -223,9 +236,15 @@ async function startSession(){
 
   pc.ontrack = e => {aiAudio.srcObject = e.streams[0];aiAudio.play().catch(()=>{});};
 
+  
+  pc.oniceconnectionstatechange = () => debugLog('ICE state: ' + pc.iceConnectionState);
+  pc.onconnectionstatechange = () => debugLog('PC state: ' + pc.connectionState);
+  pc.ondatachannel = (e) => debugLog('Remote data channel: ' + e.channel.label);
   dataChannel = pc.createDataChannel('oai-events');
-  dataChannel.onmessage = handleEventMessage;
+  debugLog('Data channel created: oai-events');
+  dataChannel.onmessage = function(e) { debugLog('DC msg: ' + e.data.substring(0, 80)); handleEventMessage(e); };
   dataChannel.onopen = () => {
+    debugLog('DATA CHANNEL OPENED!');
     const sessionUpdate = {type:'session.update',session:{turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},input_audio_transcription:{model:'whisper-1'}}};
     dataChannel.send(JSON.stringify(sessionUpdate));
     console.log('[CounselAI] session.update sent:', JSON.stringify(sessionUpdate.session));
@@ -252,7 +271,7 @@ async function startSession(){
 function handleEventMessage(ev){
   let msg;try{msg=JSON.parse(ev.data);}catch{return;}
   switch(msg.type){
-    case 'response.audio_transcript.delta':
+    case 'response.output_audio_transcript.delta':
       orb.classList.add('speaking');
       if (!currentAiEntry) {
         const created = addEntry('ai','');
@@ -263,7 +282,7 @@ function handleEventMessage(ev){
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
       setStatus('Speaking...');
       break;
-    case 'response.audio_transcript.done':
+    case 'response.output_audio_transcript.done':
       if (currentAiEntry) {
         currentAiEntry.body.textContent = msg.transcript || currentAiEntry.body.textContent;
         currentAiEntry.data.text = currentAiEntry.body.textContent;
@@ -291,8 +310,25 @@ function handleEventMessage(ev){
     case 'session.updated':
       console.log('[CounselAI] Session config accepted:', JSON.stringify(msg.session || {}));
       break;
+    case 'conversation.item.input_audio_transcription.completed':
+      if (msg.transcript) addEntry('student', msg.transcript);
+      debugLog('STUDENT transcription: ' + (msg.transcript||'').substring(0,60));
+      break;
+    case 'conversation.item.done':
+      // Fallback: extract student audio transcription from conversation item
+      if (msg.item && msg.item.role === 'user' && msg.item.content) {
+        for (const part of msg.item.content) {
+          if (part.type === 'input_audio' && part.transcript) {
+            addEntry('student', part.transcript);
+            debugLog('STUDENT from item.done: ' + part.transcript.substring(0,60));
+          }
+        }
+      }
+      break;
     case 'error':
-      showToast(msg.message || 'An error occurred.');
+      debugLog('ERROR: ' + JSON.stringify(msg.error || msg).substring(0, 120));
+      break;
+    default:
       break;
   }
 }
@@ -443,6 +479,7 @@ async function endSession(){
     const transcriptJson = JSON.stringify(finalTranscript);
     console.log('[CounselAI] transcript JSON length:', transcriptJson.length);
     console.log('[CounselAI] transcript entries:', finalTranscript.length);
+    debugLog('UPLOAD: ' + finalTranscript.length + ' entries, JSON len=' + transcriptJson.length);
     fd.append('transcript', JSON.stringify(finalTranscript));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
@@ -493,5 +530,6 @@ document.getElementById('new-btn').addEventListener('click', ()=>{location.reloa
   }catch(e){showToast('Failed to load case studies');}
 })();
 </script>
+<div id="debug-log" style="position:fixed;bottom:0;left:0;right:0;height:80px;background:rgba(0,0,0,.9);color:#0f0;font-family:monospace;font-size:11px;overflow-y:auto;padding:4px 8px;z-index:9999;display:block"></div>
 </body>
 </html>
