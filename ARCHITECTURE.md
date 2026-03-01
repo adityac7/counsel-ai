@@ -49,3 +49,31 @@ Audio comes via WebRTC media track (not data channel).
 6. `pc.setRemoteDescription({type:"answer", sdp: responseSdp})`
 7. Audio element MUST be in DOM (not a variable), call `.play()` on ontrack
 8. Accept both 200 and 201 as success from server
+
+## Live Session UX Flow
+
+### Layout (2-column on desktop, stacked on mobile)
+LEFT (60%): Video preview circle + glowing orb + status + timer
+RIGHT (40%): Case study question card (always visible for reference)
+BOTTOM (full width): Live transcript + End Session button
+
+### AI Counsellor Behavior
+1. AI reads the case study scenario aloud to the student
+2. AI asks: "What do you think about this? What would you do?"
+3. Student responds via voice
+4. AI listens, then asks probing WHY questions:
+   - "Why do you feel that way?"
+   - "What if [scenario twist]?"
+   - "You mentioned [X], can you tell me more?"
+5. AI keeps original case study context throughout
+6. After 3-4 exchanges, AI summarizes observations
+7. Turn detection: server_vad with 500ms silence threshold
+
+### Post-Session Analysis Pipeline
+1. Stop MediaRecorder → get video blob
+2. Upload to /api/analyze-session (multipart: video + transcript JSON)
+3. Server: extract frames (ffmpeg) → DeepFace face analysis
+4. Server: extract audio (ffmpeg) → librosa voice analysis  
+5. Server: transcript + face + voice → GPT-5.2 profile generation
+6. Server: MiniMax cross-validation
+7. Return structured profile (scores, summary, recommendations)
