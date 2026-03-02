@@ -128,6 +128,17 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
     </div>
   </section>
 
+  <section id="event-log-panel" class="card" style="margin-top:16px;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h3 style="margin:0;">🔍 Event Log</h3>
+      <div>
+        <button onclick="document.getElementById('event-log').textContent=''" style="background:#1a2a44;border:1px solid rgba(70,217,209,.3);color:#9bb3d3;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.8rem;">Clear</button>
+        <button onclick="navigator.clipboard.writeText(document.getElementById('event-log').textContent)" style="background:#1a2a44;border:1px solid rgba(70,217,209,.3);color:#9bb3d3;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.8rem;margin-left:4px;">Copy All</button>
+      </div>
+    </div>
+    <pre id="event-log" style="max-height:400px;overflow:auto;background:#080f1e;border:1px solid rgba(47,123,246,.25);border-radius:10px;padding:12px;font-size:.78rem;line-height:1.5;color:#8fa8c8;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+  </section>
+
   <section id="summary" class="card hidden">
     <h2>Session summary</h2>
     <div class="grid two">
@@ -275,7 +286,7 @@ function addStudentTranscript(text, source){
     return false;
   }
   if (clean === lastStudentTranscript) {
-    console.log('[CounselAI] Duplicate student transcript observed; keeping capture active.');
+    uiLog('WARN', 'Duplicate student transcript observed; keeping capture active.');
   }
   lastStudentTranscript = clean;
   addEntry('student', clean);
@@ -317,7 +328,7 @@ function captureUserTranscriptFromMessage(msg, contextType){
     captured = didCapture || captured;
   }
   if (!captured) {
-    console.log('[CounselAI] No non-empty student transcript text found for event:', contextType);
+    uiLog('WARN', 'No student transcript text found for event:', contextType);
   }
 }
 function addEntry(role,text){
@@ -450,11 +461,11 @@ async function startSession(){
 
   function bindDataChannel(dc){
     dataChannel = dc;
-    console.log('[CounselAI] Data channel active:', dc.label);
+    uiLog('OK', 'Data channel active:', dc.label);
     updateDebugSnapshot();
     dc.onmessage = function(e) { handleEventMessage(e); };
     dc.onopen = () => {
-      console.log('[CounselAI] data channel open:', dc.label);
+      uiLog('OK', 'Data channel OPEN:', dc.label);
       const sessionUpdate = {
         type:'session.update',
         session:{
@@ -467,11 +478,11 @@ async function startSession(){
         }
       };
       dc.send(JSON.stringify(sessionUpdate));
-      console.log('[CounselAI] session.update sent:', JSON.stringify(sessionUpdate.session));
+      uiLog('OK', 'session.update SENT:', JSON.stringify(sessionUpdate.session));
       setTimeout(()=>{
         const instructions = `Warmly greet ${name} by name, read the case study aloud, then ask: "Iss situation mein tum kya karte? Tell me what comes to your mind first." Case study: ${scenario}`;
         dc.send(JSON.stringify({type:'response.create',response:{instructions}}));
-        console.log('[CounselAI] response.create sent');
+        uiLog('OK', 'response.create sent');
       },300);
       updateDebugSnapshot();
     };
@@ -564,9 +575,9 @@ function handleEventMessage(ev){
       console.log(`[CounselAI] Full ${msg.type} payload:\n${pretty}`);
       const accepted = msg?.session?.input_audio_transcription || msg?.session?.audio?.input?.transcription;
       if (accepted) {
-        console.log('[CounselAI] transcription config accepted:', JSON.stringify(accepted));
+        uiLog('OK', '✅ TRANSCRIPTION ACCEPTED:', JSON.stringify(accepted));
       } else {
-        console.warn('[CounselAI] transcription NOT in accepted session config! Full session:', JSON.stringify(msg?.session || msg).slice(0, 800));
+        uiLog('ERR', '❌ TRANSCRIPTION NOT IN SESSION! Keys:', Object.keys(msg?.session || {}).join(', '), 'Full:', JSON.stringify(msg?.session || msg).slice(0, 600));
       }
       break;
     }
