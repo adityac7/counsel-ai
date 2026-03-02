@@ -562,11 +562,11 @@ function handleEventMessage(ev){
         pretty = `[unstringifiable session event: ${err}]`;
       }
       console.log(`[CounselAI] Full ${msg.type} payload:\n${pretty}`);
-      const accepted = msg?.session?.input_audio_transcription;
+      const accepted = msg?.session?.input_audio_transcription || msg?.session?.audio?.input?.transcription;
       if (accepted) {
-        console.log('[CounselAI] input_audio_transcription accepted:', accepted);
+        console.log('[CounselAI] transcription config accepted:', JSON.stringify(accepted));
       } else {
-        console.warn('[CounselAI] input_audio_transcription missing from accepted session config.', msg?.session || msg);
+        console.warn('[CounselAI] transcription NOT in accepted session config! Full session:', JSON.stringify(msg?.session || msg).slice(0, 800));
       }
       break;
     }
