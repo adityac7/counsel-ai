@@ -25,17 +25,21 @@ tr.session-row:hover{background:rgba(70,217,209,.08)}
 .chip{display:inline-block;padding:4px 8px;border-radius:999px;font-size:.8rem;background:rgba(70,217,209,.15);border:1px solid rgba(70,217,209,.3)}
 .detail{margin-top:16px;border:1px solid rgba(70,217,209,.2);border-radius:14px;background:#0b182c;padding:16px;display:none}
 .detail.active{display:block}
-.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
-.tile{background:#0c1b31;border:1px solid rgba(70,217,209,.2);border-radius:12px;padding:12px}
-.tile .label{color:var(--muted);font-size:.85rem;margin-bottom:6px}
-.transcript{margin-top:12px;max-height:340px;overflow:auto;background:#0c1b31;border:1px solid rgba(47,123,246,.25);border-radius:12px;padding:12px}
+.grid{display:grid;gap:16px}
+.two{grid-template-columns:1fr 1fr}
+.metrics{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
+.summary-wrap .card{padding:16px;margin-top:16px}
+.summary-wrap .card.first{margin-top:0}
+.transcript{margin-top:8px;max-height:340px;overflow:auto;background:#0b182c;border:1px solid rgba(47,123,246,.25);border-radius:16px;padding:14px}
 .entry{padding:9px 10px;border-radius:10px;margin-bottom:8px}
 .entry.student{background:rgba(70,217,209,.08);border:1px solid rgba(70,217,209,.2)}
 .entry.counsellor{background:rgba(47,123,246,.12);border:1px solid rgba(47,123,246,.25)}
 .role{font-size:.8rem;color:var(--muted);margin-bottom:3px}
+.meta{color:var(--muted);font-size:.95rem}
 .muted{color:var(--muted)}
 .empty{padding:20px;color:var(--muted)}
-pre{white-space:pre-wrap;word-break:break-word;margin:0;color:var(--text)}
+ul{margin:0;padding-left:18px}
+@media (max-width:760px){.two{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -116,23 +120,138 @@ function renderTranscript(entries){
   }).join('');
 }
 
-function profileScores(profile){
-  const scores = [];
-  const cp = profile && profile.cognitive_profile ? profile.cognitive_profile : {};
-  const ep = profile && profile.emotional_profile ? profile.emotional_profile : {};
-  const bp = profile && profile.behavioral_insights ? profile.behavioral_insights : {};
-  if (cp.critical_thinking != null) scores.push(`Critical Thinking: ${cp.critical_thinking}/10`);
-  if (cp.perspective_taking != null) scores.push(`Perspective Taking: ${cp.perspective_taking}/10`);
-  if (ep.eq_score != null) scores.push(`EQ Score: ${ep.eq_score}/10`);
-  if (bp.confidence != null) scores.push(`Confidence: ${bp.confidence}/10`);
-  if (!scores.length) return '<div class="muted">No profile scores available.</div>';
-  return scores.map((s)=>`<div>${s}</div>`).join('');
+function renderMetricBars(profile){
+  const metrics = [
+    {label:'Critical Thinking', value: profile?.cognitive_profile?.critical_thinking},
+    {label:'Perspective Taking', value: profile?.cognitive_profile?.perspective_taking},
+    {label:'EQ Score', value: profile?.emotional_profile?.eq_score},
+    {label:'Confidence', value: profile?.behavioral_insights?.confidence},
+  ].filter((m)=>m.value != null);
+  if (!metrics.length) return '<div class="muted">No scores available.</div>';
+  return metrics.map((m)=>{
+    const pct = Math.min(100, (Number(m.value) / 10) * 100);
+    const color = pct >= 70 ? '#2ecc71' : pct >= 40 ? '#f1c40f' : '#e74c3c';
+    return `<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <span>${escapeHtml(m.label)}</span>
+      <div style="display:flex;align-items:center;gap:8px;">
+        <div style="width:100px;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;">
+          <div style="height:100%;border-radius:4px;background:${color};width:${pct}%;"></div>
+        </div>
+        <strong>${escapeHtml(String(m.value))}/10</strong>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderRecommendations(profile){
-  const items = Array.isArray(profile && profile.recommendations) ? profile.recommendations : [];
-  if (!items.length) return '<div class="muted">No recommendations available.</div>';
-  return items.map((x)=>`<div>- ${escapeHtml(x)}</div>`).join('');
+  const list = Array.isArray(profile?.recommendations) ? profile.recommendations : [];
+  if (!list.length) return '<div class="muted">No recommendations returned.</div>';
+  return `<ul>${list.map((item)=>`<li>${escapeHtml(item)}</li>`).join('')}</ul>`;
+}
+
+function renderRows(items){
+  if (!items.length) return 'No data returned.';
+  return items.map((item)=>`<div style="margin-bottom:8px;">${escapeHtml(item)}</div>`).join('');
+}
+
+function renderProfileSections(profile){
+  const traits = Array.isArray(profile?.personality_snapshot?.traits) ? profile.personality_snapshot.traits : [];
+  const personalityItems = [
+    traits.length ? `Traits: ${traits.join(', ')}` : '',
+    profile?.personality_snapshot?.communication_style ? `Communication style: ${profile.personality_snapshot.communication_style}` : '',
+    profile?.personality_snapshot?.decision_making ? `Decision making: ${profile.personality_snapshot.decision_making}` : '',
+  ].filter(Boolean);
+
+  const cognitiveItems = [
+    profile?.cognitive_profile?.moral_reasoning_stage ? `Moral reasoning stage: ${profile.cognitive_profile.moral_reasoning_stage}` : '',
+    profile?.cognitive_profile?.problem_solving_style ? `Problem solving: ${profile.cognitive_profile.problem_solving_style}` : '',
+    profile?.cognitive_profile?.problem_solving ? `Problem solving: ${profile.cognitive_profile.problem_solving}` : '',
+  ].filter(Boolean);
+
+  const anxietyMarkers = Array.isArray(profile?.emotional_profile?.anxiety_markers) ? profile.emotional_profile.anxiety_markers : [];
+  const emotionalItems = [
+    profile?.emotional_profile?.empathy_level ? `Empathy level: ${profile.emotional_profile.empathy_level}` : '',
+    profile?.emotional_profile?.emotional_regulation ? `Emotional regulation: ${profile.emotional_profile.emotional_regulation}` : '',
+    profile?.emotional_profile?.self_awareness ? `Self awareness: ${profile.emotional_profile.self_awareness}` : '',
+    profile?.emotional_profile?.stress_response ? `Stress response: ${profile.emotional_profile.stress_response}` : '',
+    anxietyMarkers.length ? `Anxiety markers: ${anxietyMarkers.join(', ')}` : '',
+  ].filter(Boolean);
+
+  const behavioralItems = [
+    profile?.behavioral_insights?.confidence_level ? `Confidence level: ${profile.behavioral_insights.confidence_level}` : '',
+    profile?.behavioral_insights?.social_dynamics ? `Social dynamics: ${profile.behavioral_insights.social_dynamics}` : '',
+    profile?.behavioral_insights?.response_pattern ? `Response pattern: ${profile.behavioral_insights.response_pattern}` : '',
+    profile?.behavioral_insights?.leadership_potential ? `Leadership potential: ${profile.behavioral_insights.leadership_potential}` : '',
+    profile?.behavioral_insights?.peer_influence ? `Peer influence: ${profile.behavioral_insights.peer_influence}` : '',
+  ].filter(Boolean);
+
+  const conversationKeyMoments = Array.isArray(profile?.conversation_analysis?.key_moments) ? profile.conversation_analysis.key_moments : [];
+  const conversationItems = [
+    profile?.conversation_analysis?.evolution_across_rounds ? `Evolution across rounds: ${profile.conversation_analysis.evolution_across_rounds}` : '',
+    profile?.conversation_analysis?.consistency ? `Consistency: ${profile.conversation_analysis.consistency}` : '',
+    conversationKeyMoments.length ? `Key moments: ${conversationKeyMoments.join(' | ')}` : '',
+  ].filter(Boolean);
+
+  const moments = Array.isArray(profile?.key_moments) ? profile.key_moments : [];
+  const keyMomentsHtml = moments.length
+    ? moments.map((m)=>{
+        if (typeof m === 'string') {
+          return `<div style="margin-bottom:12px;padding:10px;border-left:3px solid #e8c547;background:rgba(232,197,71,0.08);border-radius:4px;">${escapeHtml(m)}</div>`;
+        }
+        return `<div style="margin-bottom:12px;padding:10px;border-left:3px solid #e8c547;background:rgba(232,197,71,0.08);border-radius:4px;">
+          <div style="font-style:italic;margin-bottom:4px;">"${escapeHtml(m.quote || '')}"</div>
+          <div style="color:#aaa;font-size:0.9em;">${escapeHtml(m.insight || '')}</div>
+        </div>`;
+      }).join('')
+    : 'No key moments identified.';
+
+  const flags = Array.isArray(profile?.red_flags) ? profile.red_flags : [];
+  const redFlagsHtml = flags.length
+    ? flags.map((f)=>`<div style="margin-bottom:6px;padding:6px 10px;background:rgba(231,76,60,0.1);border-radius:4px;">⚠ ${escapeHtml(f)}</div>`).join('')
+    : 'No red flags identified.';
+
+  return {
+    personality: renderRows(personalityItems),
+    cognitive: renderRows(cognitiveItems),
+    emotional: renderRows(emotionalItems),
+    behavioral: renderRows(behavioralItems),
+    conversation: renderRows(conversationItems),
+    keyMoments: keyMomentsHtml,
+    redFlags: redFlagsHtml,
+    summary: escapeHtml(profile?.summary || 'No summary available.'),
+  };
+}
+
+function renderFaceAnalysis(faceData){
+  if (!faceData?.summary) return 'No face data captured (camera may not have been available).';
+  const s = faceData.summary;
+  const items = [
+    s.dominant_emotion ? `Dominant emotion: ${s.dominant_emotion}` : '',
+    s.eye_contact_score != null ? `Eye contact score: ${(s.eye_contact_score * 100).toFixed(0)}%` : '',
+    s.facial_tension_score != null ? `Facial tension: ${(s.facial_tension_score * 100).toFixed(0)}%` : '',
+    s.smile_count != null ? `Smile count: ${s.smile_count}` : '',
+  ].filter(Boolean);
+  if (s.emotion_distribution) {
+    const dist = Object.entries(s.emotion_distribution)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 4)
+      .map(([k, v]) => `${k}: ${Number(v).toFixed(1)}%`)
+      .join(', ');
+    items.push(`Emotion distribution: ${dist}`);
+  }
+  return items.map((i)=>`<div style="margin-bottom:6px;">${escapeHtml(i)}</div>`).join('') || 'No face data captured.';
+}
+
+function renderVoiceAnalysis(voiceData){
+  if (!voiceData?.speech_rate) return 'No voice data captured.';
+  const items = [
+    voiceData.speech_rate.words_per_minute ? `Speech rate: ${voiceData.speech_rate.words_per_minute.toFixed(0)} WPM` : '',
+    voiceData.pauses ? `Pauses: ${voiceData.pauses.count} (total ${voiceData.pauses.total_duration.toFixed(1)}s)` : '',
+    voiceData.pitch?.mean_hz ? `Pitch: ${voiceData.pitch.mean_hz.toFixed(0)} Hz (variation: ${(voiceData.pitch.variation * 100).toFixed(0)}%)` : '',
+    voiceData.volume?.pattern ? `Volume pattern: ${voiceData.volume.pattern}` : '',
+    voiceData.overall_confidence_score != null ? `Voice confidence score: ${(voiceData.overall_confidence_score * 100).toFixed(0)}%` : '',
+  ].filter(Boolean);
+  return items.map((i)=>`<div style="margin-bottom:6px;">${escapeHtml(i)}</div>`).join('') || 'No voice data captured.';
 }
 
 async function openSession(id){
@@ -148,28 +267,70 @@ async function openSession(id){
   const face = data.face_analysis || {};
   const voice = data.voice_analysis || {};
   const student = data.student_info || {};
+  const sections = renderProfileSections(profile);
 
   detailEl.classList.add('active');
   detailEl.innerHTML = `
-    <h2>Session #${data.id}</h2>
-    <div class="grid">
-      <div class="tile"><div class="label">Student</div><div>${escapeHtml(student.name || '-')} (Class ${escapeHtml(student.class || '-')})</div></div>
-      <div class="tile"><div class="label">School</div><div>${escapeHtml(student.school || '-')}${student.section ? `, Section ${escapeHtml(student.section)}` : ''}</div></div>
-      <div class="tile"><div class="label">Timing</div><div>${formatDate(data.session_start_time)} to ${formatDate(data.session_end_time)}</div></div>
-      <div class="tile"><div class="label">Duration</div><div>${formatDuration(data.duration_seconds)}</div></div>
-      <div class="tile"><div class="label">Dominant Emotion</div><div>${escapeHtml(data.dominant_emotion || 'unknown')}</div></div>
-      <div class="tile"><div class="label">Confidence</div><div>${confidence(data.confidence_score)}</div></div>
+    <div class="summary-wrap">
+      <h2 style="margin-bottom:16px;">Session #${data.id} summary</h2>
+      <div class="grid two">
+        <div class="card first">
+          <div class="meta">${escapeHtml(student.name || '-')} • ${escapeHtml(student.class || '-')} • ${formatDuration(data.duration_seconds)}</div>
+        </div>
+        <div class="card first">
+          <strong>Score metrics</strong>
+          <div class="metrics" style="margin-top:12px;">${renderMetricBars(profile)}</div>
+        </div>
+      </div>
+      <div class="card">
+        <strong>Personality snapshot</strong>
+        <div class="meta" style="margin-top:8px;">${sections.personality}</div>
+      </div>
+      <div class="card">
+        <strong>Cognitive profile</strong>
+        <div class="meta" style="margin-top:8px;">${sections.cognitive}</div>
+      </div>
+      <div class="card">
+        <strong>Emotional profile</strong>
+        <div class="meta" style="margin-top:8px;">${sections.emotional}</div>
+      </div>
+      <div class="card">
+        <strong>Behavioral insights</strong>
+        <div class="meta" style="margin-top:8px;">${sections.behavioral}</div>
+      </div>
+      <div class="card">
+        <strong>Conversation analysis</strong>
+        <div class="meta" style="margin-top:8px;">${sections.conversation}</div>
+      </div>
+      <div class="card">
+        <strong>Recommendations</strong>
+        <div class="meta" style="margin-top:8px;">${renderRecommendations(profile)}</div>
+      </div>
+      <div class="card">
+        <strong style="color:#e8c547;">Key moments</strong>
+        <div class="meta" style="margin-top:8px;">${sections.keyMoments}</div>
+      </div>
+      <div class="card">
+        <strong style="color:#e74c3c;">Red flags</strong>
+        <div class="meta" style="margin-top:8px;">${sections.redFlags}</div>
+      </div>
+      <div class="card">
+        <strong>Summary</strong>
+        <div class="meta" style="margin-top:8px;">${sections.summary}</div>
+      </div>
+      <div class="card">
+        <strong>🎭 Face Analysis</strong>
+        <div class="meta" style="margin-top:8px;">${renderFaceAnalysis(face)}</div>
+      </div>
+      <div class="card">
+        <strong>🎤 Voice Analysis</strong>
+        <div class="meta" style="margin-top:8px;">${renderVoiceAnalysis(voice)}</div>
+      </div>
+      <div class="card">
+        <strong>Full transcript</strong>
+        <div class="transcript">${renderTranscript(data.transcript)}</div>
+      </div>
     </div>
-
-    <div class="grid">
-      <div class="tile"><div class="label">Face Analysis Summary</div><pre>${escapeHtml(JSON.stringify(face.summary || face, null, 2))}</pre></div>
-      <div class="tile"><div class="label">Voice Analysis Summary</div><pre>${escapeHtml(JSON.stringify(voice.speech_rate ? voice : voice, null, 2))}</pre></div>
-      <div class="tile"><div class="label">Profile Scores</div>${profileScores(profile)}</div>
-      <div class="tile"><div class="label">Recommendations</div>${renderRecommendations(profile)}</div>
-    </div>
-
-    <h3 style="margin-top:14px;">Full Transcript</h3>
-    <div class="transcript">${renderTranscript(data.transcript)}</div>
   `;
 }
 
