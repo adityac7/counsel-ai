@@ -458,8 +458,12 @@ async function startSession(){
       const sessionUpdate = {
         type:'session.update',
         session:{
-          turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
-          input_audio_transcription:{model:'whisper-1'}
+          audio:{
+            input:{
+              turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
+              transcription:{model:'gpt-4o-transcribe'}
+            }
+          }
         }
       };
       dc.send(JSON.stringify(sessionUpdate));
