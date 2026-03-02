@@ -3,12 +3,16 @@ import json
 import os
 import tempfile
 import traceback
+from datetime import datetime, timezone
 from fastapi import FastAPI, File, Form, Request, UploadFile
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
 from case_studies import CASE_STUDIES
+import db
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+db.init_db()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 COUNSELLOR_INSTRUCTIONS = (
     "You are a warm, neutral Indian school counsellor (class 9-12). During the "
@@ -29,6 +33,13 @@ COUNSELLOR_INSTRUCTIONS = (
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
     response = templates.TemplateResponse("live.html", {"request": request})
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    response = templates.TemplateResponse("dashboard.html", {"request": request})
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 @app.get("/api/case-studies")
@@ -69,6 +80,11 @@ async def analyze_session(
     transcript: str = Form("[]"),
     student_name: str = Form("Student"),
     student_class: str = Form("10"),
+    student_section: str = Form(""),
+    student_school: str = Form(""),
+    student_age: int = Form(15),
+    session_start_time: str = Form(None),
+    session_end_time: str = Form(None),
 ):
     try:
         transcript_data = json.loads(transcript)
@@ -114,17 +130,68 @@ async def analyze_session(
         "face_data": face_data,
         "voice_data": voice_data,
     }
+    session_end = session_end_time or datetime.now(timezone.utc).isoformat()
     try:
         import profile_generator
         profile = profile_generator.generate_profile(session_data)
         print(f"[analyze] profile keys: {list(profile.keys())}")
-        return JSONResponse({"profile": profile, "face_data": face_data, "voice_data": voice_data})
+        saved_id = db.save_session(
+            source="realtime",
+            external_session_id=None,
+            student_info={
+                "name": student_name,
+                "class": student_class,
+                "section": student_section,
+                "school": student_school,
+                "age": student_age,
+            },
+            session_start_time=session_start_time,
+            session_end_time=session_end,
+            transcript=transcript_data,
+            face_analysis=face_data,
+            voice_analysis=voice_data,
+            profile=profile,
+        )
+        return JSONResponse(
+            {"profile": profile, "face_data": face_data, "voice_data": voice_data, "session_id": saved_id}
+        )
     except Exception as exc:
         print(f"Profile generation failed: {exc}")
         traceback.print_exc()
-        return JSONResponse({"profile": {"summary": f"Analysis error: {exc}"}})
+        profile = {"summary": f"Analysis error: {exc}"}
+        saved_id = db.save_session(
+            source="realtime",
+            external_session_id=None,
+            student_info={
+                "name": student_name,
+                "class": student_class,
+                "section": student_section,
+                "school": student_school,
+                "age": student_age,
+            },
+            session_start_time=session_start_time,
+            session_end_time=session_end,
+            transcript=transcript_data,
+            face_analysis=face_data,
+            voice_analysis=voice_data,
+            profile=profile,
+        )
+        return JSONResponse({"profile": profile, "session_id": saved_id})
     finally:
         os.unlink(tmp.name)
+
+
+@app.get("/api/sessions")
+async def get_sessions():
+    return JSONResponse({"sessions": db.list_sessions()})
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session_detail(session_id: int):
+    session = db.get_session(session_id)
+    if not session:
+        return JSONResponse({"error": "Session not found"}, 404)
+    return JSONResponse(session)
 if __name__ == "__main__":
     import uvicorn
     uvicorn.run(app, host="0.0.0.0", port=8501)

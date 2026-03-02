@@ -1,0 +1,208 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>CounselAI Sessions Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0a1628;--panel:#0f1f35;--panel-2:#0c1a30;--teal:#46d9d1;--blue:#2f7bf6;--text:#e6f2ff;--muted:#9bb3d3;--danger:#ff7b7b;--ok:#55d28b;--glow:0 0 30px rgba(70,217,209,.45)}
+*{box-sizing:border-box}
+body{margin:0;font-family:"Space Grotesk","IBM Plex Sans",system-ui,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 15% 0%,#133056 0%,transparent 60%),linear-gradient(160deg,#081223,var(--bg));min-height:100vh}
+.app{max-width:1250px;margin:0 auto;padding:28px 20px 40px}
+.card{background:linear-gradient(180deg,#10233e,var(--panel));border:1px solid rgba(70,217,209,.2);border-radius:20px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.35)}
+h1,h2,h3{margin:0 0 14px;letter-spacing:.3px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px;flex-wrap:wrap}
+.links{display:flex;gap:10px;flex-wrap:wrap}
+.btn{display:inline-block;border:1px solid rgba(70,217,209,.25);background:#0c1b31;color:var(--text);text-decoration:none;padding:9px 14px;border-radius:10px}
+.btn:hover{border-color:var(--teal)}
+.table-wrap{overflow:auto;border:1px solid rgba(47,123,246,.25);border-radius:14px;background:#0b182c}
+table{width:100%;border-collapse:collapse;min-width:850px}
+th,td{text-align:left;padding:12px 14px;border-bottom:1px solid rgba(47,123,246,.18)}
+th{color:var(--muted);font-weight:500;font-size:.92rem;background:#0c1a30}
+tr.session-row{cursor:pointer;transition:background .2s ease}
+tr.session-row:hover{background:rgba(70,217,209,.08)}
+.chip{display:inline-block;padding:4px 8px;border-radius:999px;font-size:.8rem;background:rgba(70,217,209,.15);border:1px solid rgba(70,217,209,.3)}
+.detail{margin-top:16px;border:1px solid rgba(70,217,209,.2);border-radius:14px;background:#0b182c;padding:16px;display:none}
+.detail.active{display:block}
+.grid{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));margin-top:12px}
+.tile{background:#0c1b31;border:1px solid rgba(70,217,209,.2);border-radius:12px;padding:12px}
+.tile .label{color:var(--muted);font-size:.85rem;margin-bottom:6px}
+.transcript{margin-top:12px;max-height:340px;overflow:auto;background:#0c1b31;border:1px solid rgba(47,123,246,.25);border-radius:12px;padding:12px}
+.entry{padding:9px 10px;border-radius:10px;margin-bottom:8px}
+.entry.student{background:rgba(70,217,209,.08);border:1px solid rgba(70,217,209,.2)}
+.entry.counsellor{background:rgba(47,123,246,.12);border:1px solid rgba(47,123,246,.25)}
+.role{font-size:.8rem;color:var(--muted);margin-bottom:3px}
+.muted{color:var(--muted)}
+.empty{padding:20px;color:var(--muted)}
+pre{white-space:pre-wrap;word-break:break-word;margin:0;color:var(--text)}
+</style>
+</head>
+<body>
+<div class="app">
+  <section class="card">
+    <div class="topbar">
+      <div>
+        <h1>Sessions Dashboard</h1>
+        <div class="muted">All persisted counselling sessions</div>
+      </div>
+      <div class="links">
+        <a class="btn" href="/">Live Session</a>
+      </div>
+    </div>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Student</th>
+            <th>Class</th>
+            <th>Date</th>
+            <th>Duration</th>
+            <th>Dominant Emotion</th>
+            <th>Confidence Score</th>
+            <th>Source</th>
+          </tr>
+        </thead>
+        <tbody id="sessions-body">
+          <tr><td colspan="7" class="empty">Loading sessions...</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div id="session-detail" class="detail"></div>
+  </section>
+</div>
+
+<script>
+const sessionsBody = document.getElementById('sessions-body');
+const detailEl = document.getElementById('session-detail');
+
+function escapeHtml(text){
+  return String(text || '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+function formatDate(value){
+  if (!value) return '-';
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return value;
+  return d.toLocaleString();
+}
+
+function formatDuration(seconds){
+  if (seconds == null || Number.isNaN(Number(seconds))) return '-';
+  const s = Math.max(0, Number(seconds));
+  const mm = String(Math.floor(s / 60)).padStart(2, '0');
+  const ss = String(Math.floor(s % 60)).padStart(2, '0');
+  return `${mm}:${ss}`;
+}
+
+function confidence(value){
+  if (value == null || Number.isNaN(Number(value))) return '-';
+  return `${Number(value).toFixed(1)}%`;
+}
+
+function renderTranscript(entries){
+  if (!Array.isArray(entries) || entries.length === 0) return '<div class="muted">No transcript available.</div>';
+  return entries.map((e)=>{
+    const role = (e.role || 'student').toLowerCase();
+    const css = role === 'counsellor' ? 'counsellor' : 'student';
+    const label = role === 'counsellor' ? 'Counsellor' : 'Student';
+    const text = escapeHtml(e.text || '');
+    return `<div class="entry ${css}"><div class="role">${label}</div><div>${text || '(empty)'}</div></div>`;
+  }).join('');
+}
+
+function profileScores(profile){
+  const scores = [];
+  const cp = profile && profile.cognitive_profile ? profile.cognitive_profile : {};
+  const ep = profile && profile.emotional_profile ? profile.emotional_profile : {};
+  const bp = profile && profile.behavioral_insights ? profile.behavioral_insights : {};
+  if (cp.critical_thinking != null) scores.push(`Critical Thinking: ${cp.critical_thinking}/10`);
+  if (cp.perspective_taking != null) scores.push(`Perspective Taking: ${cp.perspective_taking}/10`);
+  if (ep.eq_score != null) scores.push(`EQ Score: ${ep.eq_score}/10`);
+  if (bp.confidence != null) scores.push(`Confidence: ${bp.confidence}/10`);
+  if (!scores.length) return '<div class="muted">No profile scores available.</div>';
+  return scores.map((s)=>`<div>${s}</div>`).join('');
+}
+
+function renderRecommendations(profile){
+  const items = Array.isArray(profile && profile.recommendations) ? profile.recommendations : [];
+  if (!items.length) return '<div class="muted">No recommendations available.</div>';
+  return items.map((x)=>`<div>- ${escapeHtml(x)}</div>`).join('');
+}
+
+async function openSession(id){
+  const res = await fetch(`/api/sessions/${id}`);
+  const data = await res.json();
+  if (!res.ok) {
+    detailEl.classList.add('active');
+    detailEl.innerHTML = `<div class="muted">Failed to load session: ${data.error || 'Unknown error'}</div>`;
+    return;
+  }
+
+  const profile = data.profile || {};
+  const face = data.face_analysis || {};
+  const voice = data.voice_analysis || {};
+  const student = data.student_info || {};
+
+  detailEl.classList.add('active');
+  detailEl.innerHTML = `
+    <h2>Session #${data.id}</h2>
+    <div class="grid">
+      <div class="tile"><div class="label">Student</div><div>${escapeHtml(student.name || '-')} (Class ${escapeHtml(student.class || '-')})</div></div>
+      <div class="tile"><div class="label">School</div><div>${escapeHtml(student.school || '-')}${student.section ? `, Section ${escapeHtml(student.section)}` : ''}</div></div>
+      <div class="tile"><div class="label">Timing</div><div>${formatDate(data.session_start_time)} to ${formatDate(data.session_end_time)}</div></div>
+      <div class="tile"><div class="label">Duration</div><div>${formatDuration(data.duration_seconds)}</div></div>
+      <div class="tile"><div class="label">Dominant Emotion</div><div>${escapeHtml(data.dominant_emotion || 'unknown')}</div></div>
+      <div class="tile"><div class="label">Confidence</div><div>${confidence(data.confidence_score)}</div></div>
+    </div>
+
+    <div class="grid">
+      <div class="tile"><div class="label">Face Analysis Summary</div><pre>${escapeHtml(JSON.stringify(face.summary || face, null, 2))}</pre></div>
+      <div class="tile"><div class="label">Voice Analysis Summary</div><pre>${escapeHtml(JSON.stringify(voice.speech_rate ? voice : voice, null, 2))}</pre></div>
+      <div class="tile"><div class="label">Profile Scores</div>${profileScores(profile)}</div>
+      <div class="tile"><div class="label">Recommendations</div>${renderRecommendations(profile)}</div>
+    </div>
+
+    <h3 style="margin-top:14px;">Full Transcript</h3>
+    <div class="transcript">${renderTranscript(data.transcript)}</div>
+  `;
+}
+
+async function loadSessions(){
+  try {
+    const res = await fetch('/api/sessions');
+    const payload = await res.json();
+    const sessions = Array.isArray(payload.sessions) ? payload.sessions : [];
+    if (!sessions.length) {
+      sessionsBody.innerHTML = '<tr><td colspan="7" class="empty">No sessions found yet.</td></tr>';
+      return;
+    }
+    sessionsBody.innerHTML = sessions.map((s)=>`
+      <tr class="session-row" data-id="${s.id}">
+        <td>${escapeHtml(s.student_name || 'Student')}</td>
+        <td>${escapeHtml(s.student_class || '-')}</td>
+        <td>${formatDate(s.session_end_time || s.created_at)}</td>
+        <td>${formatDuration(s.duration_seconds)}</td>
+        <td><span class="chip">${escapeHtml(s.dominant_emotion || 'unknown')}</span></td>
+        <td>${confidence(s.confidence_score)}</td>
+        <td>${escapeHtml(s.source || '-')}</td>
+      </tr>
+    `).join('');
+
+    document.querySelectorAll('.session-row').forEach((row)=>{
+      row.addEventListener('click', ()=>openSession(row.dataset.id));
+    });
+  } catch (err) {
+    sessionsBody.innerHTML = '<tr><td colspan="7" class="empty">Failed to load sessions.</td></tr>';
+  }
+}
+
+loadSessions();
+</script>
+</body>
+</html>

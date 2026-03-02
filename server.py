@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import FastAPI, UploadFile, File, Form
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import HTMLResponse, JSONResponse
@@ -15,11 +17,20 @@ sessions = {}
 from case_studies import CASE_STUDIES
 from counsellor import CounsellorSession
 import transcriber, face_analyzer, voice_analyzer, profile_generator, utils
+import db
+
+db.init_db()
 
 
 @app.get("/", response_class=HTMLResponse)
 async def index():
     with open("templates/index.html") as f:
+        return f.read()
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard():
+    with open("templates/dashboard.html") as f:
         return f.read()
 
 
@@ -61,6 +72,7 @@ async def start_session(
         "counsellor": counsellor_session,
         "rounds": [],
         "current_round": 0,
+        "started_at": datetime.now(timezone.utc).isoformat(),
     }
     return {"session_id": sid, "case_study": case}
 
@@ -149,7 +161,50 @@ async def generate_profile(sid: str):
     context = session["counsellor"].get_all_context()
     profile = profile_generator.generate_profile(context)
     cross = profile_generator.cross_validate(context, profile)
+
+    transcript = []
+    face_rounds = []
+    voice_rounds = []
+    for r in session.get("rounds", []):
+        transcript.append(
+            {"round": r.get("round"), "role": "student", "text": r.get("transcription", "")}
+        )
+        transcript.append(
+            {
+                "round": r.get("round"),
+                "role": "counsellor",
+                "text": r.get("counsellor_response", ""),
+            }
+        )
+        face_rounds.append({"round": r.get("round"), "data": r.get("face_data", {})})
+        voice_rounds.append({"round": r.get("round"), "data": r.get("voice_data", {})})
+
+    saved_id = db.save_session(
+        source="turn_based",
+        external_session_id=sid,
+        student_info=session.get("student_info", {}),
+        session_start_time=session.get("started_at"),
+        session_end_time=datetime.now(timezone.utc).isoformat(),
+        transcript=transcript,
+        face_analysis={"rounds": face_rounds},
+        voice_analysis={"rounds": voice_rounds},
+        profile=profile,
+    )
+    session["saved_session_id"] = saved_id
     return {"profile": profile, "cross_validation": cross}
+
+
+@app.get("/api/sessions")
+async def get_sessions():
+    return {"sessions": db.list_sessions()}
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session_detail(session_id: int):
+    session = db.get_session(session_id)
+    if not session:
+        return JSONResponse({"error": "Session not found"}, 404)
+    return session
 
 
 if __name__ == "__main__":

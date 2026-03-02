@@ -62,6 +62,10 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
 </head>
 <body>
 <div class="app">
+  <div class="topbar" style="margin-bottom:18px;">
+    <h3 style="margin:0;">CounselAI Live</h3>
+    <a href="/dashboard" style="color:var(--teal);text-decoration:none;font-weight:600;">Sessions Dashboard</a>
+  </div>
   <section id="welcome" class="card">
     <h1>Welcome to CounselAI Live</h1>
     <div class="grid two">
@@ -77,6 +81,18 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
                 <option value="11">11</option>
                 <option value="12">12</option>
               </select>
+      </div>
+      <div>
+        <label for="section-name">Section</label>
+        <input id="section-name" placeholder="A" />
+      </div>
+      <div>
+        <label for="school-name">School</label>
+        <input id="school-name" placeholder="Springfield High" />
+      </div>
+      <div>
+        <label for="student-age">Age</label>
+        <input id="student-age" type="number" min="10" max="20" value="15" />
       </div>
     </div>
     <label for="case-study">Case study</label>
@@ -258,8 +274,11 @@ function renderVoiceAnalysis(voiceData) {
 async function startSession(){
   const name=document.getElementById('student-name').value.trim()||'Student';
   const className=document.getElementById('class-name').value.trim()||'Class';
+  const section=document.getElementById('section-name').value.trim();
+  const school=document.getElementById('school-name').value.trim();
+  const age=Number(document.getElementById('student-age').value || 15);
   const scenario=document.getElementById('case-study').value;
-  sessionMeta={name,className,scenario,start:new Date()};
+  sessionMeta={name,className,section,school,age,scenario,start:new Date()};
   recordedChunks = [];
   transcriptEntries = [];
   currentAiEntry = null;
@@ -554,6 +573,11 @@ async function endSession(){
     fd.append('transcript', JSON.stringify(finalTranscript));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
+    fd.append('student_section', sessionMeta.section || '');
+    fd.append('student_school', sessionMeta.school || '');
+    fd.append('student_age', String(sessionMeta.age || 15));
+    fd.append('session_start_time', sessionMeta.start.toISOString());
+    fd.append('session_end_time', new Date().toISOString());
     const resp = await fetch('/api/analyze-session', {method:'POST', body: fd});
     if (resp.ok) {
       const data = await resp.json();
