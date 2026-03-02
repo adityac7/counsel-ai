@@ -80,7 +80,6 @@ async def rtc_connect(request: Request):
             "model": "gpt-4o-realtime-preview-2025-06-03",
             "instructions": COUNSELLOR_INSTRUCTIONS + scenario,
             "audio": {"output": {"voice": "sage"}},
-            "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
         }
     )
     async with httpx.AsyncClient(timeout=30) as client:
