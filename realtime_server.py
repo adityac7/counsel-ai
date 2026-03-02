@@ -80,6 +80,7 @@ async def rtc_connect(request: Request):
             "model": "gpt-4o-realtime-preview-2025-06-03",
             "instructions": COUNSELLOR_INSTRUCTIONS + scenario,
             "audio": {"output": {"voice": "sage"}},
+            "input_audio_transcription": {"model": "gpt-4o-mini-transcribe"},
         }
     )
     async with httpx.AsyncClient(timeout=30) as client:
@@ -92,10 +93,20 @@ async def rtc_connect(request: Request):
             ],
         )
     if resp.status_code not in (200, 201):
+        request_id = resp.headers.get("x-request-id", "")
+        body_preview = resp.text[:1200]
+        print(
+            "[rtc-connect] Realtime request payload: "
+            f"{session_json[:1200]}"
+        )
         print(
             f"[rtc-connect] OpenAI realtime call failed status={resp.status_code} "
-            f"body={resp.text[:1200]}"
+            f"request_id={request_id} body={body_preview}"
         )
+        try:
+            print(f"[rtc-connect] OpenAI realtime error json={json.dumps(resp.json())[:1200]}")
+        except Exception:
+            pass
     media_type = "application/sdp" if resp.status_code in (200, 201) else "text/plain"
     return Response(content=resp.text, status_code=resp.status_code, media_type=media_type)
 @app.post("/api/analyze-session")

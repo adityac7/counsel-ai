@@ -459,7 +459,7 @@ async function startSession(){
         type:'session.update',
         session:{
           turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
-          input_audio_transcription:{model:'whisper-1'}
+          input_audio_transcription:{model:'gpt-4o-mini-transcribe'}
         }
       };
       dc.send(JSON.stringify(sessionUpdate));
@@ -549,9 +549,23 @@ function handleEventMessage(ev){
       console.log('[CounselAI] input audio committed for transcription.');
       waitingForStudentTranscript = true;
       break;
-    case 'session.updated':
-      console.log('[CounselAI] Session config accepted:', JSON.stringify(msg.session || {}));
+    case 'session.created':
+    case 'session.updated': {
+      let pretty = '';
+      try {
+        pretty = JSON.stringify(msg, null, 2);
+      } catch (err) {
+        pretty = `[unstringifiable session event: ${err}]`;
+      }
+      console.log(`[CounselAI] Full ${msg.type} payload:\n${pretty}`);
+      const accepted = msg?.session?.input_audio_transcription;
+      if (accepted) {
+        console.log('[CounselAI] input_audio_transcription accepted:', accepted);
+      } else {
+        console.warn('[CounselAI] input_audio_transcription missing from accepted session config.', msg?.session || msg);
+      }
       break;
+    }
     case 'conversation.item.input_audio_transcription.completed':
     case 'conversation.item.input_audio_transcription.done':
     case 'conversation.item.input_audio_transcription.delta':
