@@ -77,7 +77,7 @@ async def rtc_connect(request: Request):
     session_json = json.dumps(
         {
             "type": "realtime",
-            "model": "gpt-realtime",
+            "model": "gpt-4o-realtime-preview-2025-06-03",
             "instructions": COUNSELLOR_INSTRUCTIONS + scenario,
             "audio": {"output": {"voice": "sage"}},
         }
