@@ -596,11 +596,31 @@ function handleEventMessage(ev){
     }
     case 'conversation.item.input_audio_transcription.completed':
     case 'conversation.item.input_audio_transcription.done':
-    case 'conversation.item.input_audio_transcription.delta':
     case 'input_audio_transcription.completed':
-    case 'input_audio_transcription.done':
-      captureUserTranscriptFromMessage(msg, msg.type);
+    case 'input_audio_transcription.done': {
+      // completed/done events have .transcript
+      const txt = msg.transcript || msg.text || '';
+      if (txt) {
+        addStudentTranscript(txt, msg.type + ':transcript');
+        uiLog('OK', '🎤 STUDENT TRANSCRIPT (completed):', txt.slice(0, 100));
+      } else {
+        captureUserTranscriptFromMessage(msg, msg.type);
+      }
       break;
+    }
+    case 'conversation.item.input_audio_transcription.delta':
+    case 'input_audio_transcription.delta': {
+      // delta events have .delta field — accumulate per item_id
+      const delta = msg.delta || '';
+      if (delta) {
+        const iid = msg.item_id || 'unknown';
+        if (!window._transcriptDeltas) window._transcriptDeltas = {};
+        if (!window._transcriptDeltas[iid]) window._transcriptDeltas[iid] = '';
+        window._transcriptDeltas[iid] += delta;
+        uiLog('INFO', '🎤 delta chunk [' + iid + ']:', delta.slice(0, 60));
+      }
+      break;
+    }
     case 'conversation.item.created':
       if ((msg.item && msg.item.role === 'user') || msg.role === 'user') {
         waitingForStudentTranscript = true;
@@ -610,9 +630,26 @@ function handleEventMessage(ev){
       }
       break;
     case 'conversation.item.done':
-      // Fallback: extract student audio transcription from conversation item
+      // Flush accumulated transcript deltas for this item
       if (msg.item && msg.item.role === 'user') {
-        captureUserTranscriptFromMessage(msg, msg.type);
+        const iid = msg.item?.id || msg.item_id || '';
+        if (window._transcriptDeltas && window._transcriptDeltas[iid] && window._transcriptDeltas[iid].trim()) {
+          addStudentTranscript(window._transcriptDeltas[iid], 'accumulated_deltas:' + iid);
+          uiLog('OK', '🎤 STUDENT TRANSCRIPT (from deltas):', window._transcriptDeltas[iid].slice(0, 100));
+          delete window._transcriptDeltas[iid];
+        } else {
+          captureUserTranscriptFromMessage(msg, msg.type);
+        }
+      }
+      // Also flush if we have ANY accumulated deltas for any item
+      if (window._transcriptDeltas) {
+        Object.keys(window._transcriptDeltas).forEach(iid => {
+          if (window._transcriptDeltas[iid] && window._transcriptDeltas[iid].trim()) {
+            addStudentTranscript(window._transcriptDeltas[iid], 'flush_deltas:' + iid);
+            uiLog('OK', '🎤 STUDENT TRANSCRIPT (flushed):', window._transcriptDeltas[iid].slice(0, 100));
+            delete window._transcriptDeltas[iid];
+          }
+        });
       }
       break;
     case 'error':
