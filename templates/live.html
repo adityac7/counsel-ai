@@ -476,9 +476,12 @@ async function startSession(){
     dc.onmessage = function(e) { handleEventMessage(e); };
     dc.onopen = () => {
       uiLog('OK', 'Data channel OPEN:', dc.label);
+      // Send session.update with BOTH flat (beta) and nested (GA) transcription formats
       const sessionUpdate = {
         type:'session.update',
         session:{
+          input_audio_transcription:{model:'gpt-4o-transcribe'},
+          turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
           audio:{
             input:{
               transcription:{model:'gpt-4o-transcribe'},
@@ -583,7 +586,7 @@ function handleEventMessage(ev){
         pretty = `[unstringifiable session event: ${err}]`;
       }
       console.log(`[CounselAI] Full ${msg.type} payload:\n${pretty}`);
-      const accepted = msg?.session?.input_audio_transcription || msg?.session?.audio?.input?.transcription;
+      const accepted = msg?.session?.input_audio_transcription || msg?.session?.audio?.input?.transcription || (msg?.session?.audio && JSON.stringify(msg.session.audio));
       if (accepted) {
         uiLog('OK', '✅ TRANSCRIPTION ACCEPTED:', JSON.stringify(accepted));
       } else {
