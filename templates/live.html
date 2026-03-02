@@ -225,6 +225,16 @@ const emotionalSection = document.getElementById('emotional-section');
 const behavioralSection = document.getElementById('behavioral-section');
 const conversationSection = document.getElementById('conversation-section');
 const recommendationsEl = document.getElementById('recommendations');
+function uiLog(level, ...args) {
+  const el = document.getElementById("event-log");
+  const ts = new Date().toLocaleTimeString("en-GB",{hour12:false});
+  const prefix = level === "WARN" ? "⚠️" : level === "OK" ? "✅" : level === "ERR" ? "❌" : "ℹ️";
+  const msg = args.map(a => typeof a === "object" ? JSON.stringify(a, null, 1) : String(a)).join(" ");
+  const line = "[" + ts + "] " + prefix + " " + msg + "\n";
+  if (el) { el.textContent += line; el.scrollTop = el.scrollHeight; }
+  if (level === "WARN" || level === "ERR") console.warn("[CounselAI]", ...args);
+  else console.log("[CounselAI]", ...args);
+}
 let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
 let timerStart, timerHandle, currentAiEntry = null;
 let transcriptEntries = [];
