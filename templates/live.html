@@ -356,10 +356,8 @@ async function startSession(){
   recorder.start(1000);
   updateDebugSnapshot();
 
-  pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
-  const audioTransceiver = pc.addTransceiver('audio', {direction:'sendrecv'});
-  const micTrack = mediaStream.getAudioTracks()[0];
-  await audioTransceiver.sender.replaceTrack(micTrack);
+  pc = new RTCPeerConnection();
+  pc.addTrack(mediaStream.getAudioTracks()[0]);
   pc.onconnectionstatechange = () => { console.log('[CounselAI] pc.connectionState:', pc.connectionState); updateDebugSnapshot(); };
   pc.oniceconnectionstatechange = () => { console.log('[CounselAI] pc.iceConnectionState:', pc.iceConnectionState); updateDebugSnapshot(); };
   pc.onicegatheringstatechange = () => { console.log('[CounselAI] pc.iceGatheringState:', pc.iceGatheringState); updateDebugSnapshot(); };
@@ -410,7 +408,6 @@ async function startSession(){
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-  await waitForIce(pc);
 
   const resp = await fetch(`/api/rtc-connect?scenario=${encodeURIComponent(scenario)}`, {method:'POST',body:pc.localDescription.sdp,headers:{'Content-Type':'application/sdp'}});
   if (resp.status !== 200 && resp.status !== 201) throw new Error(`RTC connect failed (${resp.status})`);
