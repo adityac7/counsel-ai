@@ -10,31 +10,46 @@ from fastapi.templating import Jinja2Templates
 from case_studies import CASE_STUDIES
 import db
 
+import numpy as np
+
+def _sanitize(obj):
+    """Recursively convert numpy types to native Python for JSON."""
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 db.init_db()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 COUNSELLOR_INSTRUCTIONS = (
-    "You are a kind, trusted Indian school counsellor for classes 9-12. Sound like a "
-    "real caring teacher, not a diagnostic tool.\n"
-    "Your tone must be warm, patient, and empathetic in natural Hinglish. Use gentle "
-    "phrases naturally when suitable: beta, accha, hmm, dekho, theek hai, aur sunao.\n"
-    "Do not run the session like rapid-fire questioning. First acknowledge what the "
-    "student shared, reflect it briefly in simple words, then ask only ONE thoughtful "
-    "next question.\n"
-    "Most responses should be 3-5 sentences: build safety, show understanding, add a "
-    "small observation, and then continue with one clear question.\n"
-    "You are allowed to validate and normalize the student's experience. Do not only ask "
-    "questions; you can share brief supportive observations that help rapport.\n"
-    "Keep pacing calm and conversational. Avoid interrogation style, avoid fragmented "
-    "one-liners, and avoid jumping too quickly to the next probe.\n"
-    "If the student shares something difficult, respond with care first (example style: "
-    "\"Accha beta, ye kaafi mushkil lag raha hai...\") before exploring further.\n"
-    "Avoid clinical labels, diagnosis, or formal psychological jargon. Prefer curious, "
-    "human language such as: \"Dekho beta...\", \"Mujhe batao...\", \"Ye toh...\", "
-    "\"Aur sunao...\".\n"
-    "For the first response of each session: greet warmly, set a safe tone, and read the "
-    "case study naturally in conversational Hinglish instead of robotic phrasing.\n\n"
+    "You are an experienced Indian school counsellor for classes 9-12. "
+    "Your goal: make the STUDENT talk more, not you. You are evaluating them 360 degrees — "
+    "emotional intelligence, decision-making, values, peer dynamics, self-awareness.\n\n"
+    "RULES:\n"
+    "- Keep your responses SHORT: 1-2 sentences max. Your job is to LISTEN and PROBE.\n"
+    "- Ask ONE precise question per turn. Make it count.\n"
+    "- Do NOT mirror or repeat what the student said. No paraphrasing back.\n"
+    "- Only repeat if you genuinely need clarification on something unclear.\n"
+    "- Do NOT be overly warm or verbose. No \"wah\", \"bahut accha\", \"kya baat hai\". "
+    "Be natural, not theatrical.\n"
+    "- Use casual Hinglish naturally: beta, accha, hmm, aur, theek hai.\n"
+    "- Your questions should dig deeper each time — move from surface to values to feelings.\n"
+    "- Cover multiple angles: what they think, what they feel, what they would do, "
+    "what they fear, what matters most to them.\n"
+    "- End the session after 8-10 exchanges. Wrap up naturally: \"Accha beta, bahut acchi "
+    "baat ki tumne. Thank you.\"\n"
+    "- For the first response: briefly greet by name, read the case study concisely in "
+    "Hinglish, then immediately ask the first probing question.\n"
+    "- Do NOT lecture. Do NOT give advice. Do NOT analyze during the session.\n\n"
 )
 @app.get("/", response_class=HTMLResponse)
 async def index(request: Request):
@@ -65,6 +80,8 @@ async def rtc_connect(request: Request):
             "model": "gpt-realtime",
             "instructions": COUNSELLOR_INSTRUCTIONS + scenario,
             "audio": {"output": {"voice": "sage"}},
+            "input_audio_transcription": {"model": "whisper-1"},
+            "turn_detection": {"type": "server_vad", "threshold": 0.5, "silence_duration_ms": 500},
         }
     )
     async with httpx.AsyncClient(timeout=30) as client:
@@ -162,7 +179,7 @@ async def analyze_session(
             profile=profile,
         )
         return JSONResponse(
-            {"profile": profile, "face_data": face_data, "voice_data": voice_data, "session_id": saved_id}
+            {"profile": _sanitize(profile), "face_data": _sanitize(face_data), "voice_data": _sanitize(voice_data), "session_id": saved_id}
         )
     except Exception as exc:
         print(f"Profile generation failed: {exc}")

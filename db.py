@@ -13,6 +13,20 @@ def _now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+class _NumpyEncoder(json.JSONEncoder):
+    def default(self, obj):
+        try:
+            import numpy as np
+            if isinstance(obj, (np.floating,)):
+                return float(obj)
+            if isinstance(obj, (np.integer,)):
+                return int(obj)
+            if isinstance(obj, np.ndarray):
+                return obj.tolist()
+        except ImportError:
+            pass
+        return super().default(obj)
+
 def _to_json(value: Any) -> str:
     if value is None:
         return "{}"
@@ -21,8 +35,8 @@ def _to_json(value: Any) -> str:
             json.loads(value)
             return value
         except json.JSONDecodeError:
-            return json.dumps({"value": value}, ensure_ascii=False)
-    return json.dumps(value, ensure_ascii=False)
+            return json.dumps({"value": value}, ensure_ascii=False, cls=_NumpyEncoder)
+    return json.dumps(value, ensure_ascii=False, cls=_NumpyEncoder)
 
 
 def _from_json(value: Optional[str], default: Any) -> Any:
