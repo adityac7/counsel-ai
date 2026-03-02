@@ -799,6 +799,7 @@
         });
         const replyArea = document.getElementById("counsellor-reply");
         replyArea.innerHTML = `
+          <div class="bubble student"><strong>You:</strong> ${data.transcription || '(no response)'}</div>
           <div class="bubble counsellor">${data.counsellor_response}</div>
         `;
         document.getElementById("next-actions").style.display = "flex";
@@ -862,6 +863,13 @@
         ? recommendations.map((rec) => `<div class="recommendation">${rec}</div>`).join("")
         : `<div class="recommendation">Encourage regular reflection and goal setting.</div>`;
 
+      // Build full transcript HTML
+      let transcriptHtml = '';
+      state.rounds.forEach((r) => {
+        transcriptHtml += '<div class="bubble student"><strong>Student (Round ' + r.round + '):</strong> ' + (r.transcription || '(no response)') + '</div>';
+        transcriptHtml += '<div class="bubble counsellor"><strong>Counsellor:</strong> ' + (r.counsellor_response || '') + '</div>';
+      });
+
       content.innerHTML = `
         <div class="profile-hero">
           <div>
@@ -878,6 +886,10 @@
         <div class="card" style="margin-top:20px;">
           <h3>Recommendations</h3>
           ${recHtml}
+        </div>
+        <div class="card" style="margin-top:20px;">
+          <h3>Full Transcript</h3>
+          <div class="chat">${transcriptHtml}</div>
         </div>
         <div class="actions">
           <button class="btn btn-primary" id="download-btn">Download PDF</button>

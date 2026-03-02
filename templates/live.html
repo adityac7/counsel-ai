@@ -71,7 +71,12 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
       </div>
       <div>
         <label for="class-name">Class</label>
-        <input id="class-name" placeholder="PSY 310" />
+        <select id="class-name">
+                <option value="9">9</option>
+                <option value="10">10</option>
+                <option value="11">11</option>
+                <option value="12">12</option>
+              </select>
       </div>
     </div>
     <label for="case-study">Case study</label>
@@ -150,6 +155,14 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
       <div class="meta" id="summary-text" style="margin-top:8px;"></div>
     </div>
     <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>🎭 Face Analysis</strong>
+      <div class="meta" id="face-analysis-section" style="margin-top:8px;">Waiting for analysis...</div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
+      <strong>🎤 Voice Analysis</strong>
+      <div class="meta" id="voice-analysis-section" style="margin-top:8px;">Waiting for analysis...</div>
+    </div>
+    <div class="card" style="padding:16px;margin-top:16px;">
       <strong>Full transcript</strong>
       <div class="meta" id="summary-transcript" style="margin-top:8px;white-space:pre-wrap;"></div>
     </div>
@@ -205,6 +218,42 @@ function addEntry(role,text){
   return {body, data};
 }
 function updateTimer(){timerEl.textContent=formatTime(Date.now()-timerStart);}
+
+function renderFaceAnalysis(faceData) {
+  const el = document.getElementById('face-analysis-section');
+  if (!faceData || !faceData.summary) { el.textContent = 'No face data captured (camera may not have been available).'; return; }
+  const s = faceData.summary;
+  const items = [
+    s.dominant_emotion ? 'Dominant emotion: ' + s.dominant_emotion : '',
+    s.eye_contact_score != null ? 'Eye contact score: ' + (s.eye_contact_score * 100).toFixed(0) + '%' : '',
+    s.facial_tension_score != null ? 'Facial tension: ' + (s.facial_tension_score * 100).toFixed(0) + '%' : '',
+    s.smile_count != null ? 'Smile count: ' + s.smile_count : '',
+    s.emotion_stability != null ? 'Emotion stability: ' + (s.emotion_stability * 100).toFixed(0) + '%' : '',
+  ].filter(Boolean);
+  if (s.emotion_distribution) {
+    const dist = Object.entries(s.emotion_distribution).sort((a,b) => b[1]-a[1]).slice(0,4).map(([k,v]) => k + ': ' + v.toFixed(1) + '%').join(', ');
+    items.push('Emotion distribution: ' + dist);
+  }
+  if (s.micro_expressions && s.micro_expressions.length) {
+    items.push('Micro-expressions detected: ' + s.micro_expressions.length);
+  }
+  el.innerHTML = items.map(i => '<div style="margin-bottom:6px;">' + i + '</div>').join('');
+}
+
+function renderVoiceAnalysis(voiceData) {
+  const el = document.getElementById('voice-analysis-section');
+  if (!voiceData || !voiceData.speech_rate) { el.textContent = 'No voice data captured.'; return; }
+  const items = [
+    voiceData.speech_rate.words_per_minute ? 'Speech rate: ' + voiceData.speech_rate.words_per_minute.toFixed(0) + ' WPM' : '',
+    voiceData.pauses ? 'Pauses: ' + voiceData.pauses.count + ' (total ' + voiceData.pauses.total_duration.toFixed(1) + 's)' : '',
+    voiceData.pauses && voiceData.pauses.long_pauses.length ? 'Long pauses (hesitation): ' + voiceData.pauses.long_pauses.length : '',
+    voiceData.pitch && voiceData.pitch.mean_hz ? 'Pitch: ' + voiceData.pitch.mean_hz.toFixed(0) + ' Hz (variation: ' + (voiceData.pitch.variation * 100).toFixed(0) + '%)' : '',
+    voiceData.volume ? 'Volume pattern: ' + voiceData.volume.pattern : '',
+    voiceData.overall_confidence_score != null ? 'Voice confidence score: ' + (voiceData.overall_confidence_score * 100).toFixed(0) + '%' : '',
+    voiceData.filler_words && voiceData.filler_words.count ? 'Filler words: ' + voiceData.filler_words.count + ' (' + voiceData.filler_words.per_minute.toFixed(1) + '/min)' : '',
+  ].filter(Boolean);
+  el.innerHTML = items.map(i => '<div style="margin-bottom:6px;">' + i + '</div>').join('');
+}
 
 async function startSession(){
   const name=document.getElementById('student-name').value.trim()||'Student';
@@ -318,6 +367,9 @@ function handleEventMessage(ev){
       console.warn('[CounselAI] Event error:', msg.error || msg);
       break;
     default:
+      if (msg.type && (msg.type.includes('transcript') || msg.type.includes('input') || msg.type.includes('conversation'))) {
+        console.log('[CounselAI] Unhandled relevant event:', msg.type, JSON.stringify(msg).slice(0, 300));
+      }
       break;
   }
 }
@@ -508,6 +560,8 @@ async function endSession(){
       const profile = data.profile || {};
       console.log('[CounselAI] profile received:', JSON.stringify(profile).slice(0, 500));
       buildMetrics(profile);
+      renderFaceAnalysis(data.face_data || {});
+      renderVoiceAnalysis(data.voice_data || {});
       renderProfileSections(profile);
       renderRecommendations(profile);
     } else {

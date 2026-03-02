@@ -48,6 +48,8 @@ async def rtc_connect(request: Request):
             "model": "gpt-4o-realtime-preview",
             "instructions": COUNSELLOR_INSTRUCTIONS + scenario,
             "audio": {"output": {"voice": "sage"}},
+            "input_audio_transcription": {"model": "whisper-1"},
+            "turn_detection": {"type": "server_vad", "threshold": 0.5, "silence_duration_ms": 500},
         }
     )
     async with httpx.AsyncClient(timeout=30) as client:
@@ -116,7 +118,7 @@ async def analyze_session(
         import profile_generator
         profile = profile_generator.generate_profile(session_data)
         print(f"[analyze] profile keys: {list(profile.keys())}")
-        return JSONResponse({"profile": profile})
+        return JSONResponse({"profile": profile, "face_data": face_data, "voice_data": voice_data})
     except Exception as exc:
         print(f"Profile generation failed: {exc}")
         traceback.print_exc()
