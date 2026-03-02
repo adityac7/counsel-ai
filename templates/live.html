@@ -480,11 +480,11 @@ async function startSession(){
       const sessionUpdate = {
         type:'session.update',
         session:{
-          input_audio_transcription:{model:'gpt-4o-transcribe'},
+          input_audio_transcription:{model:'gpt-4o-transcribe',language:'hi'},
           turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
           audio:{
             input:{
-              transcription:{model:'gpt-4o-transcribe'},
+              transcription:{model:'gpt-4o-transcribe',language:'hi'},
               turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500}
             }
           }
@@ -598,13 +598,13 @@ function handleEventMessage(ev){
     case 'conversation.item.input_audio_transcription.done':
     case 'input_audio_transcription.completed':
     case 'input_audio_transcription.done': {
-      // completed/done events have .transcript
       const txt = msg.transcript || msg.text || '';
+      const iid = msg.item_id || 'unknown';
+      // Clear accumulated deltas for this item since we have the final version
+      if (window._transcriptDeltas) delete window._transcriptDeltas[iid];
       if (txt) {
         addStudentTranscript(txt, msg.type + ':transcript');
-        uiLog('OK', '🎤 STUDENT TRANSCRIPT (completed):', txt.slice(0, 100));
-      } else {
-        captureUserTranscriptFromMessage(msg, msg.type);
+        uiLog('OK', '🎤 STUDENT TRANSCRIPT:', txt.slice(0, 120));
       }
       break;
     }
