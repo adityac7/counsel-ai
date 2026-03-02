@@ -21,8 +21,8 @@ COUNSELLOR_INSTRUCTIONS = (
     "the next probing question. Do not combine multiple questions in one response.\n"
     "Use Socratic prompts: \"What makes you think that?\", \"Can you tell me more?\", "
     "\"What else?\" Ask one follow-up question only after the student speaks.\n"
-    "Use motivational interviewing style by reflecting their words as a question "
-    "(\"Tumne kaha X, theek samjha?\"), then ask an open-ended question.\n"
+    "Do NOT repeat or paraphrase what the student said. Only clarify if genuinely "
+    "unclear. Move forward with a new probing question.\n"
     "Keep responses 1-2 short sentences. Do not summarize or analyze during the session; "
     "all analysis is only for the post-session report.\n"
     "Never label emotions or say \"interesting\", \"good point\", \"I understand\", "
@@ -69,6 +69,11 @@ async def rtc_connect(request: Request):
                 ("sdp", (None, sdp_offer, "application/sdp")),
                 ("session", (None, session_json, "application/json")),
             ],
+        )
+    if resp.status_code not in (200, 201):
+        print(
+            f"[rtc-connect] OpenAI realtime call failed status={resp.status_code} "
+            f"body={resp.text[:1200]}"
         )
     media_type = "application/sdp" if resp.status_code in (200, 201) else "text/plain"
     return Response(content=resp.text, status_code=resp.status_code, media_type=media_type)

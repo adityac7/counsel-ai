@@ -23,6 +23,7 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
 .status{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.95rem}
 .status .dot{width:10px;height:10px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px rgba(70,217,209,.6)}
+.debug-line{color:var(--muted);font-size:.8rem;opacity:.95}
 .timer{font-variant-numeric:tabular-nums;color:var(--text)}
 .live-grid{display:flex;flex-direction:column;gap:18px}
 .top-row{display:flex;gap:18px;align-items:flex-start}
@@ -103,8 +104,11 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
   </section>
 
   <section id="live" class="card hidden">
-    <div class="topbar">
-      <div class="status"><span class="dot"></span><span id="status-text">Connecting...</span></div>
+      <div class="topbar">
+      <div>
+        <div class="status"><span class="dot"></span><span id="status-text">Connecting...</span></div>
+        <div class="debug-line" id="rtc-debug">RTC: idle</div>
+      </div>
       <div class="timer" id="timer">00:00</div>
     </div>
     <div class="live-grid">
@@ -118,6 +122,7 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
       <div class="transcript" id="transcript"></div>
       <div class="bottom-row">
         <div class="orb-wrap"><div id="orb" class="orb"></div></div>
+        <button id="enable-audio-btn" style="display:none;max-width:260px;">Enable counsellor audio</button>
         <button id="end-btn" class="danger">End session</button>
       </div>
     </div>
@@ -187,7 +192,7 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
     </div>
   </section>
 </div>
-<audio id="ai-audio" autoplay></audio>
+<audio id="ai-audio" autoplay playsinline></audio>
 <div class="toast" id="toast"></div>
 <script>
 const screens = {welcome:document.getElementById('welcome'),live:document.getElementById('live'),summary:document.getElementById('summary')};
@@ -198,6 +203,8 @@ const orb = document.getElementById('orb');
 const preview = document.getElementById('preview');
 const previewWrap = document.getElementById('preview-wrap');
 const aiAudio = document.getElementById('ai-audio');
+const enableAudioBtn = document.getElementById('enable-audio-btn');
+const rtcDebug = document.getElementById('rtc-debug');
 const toast = document.getElementById('toast');
 const caseStudyText = document.getElementById('case-study-text');
 const profileMetrics = document.getElementById('profile-metrics');
@@ -211,11 +218,44 @@ let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
 let timerStart, timerHandle, currentAiEntry = null;
 let transcriptEntries = [];
 let sessionMeta = null;
+let eventCount = 0;
+let lastStudentTranscript = '';
 
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){statusText.textContent = text;}
 function showToast(msg){toast.textContent = msg;toast.style.display='block';setTimeout(()=>toast.style.display='none',4000);}
 function formatTime(ms){const s=Math.floor(ms/1000);const m=String(Math.floor(s/60)).padStart(2,'0');const r=String(s%60).padStart(2,'0');return `${m}:${r}`;}
+function setDebug(text){rtcDebug.textContent = text;}
+function updateDebugSnapshot(){
+  const pcState = pc ? `${pc.connectionState}/${pc.iceConnectionState}` : 'none';
+  const dcState = dataChannel ? dataChannel.readyState : 'none';
+  const recState = recorder ? recorder.state : 'none';
+  setDebug(`RTC ${pcState} | DC ${dcState} | Rec ${recState} | Events ${eventCount} | Chunks ${recordedChunks.length} | Transcript ${transcriptEntries.length}`);
+}
+function tryPlayAiAudio(){
+  if (!aiAudio.srcObject) return;
+  aiAudio.play().then(()=>{
+    enableAudioBtn.style.display = 'none';
+    console.log('[CounselAI] AI audio playback active');
+  }).catch(err=>{
+    console.warn('[CounselAI] AI audio play blocked:', err);
+    enableAudioBtn.style.display = 'inline-block';
+    setStatus('Tap "Enable counsellor audio"');
+  });
+}
+function logRealtimeEvent(msg){
+  eventCount += 1;
+  const type = msg && msg.type ? msg.type : 'unknown';
+  console.log(`[CounselAI] Event #${eventCount}: ${type}`, msg);
+  updateDebugSnapshot();
+}
+function addStudentTranscript(text){
+  const clean = (text || '').trim();
+  if (!clean) return;
+  if (clean === lastStudentTranscript) return;
+  lastStudentTranscript = clean;
+  addEntry('student', clean);
+}
 function addEntry(role,text){
   const entry=document.createElement('div');
   entry.className=`entry ${role}`;
@@ -282,38 +322,90 @@ async function startSession(){
   recordedChunks = [];
   transcriptEntries = [];
   currentAiEntry = null;
+  eventCount = 0;
+  lastStudentTranscript = '';
   transcriptEl.innerHTML = '';
+  enableAudioBtn.style.display = 'none';
+  aiAudio.srcObject = null;
   showScreen('live');
   setStatus('Connecting...');
+  setDebug('RTC: connecting');
   caseStudyText.textContent = scenario || 'No case study loaded.';
 
   try{mediaStream = await navigator.mediaDevices.getUserMedia({audio:true,video:true});}
   catch(err){mediaStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});}
+  if (!mediaStream.getAudioTracks().length) throw new Error('No microphone track available.');
 
   preview.srcObject = mediaStream;
   if (mediaStream.getVideoTracks().length === 0) {previewWrap.style.display='none';}
+  else {previewWrap.style.display='block';}
 
-  recorder = new MediaRecorder(mediaStream);
-  recorder.ondataavailable = e => { if (e.data.size) recordedChunks.push(e.data); };
+  const mimeCandidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=opus', 'video/webm'];
+  const recorderOptions = {};
+  const selectedMime = mimeCandidates.find(type => MediaRecorder.isTypeSupported(type));
+  if (selectedMime) recorderOptions.mimeType = selectedMime;
+  recorder = new MediaRecorder(mediaStream, recorderOptions);
+  recorder.onstart = () => { console.log('[CounselAI] Recorder started:', recorder.mimeType || 'default'); updateDebugSnapshot(); };
+  recorder.onerror = e => console.error('[CounselAI] Recorder error:', e);
+  recorder.ondataavailable = e => {
+    console.log('[CounselAI] Recorder chunk:', e.data.size);
+    if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    updateDebugSnapshot();
+  };
+  recorder.onstop = () => { console.log('[CounselAI] Recorder stopped. Chunks:', recordedChunks.length); updateDebugSnapshot(); };
   recorder.start(1000);
+  updateDebugSnapshot();
 
   pc = new RTCPeerConnection({iceServers:[{urls:"stun:stun.l.google.com:19302"}]});
   const audioTransceiver = pc.addTransceiver('audio', {direction:'sendrecv'});
   const micTrack = mediaStream.getAudioTracks()[0];
   await audioTransceiver.sender.replaceTrack(micTrack);
+  pc.onconnectionstatechange = () => { console.log('[CounselAI] pc.connectionState:', pc.connectionState); updateDebugSnapshot(); };
+  pc.oniceconnectionstatechange = () => { console.log('[CounselAI] pc.iceConnectionState:', pc.iceConnectionState); updateDebugSnapshot(); };
+  pc.onicegatheringstatechange = () => { console.log('[CounselAI] pc.iceGatheringState:', pc.iceGatheringState); updateDebugSnapshot(); };
 
-  pc.ontrack = e => {aiAudio.srcObject = e.streams[0];aiAudio.play().catch(()=>{});};
+  pc.ontrack = e => {
+    console.log('[CounselAI] ontrack:', e.track.kind, 'streams:', e.streams.length);
+    const stream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
+    aiAudio.srcObject = stream;
+    e.track.onunmute = () => {
+      console.log('[CounselAI] AI track unmuted');
+      tryPlayAiAudio();
+    };
+    tryPlayAiAudio();
+    updateDebugSnapshot();
+  };
 
-  dataChannel = pc.createDataChannel('oai-events');
-  dataChannel.onmessage = function(e) { handleEventMessage(e); };
-  dataChannel.onopen = () => {
-    const sessionUpdate = {type:'session.update',session:{turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},input_audio_transcription:{model:'whisper-1'}}};
-    dataChannel.send(JSON.stringify(sessionUpdate));
-    console.log('[CounselAI] session.update sent:', JSON.stringify(sessionUpdate.session));
-    setTimeout(()=>{
-      const instructions = `Warmly greet ${name} by name, read the case study aloud, then ask: "Iss situation mein tum kya karte? Tell me what comes to your mind first." Case study: ${scenario}`;
-      dataChannel.send(JSON.stringify({type:'response.create',response:{instructions}}));
-    },300);
+  function bindDataChannel(dc){
+    dataChannel = dc;
+    console.log('[CounselAI] Data channel active:', dc.label);
+    updateDebugSnapshot();
+    dc.onmessage = function(e) { handleEventMessage(e); };
+    dc.onopen = () => {
+      console.log('[CounselAI] data channel open:', dc.label);
+      const sessionUpdate = {
+        type:'session.update',
+        session:{
+          turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
+          input_audio_transcription:{model:'whisper-1'}
+        }
+      };
+      dc.send(JSON.stringify(sessionUpdate));
+      console.log('[CounselAI] session.update sent:', JSON.stringify(sessionUpdate.session));
+      setTimeout(()=>{
+        const instructions = `Warmly greet ${name} by name, read the case study aloud, then ask: "Iss situation mein tum kya karte? Tell me what comes to your mind first." Case study: ${scenario}`;
+        dc.send(JSON.stringify({type:'response.create',response:{instructions}}));
+        console.log('[CounselAI] response.create sent');
+      },300);
+      updateDebugSnapshot();
+    };
+    dc.onclose = () => { console.log('[CounselAI] data channel closed:', dc.label); updateDebugSnapshot(); };
+    dc.onerror = err => { console.error('[CounselAI] data channel error:', err); updateDebugSnapshot(); };
+  }
+  bindDataChannel(pc.createDataChannel('oai-events'));
+  pc.ondatachannel = evt => {
+    console.log('[CounselAI] Remote data channel offered:', evt.channel.label);
+    if (!dataChannel || dataChannel.readyState !== 'open') bindDataChannel(evt.channel);
   };
 
   const offer = await pc.createOffer();
@@ -328,30 +420,47 @@ async function startSession(){
   timerStart = Date.now();
   timerHandle = setInterval(updateTimer, 500);
   setStatus('Listening...');
+  updateDebugSnapshot();
 }
 
 function handleEventMessage(ev){
-  let msg;try{msg=JSON.parse(ev.data);}catch{return;}
+  let msg;
+  try{msg=JSON.parse(ev.data);}
+  catch{
+    console.log('[CounselAI] Non-JSON data channel payload:', ev.data);
+    return;
+  }
+  logRealtimeEvent(msg);
   switch(msg.type){
     case 'response.output_audio_transcript.delta':
+    case 'response.audio_transcript.delta':
       orb.classList.add('speaking');
       if (!currentAiEntry) {
         const created = addEntry('ai','');
         currentAiEntry = created;
       }
-      currentAiEntry.body.textContent += msg.delta || '';
+      currentAiEntry.body.textContent += msg.delta || msg.text || '';
       currentAiEntry.data.text = currentAiEntry.body.textContent;
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
       setStatus('Speaking...');
       break;
     case 'response.output_audio_transcript.done':
+    case 'response.audio_transcript.done':
       if (currentAiEntry) {
-        currentAiEntry.body.textContent = msg.transcript || currentAiEntry.body.textContent;
+        currentAiEntry.body.textContent = msg.transcript || msg.text || currentAiEntry.body.textContent;
         currentAiEntry.data.text = currentAiEntry.body.textContent;
         currentAiEntry = null;
-      } else if (msg.transcript) {
-        addEntry('ai', msg.transcript);
+      } else if (msg.transcript || msg.text) {
+        addEntry('ai', msg.transcript || msg.text);
       }
+      break;
+    case 'response.output_text.delta':
+      if (!currentAiEntry) currentAiEntry = addEntry('ai','');
+      currentAiEntry.body.textContent += msg.delta || '';
+      currentAiEntry.data.text = currentAiEntry.body.textContent;
+      break;
+    case 'response.output_text.done':
+      if (currentAiEntry) currentAiEntry = null;
       break;
     case 'response.done':
       orb.classList.remove('speaking');
@@ -370,14 +479,14 @@ function handleEventMessage(ev){
       console.log('[CounselAI] Session config accepted:', JSON.stringify(msg.session || {}));
       break;
     case 'conversation.item.input_audio_transcription.completed':
-      if (msg.transcript) addEntry('student', msg.transcript);
+      addStudentTranscript(msg.transcript || (msg.item && msg.item.transcript));
       break;
     case 'conversation.item.done':
       // Fallback: extract student audio transcription from conversation item
       if (msg.item && msg.item.role === 'user' && msg.item.content) {
         for (const part of msg.item.content) {
-          if (part.type === 'input_audio' && part.transcript) {
-            addEntry('student', part.transcript);
+          if ((part.type === 'input_audio' || part.type === 'audio') && part.transcript) {
+            addStudentTranscript(part.transcript);
           }
         }
       }
@@ -386,11 +495,9 @@ function handleEventMessage(ev){
       console.warn('[CounselAI] Event error:', msg.error || msg);
       break;
     default:
-      if (msg.type && (msg.type.includes('transcript') || msg.type.includes('input') || msg.type.includes('conversation'))) {
-        console.log('[CounselAI] Unhandled relevant event:', msg.type, JSON.stringify(msg).slice(0, 300));
-      }
       break;
   }
+  updateDebugSnapshot();
 }
 
 function waitForIce(pc){
@@ -531,7 +638,16 @@ async function endSession(){
   clearInterval(timerHandle);
   const videoBlob = await new Promise(resolve => {
     if (!recorder || recorder.state === 'inactive') return resolve(null);
-    recorder.onstop = () => resolve(new Blob(recordedChunks, {type:'video/webm'}));
+    recorder.requestData();
+    const stopTimer = setTimeout(() => {
+      console.warn('[CounselAI] Recorder stop timeout, resolving with current chunks');
+      resolve(recordedChunks.length ? new Blob(recordedChunks, {type: recorder.mimeType || 'video/webm'}) : null);
+    }, 3000);
+    recorder.onstop = () => {
+      clearTimeout(stopTimer);
+      const blob = recordedChunks.length ? new Blob(recordedChunks, {type: recorder.mimeType || 'video/webm'}) : null;
+      resolve(blob);
+    };
     recorder.stop();
   });
   if (dataChannel) dataChannel.close();
@@ -554,6 +670,7 @@ async function endSession(){
   try{
     const fd = new FormData();
     const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
+    console.log('[CounselAI] Final video blob size:', safeBlob.size);
     fd.append('video', safeBlob, 'session.webm');
     // Build transcript from in-memory buffer; fallback to DOM if needed.
     let finalTranscript = transcriptEntries
@@ -608,6 +725,9 @@ async function endSession(){
 
 document.getElementById('start-btn').addEventListener('click', ()=>startSession().catch(err=>{showToast(err.message);showScreen('welcome');}));
 document.getElementById('end-btn').addEventListener('click', endSession);
+enableAudioBtn.addEventListener('click', () => {
+  tryPlayAiAudio();
+});
 document.getElementById('new-btn').addEventListener('click', ()=>{location.reload();});
 
 (async()=>{
