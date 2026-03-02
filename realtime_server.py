@@ -1,14 +1,17 @@
 """CounselAI Live — WebRTC Realtime server."""
+import asyncio
 import json
 import os
 import tempfile
 import traceback
 from datetime import datetime, timezone
-from fastapi import FastAPI, File, Form, Request, UploadFile
+from fastapi import FastAPI, File, Form, Request, UploadFile, WebSocket
 from fastapi.responses import HTMLResponse, JSONResponse, Response
 from fastapi.templating import Jinja2Templates
+from starlette.websockets import WebSocketDisconnect
 from case_studies import CASE_STUDIES
 import db
+import websockets
 
 import numpy as np
 
@@ -30,6 +33,9 @@ app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 db.init_db()
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M")
+GEMINI_WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+GEMINI_MODEL = "models/gemini-2.0-flash-live"
 COUNSELLOR_INSTRUCTIONS = (
     "You are an experienced Indian school counsellor for classes 9-12. "
     "Your goal: make the STUDENT talk more, not you. You are evaluating them 360 degrees — "
@@ -108,6 +114,122 @@ async def rtc_connect(request: Request):
             pass
     media_type = "application/sdp" if resp.status_code in (200, 201) else "text/plain"
     return Response(content=resp.text, status_code=resp.status_code, media_type=media_type)
+
+
+@app.websocket("/api/gemini-ws")
+async def gemini_ws_proxy(ws: WebSocket):
+    """WebSocket proxy: browser <-> Gemini Live API."""
+    await ws.accept()
+    scenario = ws.query_params.get("scenario", "")
+    student_name = ws.query_params.get("name", "Student")
+
+    gemini_url = f"{GEMINI_WS_URL}?key={GEMINI_API_KEY}"
+    gemini = None
+
+    try:
+        gemini = await websockets.connect(gemini_url)
+
+        # Send setup message with model, instructions, and audio config
+        setup_msg = {
+            "setup": {
+                "model": GEMINI_MODEL,
+                "generationConfig": {
+                    "responseModalities": ["AUDIO"],
+                    "speechConfig": {
+                        "voiceConfig": {
+                            "prebuiltVoiceConfig": {"voiceName": "Kore"}
+                        }
+                    },
+                },
+                "systemInstruction": {
+                    "parts": [{"text": COUNSELLOR_INSTRUCTIONS + scenario}]
+                },
+            }
+        }
+        await gemini.send(json.dumps(setup_msg))
+        print("[gemini-ws] Setup message sent")
+
+        # Wait for setupComplete
+        raw = await asyncio.wait_for(gemini.recv(), timeout=15)
+        setup_resp = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
+        print(f"[gemini-ws] Setup response: {json.dumps(setup_resp)[:500]}")
+        await ws.send_json({"type": "setup_complete"})
+
+        # Send initial greeting prompt to trigger the counsellor
+        greeting = {
+            "clientContent": {
+                "turns": [{
+                    "role": "user",
+                    "parts": [{
+                        "text": (
+                            f"Greet {student_name} by name, read the case study aloud "
+                            f"in Hinglish, then ask your first probing question. "
+                            f"Case study: {scenario}"
+                        )
+                    }]
+                }],
+                "turnComplete": True,
+            }
+        }
+        await gemini.send(json.dumps(greeting))
+        print("[gemini-ws] Initial greeting sent")
+
+        # Bidirectional proxy
+        async def browser_to_gemini():
+            try:
+                while True:
+                    data = await ws.receive_text()
+                    await gemini.send(data)
+            except WebSocketDisconnect:
+                print("[gemini-ws] Browser disconnected")
+            except Exception as e:
+                print(f"[gemini-ws] browser->gemini error: {e}")
+
+        async def gemini_to_browser():
+            try:
+                async for msg in gemini:
+                    text = msg if isinstance(msg, str) else msg.decode()
+                    await ws.send_text(text)
+            except websockets.exceptions.ConnectionClosed:
+                print("[gemini-ws] Gemini connection closed")
+            except Exception as e:
+                print(f"[gemini-ws] gemini->browser error: {e}")
+
+        done, pending = await asyncio.wait(
+            [
+                asyncio.create_task(browser_to_gemini()),
+                asyncio.create_task(gemini_to_browser()),
+            ],
+            return_when=asyncio.FIRST_COMPLETED,
+        )
+        for task in pending:
+            task.cancel()
+
+    except asyncio.TimeoutError:
+        print("[gemini-ws] Gemini setup timed out")
+        try:
+            await ws.send_json({"type": "error", "message": "Gemini setup timed out"})
+        except Exception:
+            pass
+    except Exception as e:
+        print(f"[gemini-ws] Error: {e}")
+        traceback.print_exc()
+        try:
+            await ws.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        if gemini:
+            try:
+                await gemini.close()
+            except Exception:
+                pass
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
 @app.post("/api/analyze-session")
 async def analyze_session(
     video: UploadFile = File(...),

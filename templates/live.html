@@ -96,6 +96,11 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
         <input id="student-age" type="number" min="10" max="20" value="15" />
       </div>
     </div>
+    <label for="ai-model">AI Model</label>
+    <select id="ai-model">
+      <option value="openai">OpenAI GPT Realtime</option>
+      <option value="gemini">Google Gemini Live</option>
+    </select>
     <label for="case-study">Case study</label>
     <select id="case-study"></select>
     <div style="margin-top:18px;">
@@ -244,6 +249,12 @@ let lastStudentTranscript = '';
 let waitingForStudentTranscript = false;
 let lastUserItemId = null;
 const eventTypeCounts = {};
+let sessionMode = 'openai';
+let geminiWs = null;
+let geminiAudioCtx = null;
+let geminiPlaybackCtx = null;
+let geminiPlaybackTime = 0;
+let geminiMicProcessor = null;
 
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){statusText.textContent = text;}
@@ -251,10 +262,16 @@ function showToast(msg){toast.textContent = msg;toast.style.display='block';setT
 function formatTime(ms){const s=Math.floor(ms/1000);const m=String(Math.floor(s/60)).padStart(2,'0');const r=String(s%60).padStart(2,'0');return `${m}:${r}`;}
 function setDebug(text){rtcDebug.textContent = text;}
 function updateDebugSnapshot(){
-  const pcState = pc ? `${pc.connectionState}/${pc.iceConnectionState}` : 'none';
-  const dcState = dataChannel ? dataChannel.readyState : 'none';
-  const recState = recorder ? recorder.state : 'none';
-  setDebug(`RTC ${pcState} | DC ${dcState} | Rec ${recState} | Events ${eventCount} | Chunks ${recordedChunks.length} | Transcript ${transcriptEntries.length}`);
+  if (sessionMode === 'gemini') {
+    const wsState = geminiWs ? ['CONNECTING','OPEN','CLOSING','CLOSED'][geminiWs.readyState] : 'none';
+    const recState = recorder ? recorder.state : 'none';
+    setDebug(`Gemini WS ${wsState} | Rec ${recState} | Events ${eventCount} | Chunks ${recordedChunks.length} | Transcript ${transcriptEntries.length}`);
+  } else {
+    const pcState = pc ? `${pc.connectionState}/${pc.iceConnectionState}` : 'none';
+    const dcState = dataChannel ? dataChannel.readyState : 'none';
+    const recState = recorder ? recorder.state : 'none';
+    setDebug(`RTC ${pcState} | DC ${dcState} | Rec ${recState} | Events ${eventCount} | Chunks ${recordedChunks.length} | Transcript ${transcriptEntries.length}`);
+  }
 }
 function tryPlayAiAudio(){
   if (!aiAudio.srcObject) return;
@@ -403,6 +420,7 @@ async function startSession(){
   const school=document.getElementById('school-name').value.trim();
   const age=Number(document.getElementById('student-age').value || 15);
   const scenario=document.getElementById('case-study').value;
+  sessionMode = document.getElementById('ai-model').value;
   sessionMeta={name,className,section,school,age,scenario,start:new Date()};
   recordedChunks = [];
   transcriptEntries = [];
@@ -414,7 +432,7 @@ async function startSession(){
   aiAudio.srcObject = null;
   showScreen('live');
   setStatus('Connecting...');
-  setDebug('RTC: connecting');
+  setDebug(sessionMode === 'gemini' ? 'Gemini: connecting' : 'RTC: connecting');
   caseStudyText.textContent = scenario || 'No case study loaded.';
 
   try{mediaStream = await navigator.mediaDevices.getUserMedia({audio:true,video:true});}
@@ -451,6 +469,19 @@ async function startSession(){
   recorder.start(1000);
   updateDebugSnapshot();
 
+  if (sessionMode === 'gemini') {
+    await startGeminiSession(name, scenario);
+  } else {
+    await startOpenAISession(name, scenario);
+  }
+
+  timerStart = Date.now();
+  timerHandle = setInterval(updateTimer, 500);
+  setStatus('Listening...');
+  updateDebugSnapshot();
+}
+
+async function startOpenAISession(name, scenario){
   pc = new RTCPeerConnection();
   pc.addTrack(mediaStream.getAudioTracks()[0]);
   pc.onconnectionstatechange = () => { console.log('[CounselAI] pc.connectionState:', pc.connectionState); updateDebugSnapshot(); };
@@ -476,7 +507,6 @@ async function startSession(){
     dc.onmessage = function(e) { handleEventMessage(e); };
     dc.onopen = () => {
       uiLog('OK', 'Data channel OPEN:', dc.label);
-      // Send session.update with BOTH flat (beta) and nested (GA) transcription formats
       const sessionUpdate = {
         type:'session.update',
         session:{
@@ -515,11 +545,179 @@ async function startSession(){
   if (resp.status !== 200 && resp.status !== 201) throw new Error(`RTC connect failed (${resp.status})`);
   const answerSdp = await resp.text();
   await pc.setRemoteDescription({type:'answer', sdp: answerSdp});
+}
 
-  timerStart = Date.now();
-  timerHandle = setInterval(updateTimer, 500);
-  setStatus('Listening...');
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary);
+}
+
+function base64ToInt16Array(base64) {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return new Int16Array(bytes.buffer);
+}
+
+function playGeminiAudio(base64Data) {
+  if (!geminiPlaybackCtx) return;
+  const int16 = base64ToInt16Array(base64Data);
+  if (int16.length === 0) return;
+  const float32 = new Float32Array(int16.length);
+  for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
+  const buffer = geminiPlaybackCtx.createBuffer(1, float32.length, 24000);
+  buffer.getChannelData(0).set(float32);
+  const source = geminiPlaybackCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(geminiPlaybackCtx.destination);
+  const now = geminiPlaybackCtx.currentTime;
+  const startAt = Math.max(now, geminiPlaybackTime);
+  source.start(startAt);
+  geminiPlaybackTime = startAt + buffer.duration;
+}
+
+async function startGeminiSession(name, scenario){
+  uiLog('INFO', 'Starting Gemini Live session...');
+
+  // Audio capture context at 16kHz for Gemini PCM input
+  geminiAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
+  const micSource = geminiAudioCtx.createMediaStreamSource(mediaStream);
+  const bufferSize = 4096;
+  geminiMicProcessor = geminiAudioCtx.createScriptProcessor(bufferSize, 1, 1);
+
+  // Audio playback context at 24kHz for Gemini PCM output
+  geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+  geminiPlaybackTime = 0;
+
+  // Connect WebSocket to our server proxy
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}`;
+  geminiWs = new WebSocket(wsUrl);
+
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => reject(new Error('Gemini WebSocket connection timed out')), 20000);
+    geminiWs.onopen = () => {
+      uiLog('OK', 'WebSocket connected to server');
+    };
+    geminiWs.onmessage = (ev) => {
+      let msg;
+      try { msg = JSON.parse(ev.data); } catch { return; }
+
+      if (msg.type === 'setup_complete') {
+        clearTimeout(timeout);
+        uiLog('OK', 'Gemini session ready');
+        setStatus('Connected');
+        resolve();
+        return;
+      }
+      if (msg.type === 'error') {
+        clearTimeout(timeout);
+        reject(new Error(msg.message || 'Gemini error'));
+        return;
+      }
+
+      // Handle ongoing Gemini messages (after setup)
+      handleGeminiMessage(msg);
+    };
+    geminiWs.onerror = (err) => {
+      clearTimeout(timeout);
+      reject(new Error('Gemini WebSocket error'));
+    };
+    geminiWs.onclose = () => {
+      uiLog('WARN', 'Gemini WebSocket closed');
+    };
+  });
+
+  // Replace onmessage with ongoing handler now that setup is done
+  geminiWs.onmessage = (ev) => {
+    let msg;
+    try { msg = JSON.parse(ev.data); } catch { return; }
+    handleGeminiMessage(msg);
+  };
+
+  // Start sending mic audio
+  geminiMicProcessor.onaudioprocess = (e) => {
+    if (!geminiWs || geminiWs.readyState !== WebSocket.OPEN) return;
+    const float32 = e.inputBuffer.getChannelData(0);
+    const int16 = new Int16Array(float32.length);
+    for (let i = 0; i < float32.length; i++) {
+      int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
+    }
+    const base64 = arrayBufferToBase64(int16.buffer);
+    geminiWs.send(JSON.stringify({
+      realtimeInput: {
+        mediaChunks: [{
+          data: base64,
+          mimeType: "audio/pcm;rate=16000"
+        }]
+      }
+    }));
+  };
+
+  micSource.connect(geminiMicProcessor);
+  geminiMicProcessor.connect(geminiAudioCtx.destination);
+  uiLog('OK', 'Mic capture active (16kHz PCM)');
+  setDebug('Gemini: connected | Mic: active');
+}
+
+function handleGeminiMessage(msg) {
+  eventCount++;
   updateDebugSnapshot();
+
+  const serverContent = msg.serverContent;
+  if (!serverContent) {
+    // Could be a toolCall or other message type
+    if (msg.type === 'error') {
+      uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
+    }
+    return;
+  }
+
+  // Model audio/text turn
+  if (serverContent.modelTurn && serverContent.modelTurn.parts) {
+    orb.classList.add('speaking');
+    setStatus('Speaking...');
+    for (const part of serverContent.modelTurn.parts) {
+      if (part.inlineData && part.inlineData.data) {
+        playGeminiAudio(part.inlineData.data);
+      }
+      if (part.text) {
+        if (!currentAiEntry) currentAiEntry = addEntry('ai', '');
+        currentAiEntry.body.textContent += part.text;
+        currentAiEntry.data.text = currentAiEntry.body.textContent;
+        transcriptEl.scrollTop = transcriptEl.scrollHeight;
+      }
+    }
+  }
+
+  // Turn complete
+  if (serverContent.turnComplete) {
+    orb.classList.remove('speaking');
+    if (currentAiEntry) currentAiEntry = null;
+    setStatus('Listening...');
+  }
+
+  // Input transcription (student speech)
+  if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
+    const txt = serverContent.inputTranscription.text.trim();
+    if (txt) {
+      addStudentTranscript(txt, 'gemini:inputTranscription');
+      uiLog('OK', 'Student transcript:', txt.slice(0, 120));
+    }
+  }
+
+  // Output transcription (counsellor speech text)
+  if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
+    const txt = serverContent.outputTranscription.text.trim();
+    if (txt) {
+      if (!currentAiEntry) currentAiEntry = addEntry('ai', '');
+      currentAiEntry.body.textContent += txt;
+      currentAiEntry.data.text = currentAiEntry.body.textContent;
+      transcriptEl.scrollTop = transcriptEl.scrollHeight;
+    }
+  }
 }
 
 function handleEventMessage(ev){
@@ -825,8 +1023,15 @@ async function endSession(){
     };
     recorder.stop();
   });
-  if (dataChannel) dataChannel.close();
-  if (pc) pc.close();
+  if (sessionMode === 'gemini') {
+    if (geminiMicProcessor) { try { geminiMicProcessor.disconnect(); } catch(e){} geminiMicProcessor = null; }
+    if (geminiAudioCtx) { try { geminiAudioCtx.close(); } catch(e){} geminiAudioCtx = null; }
+    if (geminiPlaybackCtx) { try { geminiPlaybackCtx.close(); } catch(e){} geminiPlaybackCtx = null; }
+    if (geminiWs) { try { geminiWs.close(); } catch(e){} geminiWs = null; }
+  } else {
+    if (dataChannel) dataChannel.close();
+    if (pc) pc.close();
+  }
   if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
 
   const duration = formatTime(Date.now()-timerStart);
