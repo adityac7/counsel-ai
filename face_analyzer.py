@@ -99,7 +99,7 @@ def analyze_frames(frames_dir: str) -> Dict[str, Any]:
 
     if not os.path.isdir(frames_dir):
         print("[face_analyzer] Error: frames_dir not found")
-        return {}
+        return _neutral_defaults()
 
     frame_files = sorted(
         f
@@ -109,7 +109,7 @@ def analyze_frames(frames_dir: str) -> Dict[str, Any]:
 
     if not frame_files:
         print("[face_analyzer] Error: no frames found")
-        return {}
+        return _neutral_defaults()
 
     timeline: List[Dict[str, Any]] = []
     emotions_sum: Dict[str, float] = {}

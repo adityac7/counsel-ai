@@ -8,6 +8,28 @@ from typing import Any, Dict, List, Optional
 
 import librosa
 import numpy as np
+from utils import extract_audio_from_video
+
+
+def _load_audio_with_fallback(audio_path: str) -> tuple[Optional[np.ndarray], Optional[int], str]:
+    """Load audio with librosa and retry from ffmpeg-converted wav if needed."""
+    try:
+        y, sr = librosa.load(audio_path, sr=None)
+        return y, sr, audio_path
+    except Exception as exc:
+        print(f"[voice_analyzer] Warning: direct audio load failed ({exc})")
+
+    converted_path = extract_audio_from_video(audio_path)
+    if not converted_path or not os.path.exists(converted_path):
+        return None, None, ""
+
+    try:
+        y, sr = librosa.load(converted_path, sr=None)
+        print(f"[voice_analyzer] Loaded audio via wav fallback: {converted_path}")
+        return y, sr, converted_path
+    except Exception as exc:
+        print(f"[voice_analyzer] Warning: wav fallback load failed ({exc})")
+        return None, None, ""
 
 def detect_pauses(audio_path: str, min_duration: float = 0.5) -> List[Dict[str, float]]:
     """Detect pauses in audio based on silence intervals."""
@@ -15,11 +37,13 @@ def detect_pauses(audio_path: str, min_duration: float = 0.5) -> List[Dict[str, 
     if not os.path.exists(audio_path):
         print("[voice_analyzer] Error: audio file not found")
         return []
+    if os.path.getsize(audio_path) == 0:
+        print("[voice_analyzer] Error: audio file is empty")
+        return []
 
-    try:
-        y, sr = librosa.load(audio_path, sr=None)
-    except Exception as exc:
-        print(f"[voice_analyzer] Error: failed to load audio ({exc})")
+    y, sr, _ = _load_audio_with_fallback(audio_path)
+    if y is None or sr is None:
+        print("[voice_analyzer] Error: failed to load audio after fallback")
         return []
 
     if y.size == 0:
@@ -154,11 +178,13 @@ def analyze_audio(audio_path: str, transcript: Optional[str] = None) -> Dict[str
     if not os.path.exists(audio_path):
         print("[voice_analyzer] Error: audio file not found")
         return {}
+    if os.path.getsize(audio_path) == 0:
+        print("[voice_analyzer] Error: audio file is empty")
+        return {}
 
-    try:
-        y, sr = librosa.load(audio_path, sr=None)
-    except Exception as exc:
-        print(f"[voice_analyzer] Error: corrupted audio ({exc})")
+    y, sr, loaded_audio_path = _load_audio_with_fallback(audio_path)
+    if y is None or sr is None:
+        print("[voice_analyzer] Error: corrupted audio (failed to decode after fallback)")
         return {}
 
     if y.size == 0:
@@ -170,7 +196,7 @@ def analyze_audio(audio_path: str, transcript: Optional[str] = None) -> Dict[str
         print("[voice_analyzer] Error: audio too short")
         return {}
 
-    pauses = detect_pauses(audio_path)
+    pauses = detect_pauses(loaded_audio_path or audio_path)
     total_pause = sum(pause["duration"] for pause in pauses)
     pause_ratio = total_pause / duration if duration > 0 else 0.0
 

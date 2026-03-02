@@ -220,6 +220,9 @@ let transcriptEntries = [];
 let sessionMeta = null;
 let eventCount = 0;
 let lastStudentTranscript = '';
+let waitingForStudentTranscript = false;
+let lastUserItemId = null;
+const eventTypeCounts = {};
 
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){statusText.textContent = text;}
@@ -246,15 +249,76 @@ function tryPlayAiAudio(){
 function logRealtimeEvent(msg){
   eventCount += 1;
   const type = msg && msg.type ? msg.type : 'unknown';
+  eventTypeCounts[type] = (eventTypeCounts[type] || 0) + 1;
   console.log(`[CounselAI] Event #${eventCount}: ${type}`, msg);
+  if (/(transcript|input|user)/i.test(type)) {
+    try {
+      console.log(`[CounselAI] Event payload (${type}):\n${JSON.stringify(msg, null, 2)}`);
+    } catch (err) {
+      console.warn('[CounselAI] Failed to stringify event payload:', err);
+    }
+  }
   updateDebugSnapshot();
 }
-function addStudentTranscript(text){
-  const clean = (text || '').trim();
-  if (!clean) return;
-  if (clean === lastStudentTranscript) return;
+function addStudentTranscript(text, source){
+  const raw = typeof text === 'string' ? text : String(text ?? '');
+  const clean = raw.trim();
+  console.log('[CounselAI] Student transcript candidate:', {
+    source: source || 'unknown',
+    raw,
+    clean,
+    waitingForStudentTranscript,
+    lastUserItemId
+  });
+  if (!clean) {
+    console.log('[CounselAI] Student transcript candidate was empty.');
+    return false;
+  }
+  if (clean === lastStudentTranscript) {
+    console.log('[CounselAI] Duplicate student transcript observed; keeping capture active.');
+  }
   lastStudentTranscript = clean;
   addEntry('student', clean);
+  waitingForStudentTranscript = false;
+  return true;
+}
+
+function collectTranscriptCandidates(value, path = 'msg', out = []){
+  if (!value) return out;
+  if (typeof value === 'string') return out;
+  if (Array.isArray(value)) {
+    value.forEach((item, i) => collectTranscriptCandidates(item, `${path}[${i}]`, out));
+    return out;
+  }
+  if (typeof value !== 'object') return out;
+
+  if (typeof value.transcript === 'string') out.push({text: value.transcript, source: `${path}.transcript`});
+  if (typeof value.text === 'string' && /input_audio|user|conversation\.item|audio_transcription/.test(path)) {
+    out.push({text: value.text, source: `${path}.text`});
+  }
+  if (typeof value.delta === 'string' && /audio_transcription/.test(path)) {
+    out.push({text: value.delta, source: `${path}.delta`});
+  }
+
+  Object.keys(value).forEach(key => {
+    collectTranscriptCandidates(value[key], `${path}.${key}`, out);
+  });
+  return out;
+}
+
+function captureUserTranscriptFromMessage(msg, contextType){
+  const role = msg?.role || msg?.item?.role || msg?.content_part?.role || msg?.item?.author?.role || '';
+  const isUserScoped = role === 'user' || waitingForStudentTranscript || /input_audio|audio_transcription|user/.test(contextType || '');
+  if (!isUserScoped) return;
+  const candidates = collectTranscriptCandidates(msg);
+  let captured = false;
+  for (const candidate of candidates) {
+    const didCapture = addStudentTranscript(candidate.text, `${contextType || 'event'}:${candidate.source}`);
+    captured = didCapture || captured;
+  }
+  if (!captured) {
+    console.log('[CounselAI] No non-empty student transcript text found for event:', contextType);
+  }
 }
 function addEntry(role,text){
   const entry=document.createElement('div');
@@ -337,19 +401,29 @@ async function startSession(){
   if (!mediaStream.getAudioTracks().length) throw new Error('No microphone track available.');
 
   preview.srcObject = mediaStream;
-  if (mediaStream.getVideoTracks().length === 0) {previewWrap.style.display='none';}
-  else {previewWrap.style.display='block';}
+  const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
+  if (!hasVideoTrack) {
+    previewWrap.style.display='none';
+    console.warn('[CounselAI] Camera unavailable; recording audio-only.');
+  } else {
+    previewWrap.style.display='block';
+  }
 
-  const mimeCandidates = ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=opus', 'video/webm'];
+  const mimeCandidates = hasVideoTrack
+    ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=opus', 'video/webm']
+    : ['audio/webm;codecs=opus', 'audio/webm', 'video/webm;codecs=opus', 'video/webm'];
   const recorderOptions = {};
   const selectedMime = mimeCandidates.find(type => MediaRecorder.isTypeSupported(type));
   if (selectedMime) recorderOptions.mimeType = selectedMime;
+  console.log('[CounselAI] Recorder mime selected:', selectedMime || 'browser-default');
   recorder = new MediaRecorder(mediaStream, recorderOptions);
   recorder.onstart = () => { console.log('[CounselAI] Recorder started:', recorder.mimeType || 'default'); updateDebugSnapshot(); };
   recorder.onerror = e => console.error('[CounselAI] Recorder error:', e);
   recorder.ondataavailable = e => {
     console.log('[CounselAI] Recorder chunk:', e.data.size);
     if (e.data && e.data.size > 0) recordedChunks.push(e.data);
+    const totalBytes = recordedChunks.reduce((sum, chunk) => sum + (chunk.size || 0), 0);
+    console.log('[CounselAI] Recorder chunks:', recordedChunks.length, 'total bytes:', totalBytes);
     updateDebugSnapshot();
   };
   recorder.onstop = () => { console.log('[CounselAI] Recorder stopped. Chunks:', recordedChunks.length); updateDebugSnapshot(); };
@@ -464,6 +538,8 @@ function handleEventMessage(ev){
       setStatus('Listening...');
       break;
     case 'input_audio_buffer.speech_started':
+      waitingForStudentTranscript = true;
+      console.log('[CounselAI] Student speech started; awaiting transcript.');
       setStatus('Listening...');
       break;
     case 'input_audio_buffer.speech_stopped':
@@ -471,27 +547,39 @@ function handleEventMessage(ev){
       break;
     case 'input_audio_buffer.committed':
       console.log('[CounselAI] input audio committed for transcription.');
+      waitingForStudentTranscript = true;
       break;
     case 'session.updated':
       console.log('[CounselAI] Session config accepted:', JSON.stringify(msg.session || {}));
       break;
     case 'conversation.item.input_audio_transcription.completed':
-      addStudentTranscript(msg.transcript || (msg.item && msg.item.transcript));
+    case 'conversation.item.input_audio_transcription.done':
+    case 'conversation.item.input_audio_transcription.delta':
+    case 'input_audio_transcription.completed':
+    case 'input_audio_transcription.done':
+      captureUserTranscriptFromMessage(msg, msg.type);
+      break;
+    case 'conversation.item.created':
+      if ((msg.item && msg.item.role === 'user') || msg.role === 'user') {
+        waitingForStudentTranscript = true;
+        lastUserItemId = (msg.item && msg.item.id) || msg.item_id || null;
+        console.log('[CounselAI] User conversation item created; expecting transcript.', {lastUserItemId});
+        captureUserTranscriptFromMessage(msg, msg.type);
+      }
       break;
     case 'conversation.item.done':
       // Fallback: extract student audio transcription from conversation item
-      if (msg.item && msg.item.role === 'user' && msg.item.content) {
-        for (const part of msg.item.content) {
-          if ((part.type === 'input_audio' || part.type === 'audio') && part.transcript) {
-            addStudentTranscript(part.transcript);
-          }
-        }
+      if (msg.item && msg.item.role === 'user') {
+        captureUserTranscriptFromMessage(msg, msg.type);
       }
       break;
     case 'error':
       console.warn('[CounselAI] Event error:', msg.error || msg);
       break;
     default:
+      if (/conversation\.item|input_audio|audio_transcription|user/.test(msg.type || '')) {
+        captureUserTranscriptFromMessage(msg, msg.type);
+      }
       break;
   }
   updateDebugSnapshot();
@@ -635,15 +723,26 @@ async function endSession(){
   clearInterval(timerHandle);
   const videoBlob = await new Promise(resolve => {
     if (!recorder || recorder.state === 'inactive') return resolve(null);
-    recorder.requestData();
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      const mime = recorder.mimeType || 'video/webm';
+      const blob = recordedChunks.length ? new Blob(recordedChunks, {type: mime}) : null;
+      const size = blob ? blob.size : 0;
+      console.log('[CounselAI] Finalized recorder blob size:', size, 'mime:', mime);
+      resolve(blob);
+    };
+    try { recorder.requestData(); } catch (err) { console.warn('[CounselAI] requestData failed:', err); }
     const stopTimer = setTimeout(() => {
       console.warn('[CounselAI] Recorder stop timeout, resolving with current chunks');
-      resolve(recordedChunks.length ? new Blob(recordedChunks, {type: recorder.mimeType || 'video/webm'}) : null);
+      finish();
     }, 3000);
-    recorder.onstop = () => {
+    const previousOnStop = recorder.onstop;
+    recorder.onstop = (event) => {
       clearTimeout(stopTimer);
-      const blob = recordedChunks.length ? new Blob(recordedChunks, {type: recorder.mimeType || 'video/webm'}) : null;
-      resolve(blob);
+      if (typeof previousOnStop === 'function') previousOnStop(event);
+      finish();
     };
     recorder.stop();
   });
@@ -668,6 +767,10 @@ async function endSession(){
     const fd = new FormData();
     const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
     console.log('[CounselAI] Final video blob size:', safeBlob.size);
+    if (safeBlob.size === 0) {
+      console.warn('[CounselAI] Empty recording blob. Analysis may fail.');
+      showToast('Recording was empty. Check mic/camera permissions and try again.');
+    }
     fd.append('video', safeBlob, 'session.webm');
     // Build transcript from in-memory buffer; fallback to DOM if needed.
     let finalTranscript = transcriptEntries
@@ -684,6 +787,11 @@ async function endSession(){
     const transcriptJson = JSON.stringify(finalTranscript);
     console.log('[CounselAI] transcript JSON length:', transcriptJson.length);
     console.log('[CounselAI] transcript entries:', finalTranscript.length);
+    const roleCounts = finalTranscript.reduce((acc, item) => {
+      acc[item.role] = (acc[item.role] || 0) + 1;
+      return acc;
+    }, {});
+    console.log('[CounselAI] transcript role counts:', roleCounts);
     fd.append('transcript', JSON.stringify(finalTranscript));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
