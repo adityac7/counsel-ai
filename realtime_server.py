@@ -160,7 +160,7 @@ async def gemini_ws_proxy(ws: WebSocket):
 
 
     config = gt.LiveConnectConfig(
-        responseModalities=["AUDIO"],
+        response_modalities=["AUDIO"],
         speech_config=gt.SpeechConfig(
             voice_config=gt.VoiceConfig(
                 prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
@@ -169,9 +169,6 @@ async def gemini_ws_proxy(ws: WebSocket):
         system_instruction=gt.Content(
             parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
         ),
-        context_window_compression=gt.ContextWindowCompressionConfig(
-            trigger_tokens=25600,
-            sliding_window=gt.SlidingWindow(target_tokens=12800),
         ),
     )
 
@@ -208,11 +205,11 @@ async def gemini_ws_proxy(ws: WebSocket):
                             raw = base64.b64decode(b64data)
                             if mime.startswith("audio/"):
                                 await session.send_realtime_input(
-                                    audio=gt.Blob(data=raw, mimeType="audio/pcm")
+                                    audio=gt.Blob(data=raw, mime_type="audio/pcm")
                                 )
                             elif mime.startswith("image/"):
                                 await session.send_realtime_input(
-                                    video=gt.Blob(data=raw, mimeType=mime)
+                                    video=gt.Blob(data=raw, mime_type=mime)
                                 )
                 except WebSocketDisconnect:
                     print("[gemini-ws] Browser disconnected")
