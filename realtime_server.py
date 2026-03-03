@@ -166,9 +166,6 @@ async def gemini_ws_proxy(ws: WebSocket):
                 prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
             )
         ),
-        system_instruction=gt.Content(
-            parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
-        ),
     )
 
     session = None
@@ -176,6 +173,13 @@ async def gemini_ws_proxy(ws: WebSocket):
         async with gemini_client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
             print(f"[gemini-ws] Connected to {GEMINI_MODEL} with audio output enabled")
             await ws.send_json({"type": "setup_complete"})
+
+            # Send system instructions + scenario via client content (not config — model rejects system_instruction in config)
+            await session.send_client_content(
+                turns=gt.Content(parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]),
+                turn_complete=False,
+            )
+            print(f"[gemini-ws] System instructions sent via client content")
 
             # Send a short silent audio chunk to trigger initial greeting
             # The Live API responds to audio input; this silent prompt triggers
@@ -227,15 +231,23 @@ async def gemini_ws_proxy(ws: WebSocket):
                         msg_count += 1
                         out = {"serverContent": {}}
                         sc = out["serverContent"]
-                        audio_data = response.data
-                        text_data = response.text
                         srv = response.server_content
-            
+
+                        # Extract audio/text from model_turn parts directly (avoid response.data/text which warn on mixed content)
+                        audio_data = None
+                        text_data = None
+                        if srv and srv.model_turn and srv.model_turn.parts:
+                            for part in srv.model_turn.parts:
+                                if part.inline_data and part.inline_data.data:
+                                    audio_data = part.inline_data.data
+                                if part.text:
+                                    text_data = part.text
+
                         if audio_data:
                             print(f"[gemini-ws] Audio received: {len(audio_data)} bytes")
                             sc["modelTurn"] = {"parts": [{"inlineData": {"data": base64.b64encode(audio_data).decode(), "mimeType": "audio/pcm"}}]}
                             counsellor_audio_chunks.append(audio_data)
-            
+
                         if text_data:
                             if "modelTurn" not in sc:
                                 sc["modelTurn"] = {"parts": []}
