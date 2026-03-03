@@ -45,7 +45,7 @@ print("[init] Gemini client initialized")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M")
 GEMINI_WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
-GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
+GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-latest"
 COUNSELLOR_INSTRUCTIONS = (
     "You are an experienced Indian school counsellor for classes 9-12. "
     "Your goal: make the STUDENT talk more, not you. You are evaluating them 360 degrees — "
@@ -166,30 +166,25 @@ async def gemini_ws_proxy(ws: WebSocket):
                 prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
             )
         ),
-        system_instruction=gt.Content(
             parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
         ),
-    )
 
     session = None
     try:
         async with gemini_client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
-            print(f"[gemini-ws] Connected to {GEMINI_MODEL} with audio output enabled")
+            print("[gemini-ws] Connected via SDK")
             await ws.send_json({"type": "setup_complete"})
 
-            # Send a short silent audio chunk to trigger initial greeting
-            # The Live API responds to audio input; this silent prompt triggers
-            # the model to start with its greeting as defined in system_instruction
-            import struct
-            sample_rate = 24000
-            duration_ms = 100  # 100ms of silence
-            num_samples = int(sample_rate * duration_ms / 1000)
-            silent_audio = struct.pack('<' + 'h' * num_samples, *([0] * num_samples))
-            await session.send_realtime_input(
-                audio=gt.Blob(data=silent_audio, mime_type="audio/pcm")
+            # Send initial greeting
+            await session.send_client_content(
+                turns=gt.Content(parts=[gt.Part(text=(
+                    f"Greet {student_name} by name, read the case study aloud "
+                    f"in Hinglish, then ask your first probing question. "
+                    f"Case study: {scenario}"
+                ))]),
+                turn_complete=True,
             )
-            await session.send_realtime_input(audio_stream_end=True)
-            print("[gemini-ws] Trigger audio sent - waiting for model to greet...")
+            print("[gemini-ws] Initial greeting sent")
 
             # Bidirectional proxy
             async def browser_to_gemini():
@@ -232,7 +227,6 @@ async def gemini_ws_proxy(ws: WebSocket):
                         srv = response.server_content
             
                         if audio_data:
-                            print(f"[gemini-ws] Audio received: {len(audio_data)} bytes")
                             sc["modelTurn"] = {"parts": [{"inlineData": {"data": base64.b64encode(audio_data).decode(), "mimeType": "audio/pcm"}}]}
                             counsellor_audio_chunks.append(audio_data)
             
@@ -243,9 +237,27 @@ async def gemini_ws_proxy(ws: WebSocket):
             
                         if srv:
                             if srv.turn_complete:
-                                print(f"[gemini-ws] Turn complete")
                                 sc["turnComplete"] = True
-                                counsellor_audio_chunks = []
+                                # Transcribe counsellor audio on turn complete
+                                if counsellor_audio_chunks:
+                                    try:
+                                        import struct
+                                        all_audio = b"".join(counsellor_audio_chunks)
+                                        counsellor_audio_chunks = []
+                                        sr = 24000
+                                        ds = len(all_audio)
+                                        hdr = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36+ds, b'WAVE', b'fmt ', 16, 1, 1, sr, sr*2, 2, 16, b'data', ds)
+                                        tr = await gemini_client.aio.models.generate_content(
+                                            model="models/gemini-2.5-flash",
+                                            contents=["Transcribe this counsellor audio. Return ONLY the spoken words:", gt.Part.from_bytes(data=hdr+all_audio, mime_type="audio/wav")],
+                                            config=gt.GenerateContentConfig()
+                                        )
+                                        txt = (tr.text or "").strip()
+                                        if txt and len(txt) > 2:
+                                            sc["outputTranscription"] = {"text": txt}
+                                            print(f"[gemini-ws] Counsellor: {txt[:100]}")
+                                    except Exception as te:
+                                        print(f"[gemini-ws] Counsellor transcription err: {te}")
             
                             if srv.input_transcription:
                                 t = getattr(srv.input_transcription, 'text', '')
