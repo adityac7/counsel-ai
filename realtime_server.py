@@ -166,11 +166,8 @@ async def gemini_ws_proxy(ws: WebSocket):
                 prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
             )
         ),
-        system_instruction=gt.Content(
             parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
         ),
-        ),
-    )
 
     session = None
     try:

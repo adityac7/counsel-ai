@@ -98,8 +98,8 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
     </div>
     <label for="ai-model">AI Model</label>
     <select id="ai-model">
-      <option value="openai">OpenAI GPT Realtime</option>
       <option value="gemini">Google Gemini Live</option>
+      <option value="openai">OpenAI GPT Realtime</option>
     </select>
     <label for="case-study">Case study</label>
     <select id="case-study"></select>
@@ -244,7 +244,8 @@ let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
 let timerStart, timerHandle, currentAiEntry = null;
 let transcriptEntries = [];
 let sessionMeta = null;
-let eventCount = 0;
+
+    let geminiModelTurnCount = 0;
 let lastStudentTranscript = '';
 let waitingForStudentTranscript = false;
 let lastUserItemId = null;
@@ -255,6 +256,10 @@ let geminiAudioCtx = null;
 let geminiPlaybackCtx = null;
 let geminiPlaybackTime = 0;
 let geminiMicProcessor = null;
+let geminiVideoInterval = null;
+let geminiTranscriptBuffer = [];
+let geminiTranscriptTimer = null;
+let lastTranscriptionTime = 0;
 
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){statusText.textContent = text;}
@@ -578,6 +583,59 @@ function playGeminiAudio(base64Data) {
   geminiPlaybackTime = startAt + buffer.duration;
 }
 
+function createWavBlob(int16Arrays) {
+  // Concatenate all Int16Arrays
+  let totalLength = 0;
+  for (const arr of int16Arrays) totalLength += arr.length;
+  const combined = new Int16Array(totalLength);
+  let offset = 0;
+  for (const arr of int16Arrays) {
+    combined.set(arr, offset);
+    offset += arr.length;
+  }
+  
+  const numChannels = 1;
+  const sampleRate = 16000;
+  const bitsPerSample = 16;
+  const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+  const blockAlign = numChannels * bitsPerSample / 8;
+  const dataSize = combined.length * 2; // 2 bytes per sample
+  
+  const buffer = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buffer);
+  
+  // RIFF header
+  writeString(view, 0, 'RIFF');
+  view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, 'WAVE');
+  
+  // fmt subchunk
+  writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); // subchunk size
+  view.setUint16(20, 1, true); // PCM format
+  view.setUint16(22, numChannels, true);
+  view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true);
+  view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true);
+  
+  // data subchunk
+  writeString(view, 36, 'data');
+  view.setUint32(40, dataSize, true);
+  
+  // Write PCM samples
+  const dataView = new Int16Array(buffer, 44);
+  dataView.set(combined);
+  
+  return new Blob([buffer], { type: 'audio/wav' });
+}
+
+function writeString(view, offset, string) {
+  for (let i = 0; i < string.length; i++) {
+    view.setUint8(offset + i, string.charCodeAt(i));
+  }
+}
+
 async function startGeminiSession(name, scenario){
   uiLog('INFO', 'Starting Gemini Live session...');
 
@@ -646,6 +704,8 @@ async function startGeminiSession(name, scenario){
       int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
     }
     const base64 = arrayBufferToBase64(int16.buffer);
+    
+    // Send to Gemini Live
     geminiWs.send(JSON.stringify({
       realtimeInput: {
         mediaChunks: [{
@@ -654,17 +714,106 @@ async function startGeminiSession(name, scenario){
         }]
       }
     }));
+    
+    // Accumulate for periodic transcription
+    geminiTranscriptBuffer.push(int16);
+    
+    // Transcribe every 10 seconds with energy check
+    const now = Date.now();
+    if (now - lastTranscriptionTime > 10000 && geminiTranscriptBuffer.length > 0) {
+      lastTranscriptionTime = now;
+      
+      // Check RMS energy - skip if silence
+      let totalSamples = 0;
+      let sumSquares = 0;
+      for (const arr of geminiTranscriptBuffer) {
+        for (let i = 0; i < arr.length; i++) {
+          sumSquares += (arr[i] / 32768) * (arr[i] / 32768);
+          totalSamples++;
+        }
+      }
+      const rms = Math.sqrt(sumSquares / (totalSamples || 1));
+      
+      if (rms < 0.01) {
+        // Too quiet - skip transcription, keep buffer for continuity
+        geminiTranscriptBuffer = [];
+        return;
+      }
+      
+      // Copy buffer and keep last 1 second (16000 samples) as overlap
+      const sendBuffer = geminiTranscriptBuffer.slice();
+      const lastChunks = [];
+      let kept = 0;
+      for (let i = sendBuffer.length - 1; i >= 0 && kept < 16000; i--) {
+        lastChunks.unshift(sendBuffer[i]);
+        kept += sendBuffer[i].length;
+      }
+      geminiTranscriptBuffer = lastChunks;
+      
+      // Send audio chunks for transcription
+      (async () => {
+        try {
+          const audioBlob = createWavBlob(sendBuffer);
+          const formData = new FormData();
+          formData.append('audio', audioBlob, 'student_audio.wav');
+          const resp = await fetch('/api/gemini-transcribe', {
+            method: 'POST',
+            body: formData
+          });
+          const result = await resp.json();
+          if (result.transcript && result.transcript.trim()) {
+            addStudentTranscript(result.transcript.trim(), 'gemini:transcribe');
+            uiLog('OK', 'Transcribed:', result.transcript.slice(0, 80));
+          }
+        } catch (err) {
+          console.error('[CounselAI] Transcription error:', err);
+        }
+      })();
+    }
   };
 
   micSource.connect(geminiMicProcessor);
   geminiMicProcessor.connect(geminiAudioCtx.destination);
   uiLog('OK', 'Mic capture active (16kHz PCM)');
-  setDebug('Gemini: connected | Mic: active');
+
+  // Video frame capture — send camera JPEG every 1s to Gemini
+  const hasVideo = mediaStream.getVideoTracks().length > 0;
+  if (hasVideo) {
+    const captureCanvas = document.createElement('canvas');
+    const captureCtx = captureCanvas.getContext('2d');
+    geminiVideoInterval = setInterval(() => {
+      if (!geminiWs || geminiWs.readyState !== WebSocket.OPEN) return;
+      if (preview.videoWidth === 0) return;
+      captureCanvas.width = Math.min(preview.videoWidth, 640);
+      captureCanvas.height = Math.round(captureCanvas.width * (preview.videoHeight / preview.videoWidth));
+      captureCtx.drawImage(preview, 0, 0, captureCanvas.width, captureCanvas.height);
+      const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.6);
+      const b64 = dataUrl.split(',')[1];
+      geminiWs.send(JSON.stringify({
+        realtimeInput: {
+          mediaChunks: [{
+            data: b64,
+            mimeType: "image/jpeg"
+          }]
+        }
+      }));
+    }, 500);
+    uiLog('OK', 'Video frame capture active (2 fps JPEG)');
+  } else {
+    uiLog('WARN', 'No camera — Gemini will be audio-only');
+  }
+  setDebug('Gemini: connected | Mic: active' + (hasVideo ? ' | Cam: active' : ''));
 }
 
 function handleGeminiMessage(msg) {
   eventCount++;
   updateDebugSnapshot();
+
+  // Log full message for debugging
+  const msgKeys = Object.keys(msg);
+  if (msgKeys.length > 0 && !msgKeys.includes('serverContent')) {
+    uiLog('INFO', 'Gemini message type:', msgKeys.join(', '));
+  }
 
   const serverContent = msg.serverContent;
   if (!serverContent) {
@@ -673,6 +822,12 @@ function handleGeminiMessage(msg) {
       uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
     }
     return;
+  }
+
+  // Log serverContent structure occasionally
+  if (eventCount % 20 === 0) {
+    const scKeys = Object.keys(serverContent);
+    uiLog('INFO', 'serverContent keys:', scKeys.join(', '));
   }
 
   // Model audio/text turn
@@ -699,13 +854,36 @@ function handleGeminiMessage(msg) {
     setStatus('Listening...');
   }
 
-  // Input transcription (student speech)
+  // Input transcription (student speech) - check multiple paths
+  let studentText = '';
   if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
-    const txt = serverContent.inputTranscription.text.trim();
-    if (txt) {
-      addStudentTranscript(txt, 'gemini:inputTranscription');
-      uiLog('OK', 'Student transcript:', txt.slice(0, 120));
+    studentText = serverContent.inputTranscription.text.trim();
+  }
+  // Also check for alternative paths
+  if (serverContent.modelTurn && serverContent.modelTurn.parts) {
+    for (const part of serverContent.modelTurn.parts) {
+      if (part.thought) {
+        // Thought content may include input reference
+        const thoughtText = part.thought || '';
+        if (thoughtText && thoughtText.length > 10 && !currentAiEntry) {
+          // This might be a paraphrased student input
+          // Only capture if it looks like user speech (not model thinking)
+          const lower = thoughtText.toLowerCase();
+          if (lower.includes('student said') || lower.includes('user said')) {
+            // Extract what student said
+            const match = thoughtText.match(/(?:student|user)\s*(?:said|spoke)\s*:\s*["']?([^"']+)["']?/i);
+            if (match && match[1]) {
+              studentText = studentText || match[1].trim();
+            }
+          }
+        }
+      }
     }
+  }
+  
+  if (studentText) {
+    addStudentTranscript(studentText, 'gemini:inputTranscription');
+    uiLog('OK', 'Student transcript:', studentText.slice(0, 120));
   }
 
   // Output transcription (counsellor speech text)
@@ -1024,6 +1202,10 @@ async function endSession(){
     recorder.stop();
   });
   if (sessionMode === 'gemini') {
+    if (geminiVideoInterval) { clearInterval(geminiVideoInterval); geminiVideoInterval = null; }
+    if (geminiTranscriptTimer) { clearTimeout(geminiTranscriptTimer); geminiTranscriptTimer = null; }
+    geminiTranscriptBuffer = [];
+    lastTranscriptionTime = 0;
     if (geminiMicProcessor) { try { geminiMicProcessor.disconnect(); } catch(e){} geminiMicProcessor = null; }
     if (geminiAudioCtx) { try { geminiAudioCtx.close(); } catch(e){} geminiAudioCtx = null; }
     if (geminiPlaybackCtx) { try { geminiPlaybackCtx.close(); } catch(e){} geminiPlaybackCtx = null; }

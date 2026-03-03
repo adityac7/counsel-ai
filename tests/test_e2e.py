@@ -15,7 +15,7 @@ def browser_context():
             args=["--no-sandbox", "--disable-setuid-sandbox"],
         )
         ctx = browser.new_context(
-            permissions=[],
+            
             ignore_https_errors=True,
         )
         yield ctx
