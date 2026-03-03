@@ -45,7 +45,7 @@ print("[init] Gemini client initialized")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M")
 GEMINI_WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
-GEMINI_MODEL = "models/gemini-2.5-flash-live"
+GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-latest"
 COUNSELLOR_INSTRUCTIONS = (
     "You are an experienced Indian school counsellor for classes 9-12. "
     "Your goal: make the STUDENT talk more, not you. You are evaluating them 360 degrees — "
@@ -378,6 +378,31 @@ async def analyze_session(
         "voice_data": voice_data,
     }
     session_end = session_end_time or datetime.now(timezone.utc).isoformat()
+    # Validate session data before generating report
+    has_transcripts = len(transcript_data) > 0 and any(e.get("text", "").strip() for e in transcript_data)
+    has_audio_data = voice_data and voice_data.get("audio_duration", 0) > 5  # at least 5 seconds
+    
+    # Calculate session duration if we have timestamps
+    session_duration = 0
+    try:
+        if session_start_time and session_end:
+            from datetime import datetime
+            start = datetime.fromisoformat(session_start_time.replace('Z', '+00:00'))
+            end = datetime.fromisoformat(session_end.replace('Z', '+00:00'))
+            session_duration = (end - start).total_seconds()
+    except Exception as e:
+        print(f"[analyze] Could not calculate duration: {e}")
+    
+    has_duration = session_duration > 30  # at least 30 seconds
+    
+    print(f"[analyze] Validation: transcripts={has_transcripts}, audio={has_audio_data}, duration={session_duration}s, valid={has_transcripts or has_audio_data or has_duration}")
+    
+    # Only generate report if we have actual data
+    if not (has_transcripts or has_audio_data or has_duration):
+        error_msg = "Insufficient session data for analysis. Please ensure: (1) conversation happened with transcripts, (2) session duration > 30 seconds, or (3) audio was recorded."
+        print(f"[analyze] {error_msg}")
+        return JSONResponse({"error": error_msg}, 400)
+    
     try:
         import profile_generator
         profile = profile_generator.generate_profile(session_data)
