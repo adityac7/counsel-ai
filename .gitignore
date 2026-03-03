@@ -1,4 +1,12 @@
 venv/
 __pycache__/
-certs/
+*.pyc
+*.bak*
+counselai.db
 .env
+sessions/
+*.wav
+*.mp3
+test_server.py
+gemini_proxy_clean.py
+gemini_ws_new.py
