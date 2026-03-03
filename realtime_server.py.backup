@@ -1,0 +1,463 @@
+"""CounselAI Live — WebRTC Realtime server."""
+import asyncio
+import json
+import os
+import tempfile
+import traceback
+from datetime import datetime, timezone
+from fastapi import FastAPI, File, Form, Request, UploadFile, WebSocket
+from fastapi.responses import HTMLResponse, JSONResponse, Response
+from fastapi.templating import Jinja2Templates
+from starlette.websockets import WebSocketDisconnect
+from case_studies import CASE_STUDIES
+import db
+import websockets
+from google import genai
+import base64
+from google.genai import types as gt
+
+import numpy as np
+
+def _sanitize(obj):
+    """Recursively convert numpy types to native Python for JSON."""
+    if isinstance(obj, dict):
+        return {k: _sanitize(v) for k, v in obj.items()}
+    if isinstance(obj, (list, tuple)):
+        return [_sanitize(v) for v in obj]
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    return obj
+
+app = FastAPI()
+templates = Jinja2Templates(directory="templates")
+db.init_db()
+
+# Gemini client for transcription
+gemini_client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M"),
+    http_options={"api_version": "v1beta"}
+)
+print("[init] Gemini client initialized")
+OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M")
+GEMINI_WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
+GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-latest"
+COUNSELLOR_INSTRUCTIONS = (
+    "You are an experienced Indian school counsellor for classes 9-12. "
+    "Your goal: make the STUDENT talk more, not you. You are evaluating them 360 degrees — "
+    "emotional intelligence, decision-making, values, peer dynamics, self-awareness.\n\n"
+    "RULES:\n"
+    "- Keep your responses SHORT: 1-2 sentences max. Your job is to LISTEN and PROBE.\n"
+    "- Ask ONE precise question per turn. Make it count.\n"
+    "- Do NOT mirror or repeat what the student said. No paraphrasing back.\n"
+    "- Only repeat if you genuinely need clarification on something unclear.\n"
+    "- Do NOT be overly warm or verbose. No \"wah\", \"bahut accha\", \"kya baat hai\". "
+    "Be natural, not theatrical.\n"
+    "- Use casual Hinglish naturally: beta, accha, hmm, aur, theek hai.\n"
+    "- Your questions should dig deeper each time — move from surface to values to feelings.\n"
+    "- Cover multiple angles: what they think, what they feel, what they would do, "
+    "what they fear, what matters most to them.\n"
+    "- End the session after 8-10 exchanges. Wrap up naturally: \"Accha beta, bahut acchi "
+    "baat ki tumne. Thank you.\"\n"
+    "- For the first response: briefly greet by name, read the case study concisely in "
+    "Hinglish, then immediately ask the first probing question.\n"
+    "- Do NOT lecture. Do NOT give advice. Do NOT analyze during the session.\n\n"
+)
+@app.get("/", response_class=HTMLResponse)
+async def index(request: Request):
+    response = templates.TemplateResponse("live.html", {"request": request})
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@app.get("/dashboard", response_class=HTMLResponse)
+async def dashboard(request: Request):
+    response = templates.TemplateResponse("dashboard.html", {"request": request})
+    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+@app.get("/api/case-studies")
+async def get_case_studies():
+    return JSONResponse({"case_studies": CASE_STUDIES})
+@app.post("/api/rtc-connect")
+async def rtc_connect(request: Request):
+    import httpx
+    if not OPENAI_API_KEY:
+        return Response(content="OPENAI_API_KEY not set", status_code=500)
+
+    sdp_offer = (await request.body()).decode()
+    scenario = request.query_params.get("scenario", "")
+    session_json = json.dumps(
+        {
+            "type": "realtime",
+            "model": "gpt-realtime",
+            "instructions": COUNSELLOR_INSTRUCTIONS + scenario,
+            "audio": {"output": {"voice": "sage"}, "input": {"transcription": {"model": "gpt-4o-transcribe"}, "turn_detection": {"type": "server_vad", "threshold": 0.5, "silence_duration_ms": 500}}},
+        }
+    )
+    async with httpx.AsyncClient(timeout=30) as client:
+        resp = await client.post(
+            "https://api.openai.com/v1/realtime/calls",
+            headers={"Authorization": f"Bearer {OPENAI_API_KEY}"},
+            files=[
+                ("sdp", (None, sdp_offer, "application/sdp")),
+                ("session", (None, session_json, "application/json")),
+            ],
+        )
+    if resp.status_code not in (200, 201):
+        request_id = resp.headers.get("x-request-id", "")
+        body_preview = resp.text[:1200]
+        print(
+            "[rtc-connect] Realtime request payload: "
+            f"{session_json[:1200]}"
+        )
+        print(
+            f"[rtc-connect] OpenAI realtime call failed status={resp.status_code} "
+            f"request_id={request_id} body={body_preview}"
+        )
+        try:
+            print(f"[rtc-connect] OpenAI realtime error json={json.dumps(resp.json())[:1200]}")
+        except Exception:
+            pass
+    media_type = "application/sdp" if resp.status_code in (200, 201) else "text/plain"
+    return Response(content=resp.text, status_code=resp.status_code, media_type=media_type)
+
+
+@app.post("/api/gemini-transcribe")
+async def gemini_transcribe(audio: UploadFile = File(...)):
+    """Transcribe audio using Gemini 2.5 Flash."""
+    try:
+        import base64
+        audio_bytes = await audio.read()
+        response = gemini_client.models.generate_content(
+            model="models/gemini-2.5-flash",
+            contents=[
+                "Transcribe the human speech in this audio to text. Return ONLY the exact spoken words in the original language (Hindi/Hinglish/English). If there is no clear speech, return an empty string. Do NOT describe sounds or noises.",
+                gt.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
+            ],
+            config=gt.GenerateContentConfig()
+        )
+        text = (response.text or "").strip()
+        # Filter out non-transcription responses
+        skip_phrases = ["silence", "no speech", "no clear speech", "no audio", "no words", "empty"]
+        if any(s in text.lower() for s in skip_phrases) and len(text) < 50:
+            text = ""
+        return JSONResponse({"transcript": text})
+    except Exception as e:
+        print(f"[transcribe] Error: {e}")
+        return JSONResponse({"error": str(e)}, 500)
+
+
+@app.websocket("/api/gemini-ws")
+async def gemini_ws_proxy(ws: WebSocket):
+    """WebSocket proxy: browser <-> Gemini Live API using official SDK."""
+    await ws.accept()
+    scenario = ws.query_params.get("scenario", "")
+    student_name = ws.query_params.get("name", "Student")
+
+
+    config = gt.LiveConnectConfig(
+        response_modalities=["AUDIO"],
+        speech_config=gt.SpeechConfig(
+            voice_config=gt.VoiceConfig(
+                prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
+            )
+        ),
+            parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
+        ),
+
+    session = None
+    try:
+        async with gemini_client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
+            print("[gemini-ws] Connected via SDK")
+            await ws.send_json({"type": "setup_complete"})
+
+            # Send initial greeting
+            await session.send_client_content(
+                turns=gt.Content(parts=[gt.Part(text=(
+                    f"Greet {student_name} by name, read the case study aloud "
+                    f"in Hinglish, then ask your first probing question. "
+                    f"Case study: {scenario}"
+                ))]),
+                turn_complete=True,
+            )
+            print("[gemini-ws] Initial greeting sent")
+
+            # Bidirectional proxy
+            async def browser_to_gemini():
+                """Receive audio/video from browser and send to Gemini."""
+                import base64
+                try:
+                    while True:
+                        data = await ws.receive_text()
+                        msg = json.loads(data)
+                        ri = msg.get("realtimeInput", {})
+                        chunks = ri.get("mediaChunks", [])
+                        for chunk in chunks:
+                            mime = chunk.get("mimeType", "")
+                            b64data = chunk.get("data", "")
+                            raw = base64.b64decode(b64data)
+                            if mime.startswith("audio/"):
+                                await session.send_realtime_input(
+                                    audio=gt.Blob(data=raw, mime_type="audio/pcm")
+                                )
+                            elif mime.startswith("image/"):
+                                await session.send_realtime_input(
+                                    video=gt.Blob(data=raw, mime_type=mime)
+                                )
+                except WebSocketDisconnect:
+                    print("[gemini-ws] Browser disconnected")
+                except Exception as e:
+                    print(f"[gemini-ws] browser->gemini error: {e}")
+
+            async def gemini_to_browser():
+                """Receive responses from Gemini and forward to browser."""
+                msg_count = 0
+                counsellor_audio_chunks = []
+                try:
+                    async for response in session.receive():
+                        msg_count += 1
+                        out = {"serverContent": {}}
+                        sc = out["serverContent"]
+                        audio_data = response.data
+                        text_data = response.text
+                        srv = response.server_content
+            
+                        if audio_data:
+                            sc["modelTurn"] = {"parts": [{"inlineData": {"data": base64.b64encode(audio_data).decode(), "mimeType": "audio/pcm"}}]}
+                            counsellor_audio_chunks.append(audio_data)
+            
+                        if text_data:
+                            if "modelTurn" not in sc:
+                                sc["modelTurn"] = {"parts": []}
+                            sc["modelTurn"]["parts"].append({"text": text_data})
+            
+                        if srv:
+                            if srv.turn_complete:
+                                sc["turnComplete"] = True
+                                # Transcribe counsellor audio on turn complete
+                                if counsellor_audio_chunks:
+                                    try:
+                                        import struct
+                                        all_audio = b"".join(counsellor_audio_chunks)
+                                        counsellor_audio_chunks = []
+                                        sr = 24000
+                                        ds = len(all_audio)
+                                        hdr = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36+ds, b'WAVE', b'fmt ', 16, 1, 1, sr, sr*2, 2, 16, b'data', ds)
+                                        tr = await gemini_client.aio.models.generate_content(
+                                            model="models/gemini-2.5-flash",
+                                            contents=["Transcribe this counsellor audio. Return ONLY the spoken words:", gt.Part.from_bytes(data=hdr+all_audio, mime_type="audio/wav")],
+                                            config=gt.GenerateContentConfig()
+                                        )
+                                        txt = (tr.text or "").strip()
+                                        if txt and len(txt) > 2:
+                                            sc["outputTranscription"] = {"text": txt}
+                                            print(f"[gemini-ws] Counsellor: {txt[:100]}")
+                                    except Exception as te:
+                                        print(f"[gemini-ws] Counsellor transcription err: {te}")
+            
+                            if srv.input_transcription:
+                                t = getattr(srv.input_transcription, 'text', '')
+                                if t and t.strip():
+                                    sc["inputTranscription"] = {"text": t.strip()}
+                                    print(f"[gemini-ws] Student: {t.strip()[:100]}")
+            
+                            if srv.output_transcription:
+                                t = getattr(srv.output_transcription, 'text', '')
+                                if t and t.strip():
+                                    sc["outputTranscription"] = {"text": t.strip()}
+            
+                            if srv.generation_complete:
+                                sc["generationComplete"] = True
+            
+                        if response.setup_complete:
+                            continue
+            
+                        if msg_count <= 3 or msg_count % 50 == 0:
+                            flds = []
+                            if srv:
+                                for fn in ["model_turn","turn_complete","input_transcription","output_transcription"]:
+                                    if getattr(srv, fn, None): flds.append(fn)
+                            print(f"[gemini-ws] #{msg_count} a={'y' if audio_data else 'n'} t={'y' if text_data else 'n'} srv={flds}")
+            
+                        if sc:
+                            await ws.send_json(out)
+            
+                except Exception as e:
+                    print(f"[gemini-ws] gemini->browser error: {e}")
+                    traceback.print_exc()
+
+
+            done, pending = await asyncio.wait(
+                [
+                    asyncio.create_task(browser_to_gemini()),
+                    asyncio.create_task(gemini_to_browser()),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
+
+    except Exception as e:
+        print(f"[gemini-ws] Error: {e}")
+        traceback.print_exc()
+        try:
+            await ws.send_json({"type": "error", "message": str(e)})
+        except Exception:
+            pass
+    finally:
+        try:
+            await ws.close()
+        except Exception:
+            pass
+
+
+@app.post("/api/analyze-session")
+async def analyze_session(
+    video: UploadFile = File(...),
+    transcript: str = Form("[]"),
+    student_name: str = Form("Student"),
+    student_class: str = Form("10"),
+    student_section: str = Form(""),
+    student_school: str = Form(""),
+    student_age: int = Form(15),
+    session_start_time: str = Form(None),
+    session_end_time: str = Form(None),
+):
+    try:
+        transcript_data = json.loads(transcript)
+    except (json.JSONDecodeError, TypeError):
+        transcript_data = []
+    try:
+        with open("/tmp/counselai_last_transcript.json", "w") as f:
+            json.dump(transcript_data, f, indent=2)
+        print("[analyze] saved transcript to /tmp/counselai_last_transcript.json")
+    except Exception as exc:
+        print(f"[analyze] failed to save transcript: {exc}")
+    tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
+    tmp.write(await video.read())
+    tmp.close()
+    face_data, voice_data = {}, {}
+    try:
+        import face_analyzer
+        import utils
+        frames_dir = tempfile.mkdtemp()
+        utils.save_frames_from_video(tmp.name, frames_dir, interval=3)
+        face_data = face_analyzer.analyze_frames(frames_dir)
+    except Exception as exc:
+        print(f"Face analysis skipped: {exc}")
+        traceback.print_exc()
+    try:
+        import utils
+        import voice_analyzer
+        audio_path = utils.extract_audio_from_video(tmp.name)
+        if audio_path:
+            voice_data = voice_analyzer.analyze_audio(audio_path)
+    except Exception as exc:
+        print(f"Voice analysis skipped: {exc}")
+        traceback.print_exc()
+    print(f"[analyze] transcript entries received: {len(transcript_data)}")
+    if transcript_data:
+        print(f"[analyze] first transcript entry: {transcript_data[0]}")
+    session_data = {
+        "student_info": {"name": student_name, "class": student_class},
+        "rounds": [
+            {"transcription": e.get("text", ""), "role": e.get("role", "student")}
+            for e in transcript_data
+        ],
+        "face_data": face_data,
+        "voice_data": voice_data,
+    }
+    session_end = session_end_time or datetime.now(timezone.utc).isoformat()
+    # Validate session data before generating report
+    has_transcripts = len(transcript_data) > 0 and any(e.get("text", "").strip() for e in transcript_data)
+    has_audio_data = voice_data and voice_data.get("audio_duration", 0) > 5  # at least 5 seconds
+    
+    # Calculate session duration if we have timestamps
+    session_duration = 0
+    try:
+        if session_start_time and session_end:
+            from datetime import datetime
+            start = datetime.fromisoformat(session_start_time.replace('Z', '+00:00'))
+            end = datetime.fromisoformat(session_end.replace('Z', '+00:00'))
+            session_duration = (end - start).total_seconds()
+    except Exception as e:
+        print(f"[analyze] Could not calculate duration: {e}")
+    
+    has_duration = session_duration > 30  # at least 30 seconds
+    
+    print(f"[analyze] Validation: transcripts={has_transcripts}, audio={has_audio_data}, duration={session_duration}s, valid={has_transcripts or has_audio_data or has_duration}")
+    
+    # Only generate report if we have actual data
+    if not (has_transcripts or has_audio_data or has_duration):
+        error_msg = "Insufficient session data for analysis. Please ensure: (1) conversation happened with transcripts, (2) session duration > 30 seconds, or (3) audio was recorded."
+        print(f"[analyze] {error_msg}")
+        return JSONResponse({"error": error_msg}, 400)
+    
+    try:
+        import profile_generator
+        profile = profile_generator.generate_profile(session_data)
+        print(f"[analyze] profile keys: {list(profile.keys())}")
+        saved_id = db.save_session(
+            source="realtime",
+            external_session_id=None,
+            student_info={
+                "name": student_name,
+                "class": student_class,
+                "section": student_section,
+                "school": student_school,
+                "age": student_age,
+            },
+            session_start_time=session_start_time,
+            session_end_time=session_end,
+            transcript=transcript_data,
+            face_analysis=face_data,
+            voice_analysis=voice_data,
+            profile=profile,
+        )
+        return JSONResponse(
+            {"profile": _sanitize(profile), "face_data": _sanitize(face_data), "voice_data": _sanitize(voice_data), "session_id": saved_id}
+        )
+    except Exception as exc:
+        print(f"Profile generation failed: {exc}")
+        traceback.print_exc()
+        profile = {"summary": f"Analysis error: {exc}"}
+        saved_id = db.save_session(
+            source="realtime",
+            external_session_id=None,
+            student_info={
+                "name": student_name,
+                "class": student_class,
+                "section": student_section,
+                "school": student_school,
+                "age": student_age,
+            },
+            session_start_time=session_start_time,
+            session_end_time=session_end,
+            transcript=transcript_data,
+            face_analysis=face_data,
+            voice_analysis=voice_data,
+            profile=profile,
+        )
+        return JSONResponse({"profile": profile, "session_id": saved_id})
+    finally:
+        os.unlink(tmp.name)
+
+
+@app.get("/api/sessions")
+async def get_sessions():
+    return JSONResponse({"sessions": db.list_sessions()})
+
+
+@app.get("/api/sessions/{session_id}")
+async def get_session_detail(session_id: int):
+    session = db.get_session(session_id)
+    if not session:
+        return JSONResponse({"error": "Session not found"}, 404)
+    return JSONResponse(session)
+if __name__ == "__main__":
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=8501)
