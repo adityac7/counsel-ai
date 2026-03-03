@@ -12,6 +12,9 @@ from starlette.websockets import WebSocketDisconnect
 from case_studies import CASE_STUDIES
 import db
 import websockets
+from google import genai
+import base64
+from google.genai import types as gt
 
 import numpy as np
 
@@ -32,10 +35,17 @@ def _sanitize(obj):
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
 db.init_db()
+
+# Gemini client for transcription
+gemini_client = genai.Client(
+    api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M"),
+    http_options={"api_version": "v1beta"}
+)
+print("[init] Gemini client initialized")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M")
 GEMINI_WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
-GEMINI_MODEL = "models/gemini-2.0-flash-live"
+GEMINI_MODEL = "models/gemini-2.5-flash-live"
 COUNSELLOR_INSTRUCTIONS = (
     "You are an experienced Indian school counsellor for classes 9-12. "
     "Your goal: make the STUDENT talk more, not you. You are evaluating them 360 degrees — "
@@ -116,101 +126,187 @@ async def rtc_connect(request: Request):
     return Response(content=resp.text, status_code=resp.status_code, media_type=media_type)
 
 
+@app.post("/api/gemini-transcribe")
+async def gemini_transcribe(audio: UploadFile = File(...)):
+    """Transcribe audio using Gemini 2.5 Flash."""
+    try:
+        import base64
+        audio_bytes = await audio.read()
+        response = gemini_client.models.generate_content(
+            model="models/gemini-2.5-flash",
+            contents=[
+                "Transcribe the human speech in this audio to text. Return ONLY the exact spoken words in the original language (Hindi/Hinglish/English). If there is no clear speech, return an empty string. Do NOT describe sounds or noises.",
+                gt.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
+            ],
+            config=gt.GenerateContentConfig()
+        )
+        text = (response.text or "").strip()
+        # Filter out non-transcription responses
+        skip_phrases = ["silence", "no speech", "no clear speech", "no audio", "no words", "empty"]
+        if any(s in text.lower() for s in skip_phrases) and len(text) < 50:
+            text = ""
+        return JSONResponse({"transcript": text})
+    except Exception as e:
+        print(f"[transcribe] Error: {e}")
+        return JSONResponse({"error": str(e)}, 500)
+
+
 @app.websocket("/api/gemini-ws")
 async def gemini_ws_proxy(ws: WebSocket):
-    """WebSocket proxy: browser <-> Gemini Live API."""
+    """WebSocket proxy: browser <-> Gemini Live API using official SDK."""
     await ws.accept()
     scenario = ws.query_params.get("scenario", "")
     student_name = ws.query_params.get("name", "Student")
 
-    gemini_url = f"{GEMINI_WS_URL}?key={GEMINI_API_KEY}"
-    gemini = None
 
+    config = gt.LiveConnectConfig(
+        response_modalities=["AUDIO"],
+        speech_config=gt.SpeechConfig(
+            voice_config=gt.VoiceConfig(
+                prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
+            )
+        ),
+        system_instruction=gt.Content(
+            parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
+        ),
+        context_window_compression=gt.ContextWindowCompressionConfig(
+            trigger_tokens=25600,
+            sliding_window=gt.SlidingWindow(target_tokens=12800),
+        ),
+    )
+
+    session = None
     try:
-        gemini = await websockets.connect(gemini_url)
+        async with gemini_client.aio.live.connect(model=GEMINI_MODEL, config=config) as session:
+            print("[gemini-ws] Connected via SDK")
+            await ws.send_json({"type": "setup_complete"})
 
-        # Send setup message with model, instructions, and audio config
-        setup_msg = {
-            "setup": {
-                "model": GEMINI_MODEL,
-                "generationConfig": {
-                    "responseModalities": ["AUDIO"],
-                    "speechConfig": {
-                        "voiceConfig": {
-                            "prebuiltVoiceConfig": {"voiceName": "Kore"}
-                        }
-                    },
-                },
-                "systemInstruction": {
-                    "parts": [{"text": COUNSELLOR_INSTRUCTIONS + scenario}]
-                },
-            }
-        }
-        await gemini.send(json.dumps(setup_msg))
-        print("[gemini-ws] Setup message sent")
+            # Send initial greeting
+            await session.send_client_content(
+                turns=gt.Content(parts=[gt.Part(text=(
+                    f"Greet {student_name} by name, read the case study aloud "
+                    f"in Hinglish, then ask your first probing question. "
+                    f"Case study: {scenario}"
+                ))]),
+                turn_complete=True,
+            )
+            print("[gemini-ws] Initial greeting sent")
 
-        # Wait for setupComplete
-        raw = await asyncio.wait_for(gemini.recv(), timeout=15)
-        setup_resp = json.loads(raw) if isinstance(raw, str) else json.loads(raw.decode())
-        print(f"[gemini-ws] Setup response: {json.dumps(setup_resp)[:500]}")
-        await ws.send_json({"type": "setup_complete"})
+            # Bidirectional proxy
+            async def browser_to_gemini():
+                """Receive audio/video from browser and send to Gemini."""
+                import base64
+                try:
+                    while True:
+                        data = await ws.receive_text()
+                        msg = json.loads(data)
+                        ri = msg.get("realtimeInput", {})
+                        chunks = ri.get("mediaChunks", [])
+                        for chunk in chunks:
+                            mime = chunk.get("mimeType", "")
+                            b64data = chunk.get("data", "")
+                            raw = base64.b64decode(b64data)
+                            if mime.startswith("audio/"):
+                                await session.send_realtime_input(
+                                    audio=gt.Blob(data=raw, mimeType="audio/pcm")
+                                )
+                            elif mime.startswith("image/"):
+                                await session.send_realtime_input(
+                                    video=gt.Blob(data=raw, mimeType=mime)
+                                )
+                except WebSocketDisconnect:
+                    print("[gemini-ws] Browser disconnected")
+                except Exception as e:
+                    print(f"[gemini-ws] browser->gemini error: {e}")
 
-        # Send initial greeting prompt to trigger the counsellor
-        greeting = {
-            "clientContent": {
-                "turns": [{
-                    "role": "user",
-                    "parts": [{
-                        "text": (
-                            f"Greet {student_name} by name, read the case study aloud "
-                            f"in Hinglish, then ask your first probing question. "
-                            f"Case study: {scenario}"
-                        )
-                    }]
-                }],
-                "turnComplete": True,
-            }
-        }
-        await gemini.send(json.dumps(greeting))
-        print("[gemini-ws] Initial greeting sent")
+            async def gemini_to_browser():
+                """Receive responses from Gemini and forward to browser."""
+                msg_count = 0
+                counsellor_audio_chunks = []
+                try:
+                    async for response in session.receive():
+                        msg_count += 1
+                        out = {"serverContent": {}}
+                        sc = out["serverContent"]
+                        audio_data = response.data
+                        text_data = response.text
+                        srv = response.server_content
+            
+                        if audio_data:
+                            sc["modelTurn"] = {"parts": [{"inlineData": {"data": base64.b64encode(audio_data).decode(), "mimeType": "audio/pcm"}}]}
+                            counsellor_audio_chunks.append(audio_data)
+            
+                        if text_data:
+                            if "modelTurn" not in sc:
+                                sc["modelTurn"] = {"parts": []}
+                            sc["modelTurn"]["parts"].append({"text": text_data})
+            
+                        if srv:
+                            if srv.turn_complete:
+                                sc["turnComplete"] = True
+                                # Transcribe counsellor audio on turn complete
+                                if counsellor_audio_chunks:
+                                    try:
+                                        import struct
+                                        all_audio = b"".join(counsellor_audio_chunks)
+                                        counsellor_audio_chunks = []
+                                        sr = 24000
+                                        ds = len(all_audio)
+                                        hdr = struct.pack('<4sI4s4sIHHIIHH4sI', b'RIFF', 36+ds, b'WAVE', b'fmt ', 16, 1, 1, sr, sr*2, 2, 16, b'data', ds)
+                                        tr = await gemini_client.aio.models.generate_content(
+                                            model="models/gemini-2.5-flash",
+                                            contents=["Transcribe this counsellor audio. Return ONLY the spoken words:", gt.Part.from_bytes(data=hdr+all_audio, mime_type="audio/wav")],
+                                            config=gt.GenerateContentConfig()
+                                        )
+                                        txt = (tr.text or "").strip()
+                                        if txt and len(txt) > 2:
+                                            sc["outputTranscription"] = {"text": txt}
+                                            print(f"[gemini-ws] Counsellor: {txt[:100]}")
+                                    except Exception as te:
+                                        print(f"[gemini-ws] Counsellor transcription err: {te}")
+            
+                            if srv.input_transcription:
+                                t = getattr(srv.input_transcription, 'text', '')
+                                if t and t.strip():
+                                    sc["inputTranscription"] = {"text": t.strip()}
+                                    print(f"[gemini-ws] Student: {t.strip()[:100]}")
+            
+                            if srv.output_transcription:
+                                t = getattr(srv.output_transcription, 'text', '')
+                                if t and t.strip():
+                                    sc["outputTranscription"] = {"text": t.strip()}
+            
+                            if srv.generation_complete:
+                                sc["generationComplete"] = True
+            
+                        if response.setup_complete:
+                            continue
+            
+                        if msg_count <= 3 or msg_count % 50 == 0:
+                            flds = []
+                            if srv:
+                                for fn in ["model_turn","turn_complete","input_transcription","output_transcription"]:
+                                    if getattr(srv, fn, None): flds.append(fn)
+                            print(f"[gemini-ws] #{msg_count} a={'y' if audio_data else 'n'} t={'y' if text_data else 'n'} srv={flds}")
+            
+                        if sc:
+                            await ws.send_json(out)
+            
+                except Exception as e:
+                    print(f"[gemini-ws] gemini->browser error: {e}")
+                    traceback.print_exc()
 
-        # Bidirectional proxy
-        async def browser_to_gemini():
-            try:
-                while True:
-                    data = await ws.receive_text()
-                    await gemini.send(data)
-            except WebSocketDisconnect:
-                print("[gemini-ws] Browser disconnected")
-            except Exception as e:
-                print(f"[gemini-ws] browser->gemini error: {e}")
 
-        async def gemini_to_browser():
-            try:
-                async for msg in gemini:
-                    text = msg if isinstance(msg, str) else msg.decode()
-                    await ws.send_text(text)
-            except websockets.exceptions.ConnectionClosed:
-                print("[gemini-ws] Gemini connection closed")
-            except Exception as e:
-                print(f"[gemini-ws] gemini->browser error: {e}")
+            done, pending = await asyncio.wait(
+                [
+                    asyncio.create_task(browser_to_gemini()),
+                    asyncio.create_task(gemini_to_browser()),
+                ],
+                return_when=asyncio.FIRST_COMPLETED,
+            )
+            for task in pending:
+                task.cancel()
 
-        done, pending = await asyncio.wait(
-            [
-                asyncio.create_task(browser_to_gemini()),
-                asyncio.create_task(gemini_to_browser()),
-            ],
-            return_when=asyncio.FIRST_COMPLETED,
-        )
-        for task in pending:
-            task.cancel()
-
-    except asyncio.TimeoutError:
-        print("[gemini-ws] Gemini setup timed out")
-        try:
-            await ws.send_json({"type": "error", "message": "Gemini setup timed out"})
-        except Exception:
-            pass
     except Exception as e:
         print(f"[gemini-ws] Error: {e}")
         traceback.print_exc()
@@ -219,11 +315,6 @@ async def gemini_ws_proxy(ws: WebSocket):
         except Exception:
             pass
     finally:
-        if gemini:
-            try:
-                await gemini.close()
-            except Exception:
-                pass
         try:
             await ws.close()
         except Exception:
