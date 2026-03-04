@@ -38,12 +38,12 @@ db.init_db()
 
 # Gemini client for transcription
 gemini_client = genai.Client(
-    api_key=os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M"),
+    api_key=os.environ.get("GEMINI_API_KEY", ""),
     http_options={"api_version": "v1beta"}
 )
 print("[init] Gemini client initialized")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
-GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "AIzaSyBzcUqlceO2SJoX9UIcg8tL0Gn7YKpgK1M")
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GEMINI_WS_URL = "wss://generativelanguage.googleapis.com/ws/google.ai.generativelanguage.v1beta.GenerativeService.BidiGenerateContent"
 GEMINI_MODEL = "models/gemini-2.5-flash-native-audio-preview-12-2025"
 COUNSELLOR_INSTRUCTIONS = (
