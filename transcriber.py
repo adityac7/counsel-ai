@@ -59,9 +59,17 @@ def transcribe_audio(audio_path: str) -> Dict[str, Any]:
         print("[transcriber] Error: empty response from Whisper")
         return {}
 
-    text = getattr(response, "text", "") or response.get("text", "")
-    segments_raw = getattr(response, "segments", None) or response.get("segments", [])
-    duration = getattr(response, "duration", None) or response.get("duration", duration)
+    text = getattr(response, "text", None)
+    if text is None and isinstance(response, dict):
+        text = response.get("text", "")
+    text = text or ""
+    segments_raw = getattr(response, "segments", None)
+    if segments_raw is None and isinstance(response, dict):
+        segments_raw = response.get("segments", [])
+    segments_raw = segments_raw or []
+    duration = getattr(response, "duration", None)
+    if duration is None and isinstance(response, dict):
+        duration = response.get("duration", duration)
 
     if not text:
         print("[transcriber] Warning: no transcript text returned")

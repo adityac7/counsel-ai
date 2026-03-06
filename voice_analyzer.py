@@ -252,6 +252,7 @@ def analyze_audio(audio_path: str, transcript: Optional[str] = None) -> Dict[str
         "filler_words": filler_words,
         "voice_quality": voice_quality,
         "overall_confidence_score": overall_confidence_score,
+        "audio_duration": float(duration),
     }
 
     print("[voice_analyzer] Analysis complete")

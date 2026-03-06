@@ -11,3 +11,5 @@ test_server.py
 gemini_proxy_clean.py
 gemini_ws_new.py
 certs/
+*.backup
+*.bak*

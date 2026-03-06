@@ -49,7 +49,10 @@ async def start_session(
 ):
     sid = str(uuid.uuid4())
     # pick first case study matching class
-    class_int = int(student_class)
+    try:
+        class_int = int(student_class)
+    except (ValueError, TypeError):
+        return JSONResponse({"error": "student_class must be a number"}, status_code=400)
     case = next(
         (
             c
@@ -111,10 +114,9 @@ async def respond(
 
         # Voice analysis
         try:
-            audio_path = utils.extract_audio_from_video(tmp.name) if video else tmp.name
-            voice_data = voice_analyzer.analyze_audio(audio_path)
-        except:
-            pass
+            voice_data = voice_analyzer.analyze_audio(tmp.name)
+        except Exception as e:
+            print(f'[voice] analysis failed: {e}')
         os.unlink(tmp.name)
 
     if video:
@@ -125,8 +127,8 @@ async def respond(
             frames_dir = tempfile.mkdtemp()
             utils.save_frames_from_video(tmp.name, frames_dir, interval=2)
             face_data = face_analyzer.analyze_frames(frames_dir)
-        except:
-            pass
+        except Exception as e:
+            print(f"[error] {e}")
         os.unlink(tmp.name)
 
     # Get counsellor response

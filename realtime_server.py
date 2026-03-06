@@ -133,7 +133,7 @@ async def gemini_transcribe(audio: UploadFile = File(...)):
         import base64
         audio_bytes = await audio.read()
         response = gemini_client.models.generate_content(
-            model="models/gemini-2.5-flash",
+            model="models/gemini-3.1-flash-lite-preview",
             contents=[
                 "Transcribe the human speech in this audio to text. Return ONLY the exact spoken words in the original language (Hindi/Hinglish/English). If there is no clear speech, return an empty string. Do NOT describe sounds or noises.",
                 gt.Part.from_bytes(data=audio_bytes, mime_type="audio/wav")
@@ -332,9 +332,10 @@ async def analyze_session(
     except (json.JSONDecodeError, TypeError):
         transcript_data = []
     try:
-        with open("/tmp/counselai_last_transcript.json", "w") as f:
-            json.dump(transcript_data, f, indent=2)
-        print("[analyze] saved transcript to /tmp/counselai_last_transcript.json")
+        if os.environ.get("COUNSELAI_DEBUG"):
+            with open("/tmp/counselai_last_transcript.json", "w") as f:
+                json.dump(transcript_data, f, indent=2)
+            print("[analyze] saved transcript to /tmp/counselai_last_transcript.json")
     except Exception as exc:
         print(f"[analyze] failed to save transcript: {exc}")
     tmp = tempfile.NamedTemporaryFile(delete=False, suffix=".webm")
