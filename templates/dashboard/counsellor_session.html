@@ -1,0 +1,577 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Session Review — CounselAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a1628; --panel: #0f1f35; --panel-2: #0c1a30;
+  --teal: #46d9d1; --blue: #2f7bf6; --text: #e6f2ff;
+  --muted: #9bb3d3; --danger: #ff7b7b; --warning: #f5a623; --ok: #55d28b;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  color: var(--text);
+  background: radial-gradient(1200px 600px at 15% 0%, #133056 0%, transparent 60%),
+              linear-gradient(160deg, #081223, var(--bg));
+  min-height: 100vh;
+}
+.app { max-width: 1400px; margin: 0 auto; padding: 24px 20px 40px; }
+
+/* Breadcrumb */
+.breadcrumb { display: flex; align-items: center; gap: 8px; margin-bottom: 20px; }
+.breadcrumb a { color: var(--teal); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb .sep { color: var(--muted); }
+
+/* Cards */
+.card {
+  background: linear-gradient(180deg, #10233e, var(--panel));
+  border: 1px solid rgba(70,217,209,.15); border-radius: 16px;
+  padding: 20px; margin-bottom: 16px;
+}
+.card h2 { font-size: 1.15rem; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.card h3 { font-size: 1rem; margin-bottom: 8px; color: var(--teal); }
+
+/* Grid layout */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+.grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; }
+@media (max-width: 900px) { .grid-2, .grid-3 { grid-template-columns: 1fr; } }
+
+/* Session header */
+.session-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: 16px; margin-bottom: 24px;
+}
+.session-header h1 { font-size: 1.5rem; }
+.session-meta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 8px; }
+.meta-item { color: var(--muted); font-size: .9rem; }
+.meta-item strong { color: var(--text); }
+
+/* Chips & badges */
+.chip {
+  display: inline-block; padding: 3px 10px; border-radius: 999px;
+  font-size: .8rem; font-weight: 500;
+}
+.chip-status { background: rgba(85,210,139,.15); border: 1px solid rgba(85,210,139,.3); color: var(--ok); }
+.chip-status.processing { background: rgba(47,123,246,.15); border-color: rgba(47,123,246,.3); color: var(--blue); }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; border-bottom: 2px solid rgba(47,123,246,.15); margin-bottom: 20px; }
+.tab {
+  padding: 10px 20px; cursor: pointer; color: var(--muted);
+  border-bottom: 2px solid transparent; margin-bottom: -2px;
+  font-size: .95rem; transition: all .2s;
+}
+.tab:hover { color: var(--text); }
+.tab.active { color: var(--teal); border-color: var(--teal); font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Constructs */
+.construct {
+  background: #0b182c; border: 1px solid rgba(47,123,246,.2);
+  border-radius: 12px; padding: 16px; margin-bottom: 12px;
+}
+.construct-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 8px;
+}
+.construct-label { font-weight: 600; font-size: 1rem; }
+.construct-score {
+  display: flex; align-items: center; gap: 8px;
+}
+.score-bar {
+  width: 80px; height: 6px; background: rgba(255,255,255,.1);
+  border-radius: 3px; overflow: hidden;
+}
+.score-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+.construct-status {
+  font-size: .8rem; padding: 2px 8px; border-radius: 999px;
+}
+.construct-status.supported { background: rgba(85,210,139,.15); color: var(--ok); }
+.construct-status.mixed { background: rgba(245,166,35,.15); color: var(--warning); }
+.construct-status.weak { background: rgba(255,123,123,.15); color: var(--danger); }
+.construct-body { color: var(--muted); font-size: .92rem; line-height: 1.5; }
+.construct-evidence { margin-top: 8px; }
+.evidence-tag {
+  display: inline-block; padding: 2px 8px; margin: 2px 4px 2px 0;
+  background: rgba(70,217,209,.1); border: 1px solid rgba(70,217,209,.2);
+  border-radius: 6px; font-size: .78rem; color: var(--teal);
+}
+.quote {
+  border-left: 3px solid var(--teal); padding: 6px 12px; margin: 6px 0;
+  background: rgba(70,217,209,.05); border-radius: 0 8px 8px 0;
+  font-style: italic; font-size: .9rem; color: var(--muted);
+}
+
+/* Red flags */
+.red-flag {
+  background: rgba(255,123,123,.06); border: 1px solid rgba(255,123,123,.2);
+  border-radius: 12px; padding: 14px; margin-bottom: 10px;
+}
+.red-flag .severity {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: .78rem; font-weight: 600; margin-right: 8px;
+}
+.severity.high { background: rgba(255,123,123,.2); color: var(--danger); }
+.severity.medium { background: rgba(245,166,35,.2); color: var(--warning); }
+.severity.low { background: rgba(85,210,139,.15); color: var(--ok); }
+.red-flag .reason { margin-top: 6px; color: var(--muted); font-size: .92rem; }
+.red-flag .action { margin-top: 6px; color: var(--teal); font-size: .88rem; }
+
+/* Transcript */
+.transcript-container {
+  max-height: 500px; overflow-y: auto; padding-right: 8px;
+}
+.turn {
+  padding: 10px 14px; border-radius: 10px; margin-bottom: 8px;
+  position: relative;
+}
+.turn.student {
+  background: rgba(70,217,209,.06); border: 1px solid rgba(70,217,209,.15);
+}
+.turn.counsellor {
+  background: rgba(47,123,246,.08); border: 1px solid rgba(47,123,246,.2);
+}
+.turn .speaker {
+  font-size: .78rem; color: var(--muted); margin-bottom: 3px;
+  display: flex; justify-content: space-between;
+}
+.turn .text { font-size: .94rem; line-height: 1.5; }
+.turn .conf { font-size: .75rem; color: var(--muted); opacity: .7; }
+
+/* Evidence explorer */
+.evidence-node {
+  background: #0b182c; border: 1px solid rgba(47,123,246,.2);
+  border-radius: 10px; padding: 12px; margin-bottom: 10px;
+}
+.evidence-node .modality-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: .75rem; font-weight: 600; margin-right: 6px;
+}
+.modality-badge.content { background: rgba(70,217,209,.15); color: var(--teal); }
+.modality-badge.audio { background: rgba(47,123,246,.15); color: var(--blue); }
+.modality-badge.video { background: rgba(245,166,35,.15); color: var(--warning); }
+.modality-badge.cross_modal { background: rgba(255,123,123,.15); color: var(--danger); }
+.confidence-bar {
+  display: inline-flex; align-items: center; gap: 6px; font-size: .8rem; color: var(--muted);
+}
+.signal-windows { margin-top: 16px; }
+.window-card {
+  background: #0b182c; border: 1px solid rgba(70,217,209,.15);
+  border-radius: 10px; padding: 12px; margin-bottom: 8px;
+}
+.window-header { display: flex; justify-content: space-between; align-items: center; }
+.window-topic { font-weight: 600; color: var(--teal); }
+.window-time { font-size: .82rem; color: var(--muted); }
+
+/* Follow-ups & cross-modal notes */
+.note-item {
+  padding: 8px 12px; margin-bottom: 6px;
+  background: rgba(47,123,246,.06); border-left: 3px solid var(--blue);
+  border-radius: 0 8px 8px 0; font-size: .92rem;
+}
+.followup-item {
+  padding: 8px 12px; margin-bottom: 6px;
+  background: rgba(70,217,209,.06); border-left: 3px solid var(--teal);
+  border-radius: 0 8px 8px 0; font-size: .92rem;
+}
+
+.btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(70,217,209,.25); background: #0c1b31;
+  color: var(--text); text-decoration: none; padding: 8px 14px;
+  border-radius: 10px; font-size: .9rem; cursor: pointer;
+}
+.btn:hover { border-color: var(--teal); }
+
+.muted { color: var(--muted); }
+.empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- Breadcrumb -->
+  <div class="breadcrumb">
+    <a href="/api/v1/dashboard/counsellor">← Workbench</a>
+    <span class="sep">/</span>
+    <span>Session Review</span>
+  </div>
+
+  <!-- Session Header -->
+  <div class="session-header">
+    <div>
+      <h1>{{ data.student.name or 'Unknown Student' }}</h1>
+      <div class="session-meta">
+        <span class="meta-item">Grade <strong>{{ data.student.grade or '—' }}</strong></span>
+        {% if data.student.section %}
+        <span class="meta-item">Section <strong>{{ data.student.section }}</strong></span>
+        {% endif %}
+        {% if data.student.age %}
+        <span class="meta-item">Age <strong>{{ data.student.age }}</strong></span>
+        {% endif %}
+        {% if data.student.school %}
+        <span class="meta-item">School <strong>{{ data.student.school }}</strong></span>
+        {% endif %}
+        <span class="meta-item">Case <strong>{{ data.session.case_study_id }}</strong></span>
+        <span class="meta-item">
+          <span class="chip chip-status {{ data.session.status }}">{{ data.session.status }}</span>
+        </span>
+      </div>
+    </div>
+    <div style="text-align: right;">
+      <div class="meta-item">{{ data.session.started_at or '—' }}</div>
+      {% if data.session.duration_seconds %}
+      <div class="meta-item" style="margin-top:4px;">
+        Duration: <strong>{{ (data.session.duration_seconds // 60) }}m {{ data.session.duration_seconds % 60 }}s</strong>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tabs -->
+  <div class="tabs">
+    <div class="tab active" data-tab="profile" onclick="switchTab('profile')">📋 Profile</div>
+    <div class="tab" data-tab="evidence" onclick="switchTab('evidence')">🔍 Evidence</div>
+    <div class="tab" data-tab="transcript" onclick="switchTab('transcript')">💬 Transcript</div>
+    <div class="tab" data-tab="signals" onclick="switchTab('signals')">📊 Signals</div>
+  </div>
+
+  <!-- Tab: Profile -->
+  <div class="tab-content active" id="tab-profile">
+    {% if data.profile %}
+    {% set cv = data.profile.counsellor_view %}
+
+    <!-- Summary -->
+    {% if cv.summary %}
+    <div class="card">
+      <h2>📝 Summary</h2>
+      <p>{{ cv.summary }}</p>
+    </div>
+    {% endif %}
+
+    <!-- Red Flags -->
+    {% set flags = data.profile.red_flags %}
+    {% if flags and flags|length > 0 %}
+    <div class="card">
+      <h2>🚩 Red Flags ({{ flags|length }})</h2>
+      {% for rf in flags %}
+      <div class="red-flag">
+        <span class="severity {{ rf.severity or 'medium' }}">{{ (rf.severity or 'medium')|upper }}</span>
+        <strong>{{ rf.key or 'Unknown' }}</strong>
+        <div class="reason">{{ rf.reason or '' }}</div>
+        {% if rf.recommended_action %}
+        <div class="action">→ {{ rf.recommended_action }}</div>
+        {% endif %}
+        {% if rf.evidence_refs %}
+        <div class="construct-evidence" style="margin-top:6px;">
+          {% for ref in rf.evidence_refs %}
+          <span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Constructs -->
+    {% if cv.constructs %}
+    <div class="card">
+      <h2>🧩 Constructs ({{ cv.constructs|length }})</h2>
+      {% for c in cv.constructs %}
+      <div class="construct">
+        <div class="construct-header">
+          <div>
+            <span class="construct-label">{{ c.label or c.key }}</span>
+            <span class="construct-status {{ c.status or 'weak' }}">{{ c.status or 'weak' }}</span>
+          </div>
+          {% if c.score is not none %}
+          <div class="construct-score">
+            <div class="score-bar">
+              <div class="score-fill" style="width:{{ (c.score * 100)|int }}%; background:{% if c.score >= 0.7 %}var(--ok){% elif c.score >= 0.4 %}var(--warning){% else %}var(--danger){% endif %};"></div>
+            </div>
+            <span style="font-size:.85rem;">{{ '%.0f'|format(c.score * 100) }}%</span>
+          </div>
+          {% endif %}
+        </div>
+        <div class="construct-body">{{ c.evidence_summary or '' }}</div>
+        {% if c.supporting_quotes %}
+        {% for q in c.supporting_quotes %}
+        <div class="quote">"{{ q }}"</div>
+        {% endfor %}
+        {% endif %}
+        {% if c.evidence_refs %}
+        <div class="construct-evidence">
+          {% for ref in c.evidence_refs %}
+          <span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Cross-modal notes -->
+    {% if cv.cross_modal_notes %}
+    <div class="card">
+      <h2>🔗 Cross-Modal Notes</h2>
+      {% for note in cv.cross_modal_notes %}
+      <div class="note-item">{{ note }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Recommended follow-ups -->
+    {% if cv.recommended_follow_ups %}
+    <div class="card">
+      <h2>📌 Recommended Follow-ups</h2>
+      {% for fu in cv.recommended_follow_ups %}
+      <div class="followup-item">{{ fu }}</div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="card">
+      <div class="empty">No profile generated for this session yet.</div>
+    </div>
+    {% endif %}
+  </div>
+
+  <!-- Tab: Evidence Explorer -->
+  <div class="tab-content" id="tab-evidence">
+    <div class="card" id="evidence-loading">
+      <p class="muted">Loading evidence data...</p>
+    </div>
+  </div>
+
+  <!-- Tab: Transcript -->
+  <div class="tab-content" id="tab-transcript">
+    <div class="card">
+      <h2>💬 Session Transcript ({{ data.turns|length }} turns)</h2>
+      {% if data.turns %}
+      <div class="transcript-container">
+        {% for t in data.turns %}
+        <div class="turn {{ t.speaker }}">
+          <div class="speaker">
+            <span>{{ t.speaker|capitalize }} — Turn {{ t.turn_index }}</span>
+            <span class="conf">
+              {{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}
+              {% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}
+            </span>
+          </div>
+          <div class="text">{{ t.text }}</div>
+        </div>
+        {% endfor %}
+      </div>
+      {% else %}
+      <div class="empty">No transcript turns recorded.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <!-- Tab: Signals -->
+  <div class="tab-content" id="tab-signals">
+    <!-- Signal Windows -->
+    {% if data.signal_windows %}
+    <div class="card">
+      <h2>🪟 Topic Windows ({{ data.signal_windows|length }})</h2>
+      <div class="signal-windows">
+        {% for w in data.signal_windows %}
+        <div class="window-card">
+          <div class="window-header">
+            <span class="window-topic">{{ w.topic_key }}</span>
+            <span class="window-time">
+              {{ '%d:%02d'|format(w.start_ms // 60000, (w.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(w.end_ms // 60000, (w.end_ms // 1000) % 60) }}
+              · Reliability: {{ '%.0f'|format(w.reliability_score * 100) }}%
+            </span>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
+
+    <!-- Hypotheses -->
+    {% if data.hypotheses %}
+    <div class="card">
+      <h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
+      {% for h in data.hypotheses %}
+      <div class="construct">
+        <div class="construct-header">
+          <div>
+            <span class="construct-label">{{ h.label }}</span>
+            <span class="construct-status {{ h.status }}">{{ h.status }}</span>
+          </div>
+          {% if h.score is not none %}
+          <div class="construct-score">
+            <span style="font-size:.85rem;">{{ '%.0f'|format(h.score * 100) }}%</span>
+          </div>
+          {% endif %}
+        </div>
+        <div class="construct-body">{{ h.evidence_summary }}</div>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Observations by modality -->
+    {% for modality, obs_list in data.observations.items() %}
+    <div class="card">
+      <h2>
+        <span class="modality-badge {{ modality }}">{{ modality|upper }}</span>
+        Observations ({{ obs_list|length }})
+      </h2>
+      {% for obs in obs_list[:20] %}
+      <div class="evidence-node">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
+          <strong>{{ obs.signal_key }}</strong>
+          <span class="confidence-bar">
+            Confidence: {{ '%.0f'|format(obs.confidence * 100) }}%
+          </span>
+        </div>
+        {% if obs.value %}
+        <div class="muted" style="font-size:.88rem;">
+          {% for k, v in obs.value.items() %}
+          <span style="margin-right:12px;">{{ k }}: <strong>{{ v }}</strong></span>
+          {% endfor %}
+        </div>
+        {% endif %}
+      </div>
+      {% endfor %}
+      {% if obs_list|length > 20 %}
+      <div class="muted" style="padding:8px;">... and {{ obs_list|length - 20 }} more observations</div>
+      {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if not data.signal_windows and not data.hypotheses and not data.observations %}
+    <div class="card">
+      <div class="empty">No signal data available for this session.</div>
+    </div>
+    {% endif %}
+  </div>
+</div>
+
+<script>
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.toggle('active', c.id === 'tab-' + name));
+
+  // Lazy-load evidence
+  if (name === 'evidence' && !window._evidenceLoaded) {
+    loadEvidence();
+  }
+}
+
+async function loadEvidence() {
+  const sessionId = '{{ data.session.id }}';
+  const container = document.getElementById('tab-evidence');
+  try {
+    const res = await fetch(`/api/v1/dashboard/counsellor/sessions/${sessionId}/evidence`);
+    const ev = await res.json();
+    if (ev.error) {
+      container.innerHTML = `<div class="card"><div class="empty">${ev.error}</div></div>`;
+      return;
+    }
+
+    let html = '';
+
+    // Summary stats
+    const mc = ev.modality_counts || {};
+    html += `<div class="card">
+      <h2>🔍 Evidence Overview</h2>
+      <div style="display:flex;gap:16px;flex-wrap:wrap;">
+        <div class="meta-item">Total observations: <strong>${ev.total_observations}</strong></div>
+        ${Object.entries(mc).map(([k,v]) => `
+          <div class="meta-item"><span class="modality-badge ${k}">${k}</span> <strong>${v}</strong></div>
+        `).join('')}
+      </div>
+    </div>`;
+
+    // Hypothesis links
+    if (ev.hypothesis_links && ev.hypothesis_links.length) {
+      html += `<div class="card"><h2>🧪 Hypothesis Links (${ev.hypothesis_links.length})</h2>`;
+      ev.hypothesis_links.forEach(h => {
+        const pct = h.score != null ? Math.round(h.score * 100) + '%' : '—';
+        html += `<div class="construct">
+          <div class="construct-header">
+            <div>
+              <span class="construct-label">${esc(h.label)}</span>
+              <span class="construct-status ${h.status}">${h.status}</span>
+            </div>
+            <span style="font-size:.85rem;">${pct}</span>
+          </div>
+          <div class="construct-body">${esc(h.evidence_summary)}</div>
+        </div>`;
+      });
+      html += `</div>`;
+    }
+
+    // Evidence nodes grouped by modality
+    const byMod = {};
+    (ev.evidence_nodes || []).forEach(n => {
+      const m = n.modality || 'unknown';
+      if (!byMod[m]) byMod[m] = [];
+      byMod[m].push(n);
+    });
+
+    for (const [mod, nodes] of Object.entries(byMod)) {
+      html += `<div class="card"><h2><span class="modality-badge ${mod}">${mod.toUpperCase()}</span> Evidence (${nodes.length})</h2>`;
+      nodes.slice(0, 30).forEach(n => {
+        html += `<div class="evidence-node">
+          <div style="display:flex;justify-content:space-between;margin-bottom:4px;">
+            <strong>${esc(n.signal_key)}</strong>
+            <span class="confidence-bar">Confidence: ${Math.round(n.confidence * 100)}%</span>
+          </div>`;
+        if (n.window) {
+          const ws = Math.floor(n.window.start_ms / 60000);
+          const wss = Math.floor((n.window.start_ms / 1000) % 60);
+          html += `<div class="muted" style="font-size:.85rem;margin-bottom:4px;">
+            Window: <span class="evidence-tag">${esc(n.window.topic_key)}</span>
+            ${ws}:${String(wss).padStart(2,'0')}
+          </div>`;
+        }
+        if (n.related_turns && n.related_turns.length) {
+          n.related_turns.forEach(t => {
+            html += `<div class="quote">[Turn ${t.turn_index}, ${t.speaker}] "${esc(t.text)}"</div>`;
+          });
+        }
+        const val = n.value || {};
+        const valKeys = Object.keys(val);
+        if (valKeys.length) {
+          html += `<div class="muted" style="font-size:.85rem;margin-top:4px;">`;
+          valKeys.forEach(k => { html += `<span style="margin-right:10px;">${esc(k)}: <strong>${esc(String(val[k]))}</strong></span>`; });
+          html += `</div>`;
+        }
+        html += `</div>`;
+      });
+      if (nodes.length > 30) {
+        html += `<div class="muted" style="padding:8px;">... and ${nodes.length - 30} more</div>`;
+      }
+      html += `</div>`;
+    }
+
+    if (!ev.evidence_nodes || !ev.evidence_nodes.length) {
+      html += `<div class="card"><div class="empty">No evidence data available.</div></div>`;
+    }
+
+    container.innerHTML = html;
+    window._evidenceLoaded = true;
+  } catch (err) {
+    container.innerHTML = `<div class="card"><div class="empty">Failed to load evidence: ${err.message}</div></div>`;
+  }
+}
+
+function esc(text) {
+  return String(text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

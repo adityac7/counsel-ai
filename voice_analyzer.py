@@ -1,4 +1,9 @@
-"""Voice prosody analysis using librosa."""
+"""Voice prosody analysis — legacy compatibility wrapper.
+
+The core extraction logic now lives in ``counselai.signals.audio.extractor``.
+This module preserves the original ``analyze_audio`` / ``detect_pauses`` API
+so that existing callers keep working without changes.
+"""
 from __future__ import annotations
 
 import math
@@ -9,6 +14,18 @@ from typing import Any, Dict, List, Optional
 import librosa
 import numpy as np
 from utils import extract_audio_from_video
+
+# Re-export new extractor for callers that want the structured API
+try:
+    from counselai.signals.audio.extractor import (
+        AudioSignalExtractor,
+        extract_audio_features,
+        load_audio as _new_load_audio,
+    )
+except ImportError:
+    AudioSignalExtractor = None  # type: ignore[assignment,misc]
+    extract_audio_features = None  # type: ignore[assignment]
+    _new_load_audio = None
 
 
 def _load_audio_with_fallback(audio_path: str) -> tuple[Optional[np.ndarray], Optional[int], str]:

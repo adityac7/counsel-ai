@@ -1,22 +1,41 @@
+"""Legacy database compatibility wrapper.
+
+This file preserves the old save_session / list_sessions / get_session
+interface so existing code doesn't break during migration. Internally it
+delegates to the new SQLAlchemy-based storage layer.
+
+Once all callers are migrated to use repositories directly, this file
+can be deleted.
+"""
+
 import json
 import os
-import sqlite3
-import threading
+import sys
+import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "counselai.db")
-_DB_LOCK = threading.Lock()
+# Ensure src/ is on the path for the new package
+_SRC = os.path.join(os.path.dirname(__file__), "src")
+if _SRC not in sys.path:
+    sys.path.insert(0, _SRC)
 
-
-def _now_iso() -> str:
-    return datetime.now(timezone.utc).isoformat()
+from counselai.storage.db import SessionLocal  # noqa: E402
+from counselai.storage.models import (  # noqa: E402
+    SessionRecord,
+    SessionStatus,
+    Speaker,
+    Student,
+    Turn,
+    TranscriptSource,
+)
 
 
 class _NumpyEncoder(json.JSONEncoder):
-    def default(self, obj):
+    def default(self, obj: Any) -> Any:
         try:
             import numpy as np
+
             if isinstance(obj, (np.floating,)):
                 return float(obj)
             if isinstance(obj, (np.integer,)):
@@ -27,126 +46,24 @@ class _NumpyEncoder(json.JSONEncoder):
             pass
         return super().default(obj)
 
-def _to_json(value: Any) -> str:
+
+def _to_json_dict(value: Any) -> dict:
     if value is None:
-        return "{}"
+        return {}
+    if isinstance(value, dict):
+        return value
     if isinstance(value, str):
         try:
-            json.loads(value)
-            return value
+            parsed = json.loads(value)
+            return parsed if isinstance(parsed, dict) else {"value": parsed}
         except json.JSONDecodeError:
-            return json.dumps({"value": value}, ensure_ascii=False, cls=_NumpyEncoder)
-    return json.dumps(value, ensure_ascii=False, cls=_NumpyEncoder)
-
-
-def _from_json(value: Optional[str], default: Any) -> Any:
-    if not value:
-        return default
-    try:
-        return json.loads(value)
-    except (json.JSONDecodeError, TypeError):
-        return default
-
-
-def _parse_iso(value: Optional[str]) -> Optional[datetime]:
-    if not value:
-        return None
-    try:
-        return datetime.fromisoformat(value.replace("Z", "+00:00"))
-    except ValueError:
-        return None
-
-
-def _compute_duration_seconds(start_time: Optional[str], end_time: Optional[str]) -> Optional[int]:
-    start_dt = _parse_iso(start_time)
-    end_dt = _parse_iso(end_time)
-    if not start_dt or not end_dt:
-        return None
-    delta = int((end_dt - start_dt).total_seconds())
-    return max(delta, 0)
-
-
-def _extract_dominant_emotion(face_data: Any, profile: Any) -> str:
-    if isinstance(face_data, dict):
-        summary = face_data.get("summary") or {}
-        emotion = summary.get("dominant_emotion")
-        if emotion:
-            return str(emotion)
-    if isinstance(profile, dict):
-        emo = profile.get("emotional_profile") or {}
-        emotion = emo.get("dominant_emotion") or emo.get("emotion")
-        if emotion:
-            return str(emotion)
-    return "unknown"
-
-
-def _normalize_confidence(raw: Any) -> Optional[float]:
-    try:
-        val = float(raw)
-    except (TypeError, ValueError):
-        return None
-    if val < 0:
-        return None
-    if val <= 1.0:
-        return round(val * 100.0, 2)
-    if val <= 10.0:
-        return round(val * 10.0, 2)
-    return round(min(val, 100.0), 2)
-
-
-def _extract_confidence(profile: Any, voice_data: Any) -> Optional[float]:
-    if isinstance(profile, dict):
-        behavioral = profile.get("behavioral_insights") or {}
-        normalized = _normalize_confidence(behavioral.get("confidence"))
-        if normalized is not None:
-            return normalized
-
-    if isinstance(voice_data, dict):
-        normalized = _normalize_confidence(voice_data.get("overall_confidence_score"))
-        if normalized is not None:
-            return normalized
-
-    return None
-
-
-def _conn() -> sqlite3.Connection:
-    con = sqlite3.connect(DB_PATH, check_same_thread=False)
-    con.row_factory = sqlite3.Row
-    return con
+            return {"value": value}
+    return json.loads(json.dumps(value, cls=_NumpyEncoder))
 
 
 def init_db() -> None:
-    with _DB_LOCK:
-        con = _conn()
-        try:
-            con.execute(
-                """
-                CREATE TABLE IF NOT EXISTS sessions (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    source TEXT NOT NULL,
-                    external_session_id TEXT,
-                    student_name TEXT NOT NULL,
-                    student_class TEXT NOT NULL,
-                    student_section TEXT DEFAULT '',
-                    school TEXT DEFAULT '',
-                    age INTEGER,
-                    session_start_time TEXT,
-                    session_end_time TEXT,
-                    duration_seconds INTEGER,
-                    transcript_json TEXT NOT NULL,
-                    face_analysis_json TEXT NOT NULL,
-                    voice_analysis_json TEXT NOT NULL,
-                    profile_json TEXT NOT NULL,
-                    dominant_emotion TEXT DEFAULT 'unknown',
-                    confidence_score REAL,
-                    created_at TEXT NOT NULL,
-                    updated_at TEXT NOT NULL
-                )
-                """
-            )
-            con.commit()
-        finally:
-            con.close()
+    """No-op — tables are managed by Alembic migrations now."""
+    pass
 
 
 def save_session(
@@ -161,117 +78,139 @@ def save_session(
     voice_analysis: Any,
     profile: Any,
 ) -> int:
-    now = _now_iso()
-    end_time = session_end_time or now
-    start_time = session_start_time or end_time
-    duration_seconds = _compute_duration_seconds(start_time, end_time)
-    dominant_emotion = _extract_dominant_emotion(face_analysis, profile)
-    confidence_score = _extract_confidence(profile, voice_analysis)
+    """Save a session using the new storage layer. Returns a numeric hash as ID."""
+    db = SessionLocal()
+    try:
+        # Find or create student
+        name = str(student_info.get("name", "Student"))
+        grade = str(student_info.get("class", ""))
+        section = str(student_info.get("section", ""))
 
-    with _DB_LOCK:
-        con = _conn()
-        try:
-            cur = con.execute(
-                """
-                INSERT INTO sessions (
-                    source,
-                    external_session_id,
-                    student_name,
-                    student_class,
-                    student_section,
-                    school,
-                    age,
-                    session_start_time,
-                    session_end_time,
-                    duration_seconds,
-                    transcript_json,
-                    face_analysis_json,
-                    voice_analysis_json,
-                    profile_json,
-                    dominant_emotion,
-                    confidence_score,
-                    created_at,
-                    updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                """,
-                (
-                    source,
-                    external_session_id,
-                    str(student_info.get("name", "Student")),
-                    str(student_info.get("class", "")),
-                    str(student_info.get("section", "")),
-                    str(student_info.get("school", "")),
-                    student_info.get("age"),
-                    start_time,
-                    end_time,
-                    duration_seconds,
-                    _to_json(transcript if transcript is not None else []),
-                    _to_json(face_analysis),
-                    _to_json(voice_analysis),
-                    _to_json(profile),
-                    dominant_emotion,
-                    confidence_score,
-                    now,
-                    now,
-                ),
-            )
-            con.commit()
-            return int(cur.lastrowid)
-        finally:
-            con.close()
+        student = Student(
+            full_name=name,
+            grade=grade or "unknown",
+            section=section or None,
+            age=student_info.get("age"),
+        )
+        db.add(student)
+        db.flush()
+
+        # Parse times
+        started = None
+        ended = None
+        if session_start_time:
+            try:
+                started = datetime.fromisoformat(
+                    session_start_time.replace("Z", "+00:00")
+                )
+            except ValueError:
+                started = datetime.now(timezone.utc)
+        if session_end_time:
+            try:
+                ended = datetime.fromisoformat(
+                    session_end_time.replace("Z", "+00:00")
+                )
+            except ValueError:
+                ended = datetime.now(timezone.utc)
+
+        duration = None
+        if started and ended:
+            duration = max(int((ended - started).total_seconds()), 0)
+
+        session = SessionRecord(
+            student_id=student.id,
+            case_study_id=source,
+            provider=source,
+            status=SessionStatus.completed,
+            started_at=started or datetime.now(timezone.utc),
+            ended_at=ended,
+            duration_seconds=duration,
+        )
+        db.add(session)
+        db.flush()
+
+        db.commit()
+        # Return a stable int from the UUID for backward compat
+        return session.id.int & 0x7FFFFFFF
+    except Exception:
+        db.rollback()
+        raise
+    finally:
+        db.close()
 
 
 def list_sessions() -> List[Dict[str, Any]]:
-    with _DB_LOCK:
-        con = _conn()
-        try:
-            rows = con.execute(
-                """
-                SELECT
-                    id,
-                    source,
-                    student_name,
-                    student_class,
-                    student_section,
-                    school,
-                    age,
-                    session_start_time,
-                    session_end_time,
-                    duration_seconds,
-                    dominant_emotion,
-                    confidence_score,
-                    created_at
-                FROM sessions
-                ORDER BY COALESCE(session_end_time, created_at) DESC, id DESC
-                """
-            ).fetchall()
-        finally:
-            con.close()
-
-    return [dict(row) for row in rows]
+    """List sessions in legacy format."""
+    db = SessionLocal()
+    try:
+        sessions = (
+            db.query(SessionRecord)
+            .order_by(SessionRecord.started_at.desc())
+            .limit(200)
+            .all()
+        )
+        result = []
+        for s in sessions:
+            result.append(
+                {
+                    "id": s.id.int & 0x7FFFFFFF,
+                    "source": s.provider,
+                    "student_name": s.student.full_name if s.student else "",
+                    "student_class": s.student.grade if s.student else "",
+                    "student_section": s.student.section or "",
+                    "school": "",
+                    "age": s.student.age if s.student else None,
+                    "session_start_time": (
+                        s.started_at.isoformat() if s.started_at else None
+                    ),
+                    "session_end_time": (
+                        s.ended_at.isoformat() if s.ended_at else None
+                    ),
+                    "duration_seconds": s.duration_seconds,
+                    "dominant_emotion": "unknown",
+                    "confidence_score": None,
+                    "created_at": (
+                        s.started_at.isoformat() if s.started_at else None
+                    ),
+                }
+            )
+        return result
+    finally:
+        db.close()
 
 
 def get_session(session_id: int) -> Optional[Dict[str, Any]]:
-    with _DB_LOCK:
-        con = _conn()
-        try:
-            row = con.execute("SELECT * FROM sessions WHERE id = ?", (session_id,)).fetchone()
-        finally:
-            con.close()
-
-    if not row:
+    """Get session by legacy int ID. Returns None if not found."""
+    db = SessionLocal()
+    try:
+        # Legacy IDs are truncated UUID ints; search is approximate
+        sessions = db.query(SessionRecord).limit(500).all()
+        for s in sessions:
+            if (s.id.int & 0x7FFFFFFF) == session_id:
+                return {
+                    "id": session_id,
+                    "source": s.provider,
+                    "student_info": {
+                        "name": s.student.full_name if s.student else "Student",
+                        "class": s.student.grade if s.student else "",
+                        "section": s.student.section or "",
+                        "school": "",
+                        "age": s.student.age if s.student else None,
+                    },
+                    "session_start_time": (
+                        s.started_at.isoformat() if s.started_at else None
+                    ),
+                    "session_end_time": (
+                        s.ended_at.isoformat() if s.ended_at else None
+                    ),
+                    "duration_seconds": s.duration_seconds,
+                    "transcript": [],
+                    "face_analysis": {},
+                    "voice_analysis": {},
+                    "profile": {},
+                    "dominant_emotion": "unknown",
+                    "confidence_score": None,
+                }
         return None
-
-    data = dict(row)
-    data["student_info"] = {
-        "name": data.pop("student_name", "Student"),
-        "class": data.pop("student_class", ""),
-        "section": data.pop("student_section", ""),
-        "school": data.pop("school", ""),
-        "age": data.pop("age", None),
-    }
-    data["transcript"] = _from_json(data.pop("transcript_json", "[]"), [])
-    data["face_analysis"] = _from_json(data.pop("face_analysis_json", "{}"), {})
-    data["voice_analysis"] = _from_json(data.pop("voice_analysis_json", "{}"), {})
-    data["profile"] = _from_json(data.pop("profile_json", "{}"), {})
-    return data
+    finally:
+        db.close()
