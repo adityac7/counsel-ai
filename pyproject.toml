@@ -36,5 +36,15 @@ dev = [
     "playwright>=1.41.0",
 ]
 
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
+markers = [
+    "e2e: End-to-end browser tests (require running server)",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+]
+
 [tool.setuptools.packages.find]
 where = ["src"]
