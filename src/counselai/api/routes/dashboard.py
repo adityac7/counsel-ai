@@ -11,7 +11,7 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from sqlalchemy.orm import Session
 
-from counselai.api.deps import get_db
+from counselai.api.deps import get_sync_db
 from counselai.api.schemas import (
     CounsellorQueueResponse,
     ProfileResponse,
@@ -43,7 +43,7 @@ router = APIRouter()
 
 
 @router.get("/counsellor", response_class=HTMLResponse)
-def counsellor_workbench(request: Request, db: Session = Depends(get_db)):
+def counsellor_workbench(request: Request, db: Session = Depends(get_sync_db)):
     """Main counsellor workbench page."""
     schools = get_available_schools(db)
     grades = get_available_grades(db)
@@ -57,7 +57,7 @@ def counsellor_workbench(request: Request, db: Session = Depends(get_db)):
 def counsellor_session_detail_page(
     request: Request,
     session_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Session review page for a single session."""
     try:
@@ -91,7 +91,7 @@ def counsellor_queue(
     search: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Sessions needing review, with optional filters."""
     filters = QueueFilters(
@@ -112,7 +112,7 @@ def counsellor_queue(
 @router.get("/counsellor/sessions/{session_id}/review")
 def counsellor_session_review(
     session_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Full session review data as JSON."""
     try:
@@ -129,7 +129,7 @@ def counsellor_session_review(
 @router.get("/counsellor/sessions/{session_id}/evidence")
 def counsellor_session_evidence(
     session_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Evidence explorer data for a session."""
     try:
@@ -144,7 +144,7 @@ def counsellor_session_evidence(
 
 
 @router.get("/counsellor/filters")
-def counsellor_filters(db: Session = Depends(get_db)):
+def counsellor_filters(db: Session = Depends(get_sync_db)):
     """Available filter options for the counsellor queue."""
     return JSONResponse({
         "schools": get_available_schools(db),
@@ -158,7 +158,7 @@ def counsellor_filters(db: Session = Depends(get_db)):
 # ---------------------------------------------------------------------------
 
 @router.get("/students/{student_id}", response_model=StudentDashboardResponse)
-def student_dashboard_api(student_id: str, db: Session = Depends(get_db)):
+def student_dashboard_api(student_id: str, db: Session = Depends(get_sync_db)):
     """Historical sessions and latest profile summary (JSON API)."""
     try:
         sid = uuid.UUID(student_id)
@@ -203,7 +203,7 @@ def student_dashboard_api(student_id: str, db: Session = Depends(get_db)):
 def student_insights_page(
     student_id: str,
     request: Request,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Student-facing insights page — strengths, interests, growth."""
     try:
@@ -230,7 +230,7 @@ def school_overview(
     school_id: str,
     grade: str | None = Query(None, description="Filter class-level insights to this grade"),
     trend: str = Query("month", description="Trend granularity: month or week"),
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """School-level aggregate analytics.
 
@@ -256,7 +256,7 @@ def school_overview(
 def school_class_insights(
     school_id: str,
     grade: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Class-level aggregate insights for a specific grade.
 
@@ -284,7 +284,7 @@ def school_class_insights(
 def school_dashboard_page(
     request: Request,
     school_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
 ):
     """Render the school analytics dashboard HTML page."""
     try:

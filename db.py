@@ -20,14 +20,11 @@ _SRC = os.path.join(os.path.dirname(__file__), "src")
 if _SRC not in sys.path:
     sys.path.insert(0, _SRC)
 
-from counselai.storage.db import SessionLocal  # noqa: E402
+from counselai.storage.db import get_sync_session_factory, init_db  # noqa: E402
 from counselai.storage.models import (  # noqa: E402
     SessionRecord,
     SessionStatus,
-    Speaker,
     Student,
-    Turn,
-    TranscriptSource,
 )
 
 
@@ -47,21 +44,14 @@ class _NumpyEncoder(json.JSONEncoder):
         return super().default(obj)
 
 
-def _to_json_dict(value: Any) -> dict:
-    if value is None:
-        return {}
-    if isinstance(value, dict):
-        return value
-    if isinstance(value, str):
-        try:
-            parsed = json.loads(value)
-            return parsed if isinstance(parsed, dict) else {"value": parsed}
-        except json.JSONDecodeError:
-            return {"value": value}
-    return json.loads(json.dumps(value, cls=_NumpyEncoder))
+def _get_session():
+    """Get a sync DB session, initialising DB if needed."""
+    init_db()
+    factory = get_sync_session_factory()
+    return factory()
 
 
-def init_db() -> None:
+def init_db_legacy() -> None:
     """No-op — tables are managed by Alembic migrations now."""
     pass
 
@@ -79,9 +69,8 @@ def save_session(
     profile: Any,
 ) -> int:
     """Save a session using the new storage layer. Returns a numeric hash as ID."""
-    db = SessionLocal()
+    db = _get_session()
     try:
-        # Find or create student
         name = str(student_info.get("name", "Student"))
         grade = str(student_info.get("class", ""))
         section = str(student_info.get("section", ""))
@@ -95,7 +84,6 @@ def save_session(
         db.add(student)
         db.flush()
 
-        # Parse times
         started = None
         ended = None
         if session_start_time:
@@ -121,16 +109,14 @@ def save_session(
             student_id=student.id,
             case_study_id=source,
             provider=source,
-            status=SessionStatus.completed,
+            status=SessionStatus.completed.value,
             started_at=started or datetime.now(timezone.utc),
             ended_at=ended,
             duration_seconds=duration,
         )
         db.add(session)
         db.flush()
-
         db.commit()
-        # Return a stable int from the UUID for backward compat
         return session.id.int & 0x7FFFFFFF
     except Exception:
         db.rollback()
@@ -141,7 +127,7 @@ def save_session(
 
 def list_sessions() -> List[Dict[str, Any]]:
     """List sessions in legacy format."""
-    db = SessionLocal()
+    db = _get_session()
     try:
         sessions = (
             db.query(SessionRecord)
@@ -167,8 +153,6 @@ def list_sessions() -> List[Dict[str, Any]]:
                         s.ended_at.isoformat() if s.ended_at else None
                     ),
                     "duration_seconds": s.duration_seconds,
-                    "dominant_emotion": "unknown",
-                    "confidence_score": None,
                     "created_at": (
                         s.started_at.isoformat() if s.started_at else None
                     ),
@@ -181,9 +165,8 @@ def list_sessions() -> List[Dict[str, Any]]:
 
 def get_session(session_id: int) -> Optional[Dict[str, Any]]:
     """Get session by legacy int ID. Returns None if not found."""
-    db = SessionLocal()
+    db = _get_session()
     try:
-        # Legacy IDs are truncated UUID ints; search is approximate
         sessions = db.query(SessionRecord).limit(500).all()
         for s in sessions:
             if (s.id.int & 0x7FFFFFFF) == session_id:
@@ -208,8 +191,6 @@ def get_session(session_id: int) -> Optional[Dict[str, Any]]:
                     "face_analysis": {},
                     "voice_analysis": {},
                     "profile": {},
-                    "dominant_emotion": "unknown",
-                    "confidence_score": None,
                 }
         return None
     finally:
