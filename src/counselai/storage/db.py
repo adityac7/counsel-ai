@@ -1,19 +1,24 @@
-"""Async database engine, session factory, and base model for SQLite."""
+"""Database engine, session factory, and base model for SQLite.
+
+Provides both async (for FastAPI routes) and sync (for dashboard
+service layers) session factories from a single configuration.
+"""
 
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from contextlib import asynccontextmanager, contextmanager
+from typing import AsyncGenerator, Generator
 
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
+from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.orm import DeclarativeBase
+from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +27,10 @@ _DEFAULT_URL = "sqlite+aiosqlite:///counselai.db"
 
 _engine: AsyncEngine | None = None
 _session_factory: async_sessionmaker[AsyncSession] | None = None
+
+# Sync engine/factory for dashboard service layers
+_sync_engine: Engine | None = None
+_sync_session_factory: sessionmaker[Session] | None = None
 
 
 class Base(DeclarativeBase):
@@ -45,13 +54,22 @@ def _build_engine(url: str) -> AsyncEngine:
     )
 
 
+def _async_to_sync_url(url: str) -> str:
+    """Convert an async SQLAlchemy URL to its sync equivalent."""
+    if "+aiosqlite" in url:
+        return url.replace("+aiosqlite", "")
+    if "+asyncpg" in url:
+        return url.replace("+asyncpg", "+psycopg2")
+    return url
+
+
 def init_db(url: str = _DEFAULT_URL) -> None:
     """Initialise the global engine and session factory.
 
     Safe to call multiple times — subsequent calls are no-ops unless
     the URL changes.
     """
-    global _engine, _session_factory
+    global _engine, _session_factory, _sync_engine, _sync_session_factory
 
     if _engine is not None:
         return
@@ -62,6 +80,15 @@ def init_db(url: str = _DEFAULT_URL) -> None:
         class_=AsyncSession,
         expire_on_commit=False,
     )
+
+    # Build sync engine for dashboard service layers
+    sync_url = _async_to_sync_url(url)
+    connect_args: dict = {}
+    if sync_url.startswith("sqlite"):
+        connect_args = {"check_same_thread": False}
+    _sync_engine = create_engine(sync_url, echo=False, connect_args=connect_args)
+    _sync_session_factory = sessionmaker(bind=_sync_engine, expire_on_commit=False)
+
     logger.info("Database engine initialised: %s", url.split("?")[0])
 
 
@@ -98,6 +125,35 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
         except Exception:
             await session.rollback()
             raise
+
+
+def get_sync_session_factory() -> sessionmaker[Session]:
+    """Return the global sync session factory."""
+    if _sync_session_factory is None:
+        init_db()
+    assert _sync_session_factory is not None
+    return _sync_session_factory
+
+
+def get_sync_db() -> Generator[Session, None, None]:
+    """Yield a sync session — use as a FastAPI dependency for sync routes.
+
+    Example::
+
+        @router.get("/")
+        def index(db: Session = Depends(get_sync_db)):
+            ...
+    """
+    factory = get_sync_session_factory()
+    session = factory()
+    try:
+        yield session
+        session.commit()
+    except Exception:
+        session.rollback()
+        raise
+    finally:
+        session.close()
 
 
 @asynccontextmanager
@@ -138,10 +194,14 @@ async def health_check() -> dict[str, str]:
 
 
 async def close_db() -> None:
-    """Dispose of the engine connection pool."""
-    global _engine, _session_factory
+    """Dispose of all engine connection pools."""
+    global _engine, _session_factory, _sync_engine, _sync_session_factory
     if _engine is not None:
         await _engine.dispose()
         _engine = None
         _session_factory = None
-        logger.info("Database engine disposed.")
+    if _sync_engine is not None:
+        _sync_engine.dispose()
+        _sync_engine = None
+        _sync_session_factory = None
+    logger.info("Database engines disposed.")

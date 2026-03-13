@@ -15,7 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from counselai.api.deps import get_db
+from counselai.api.deps import get_sync_db
 from counselai.api.schemas import (
     SessionCompleteResponse,
     SessionCreateRequest,
@@ -69,7 +69,7 @@ def _parse_turns(transcript_json: str) -> list[RawTurn]:
 # ---------------------------------------------------------------------------
 
 @router.post("/session", response_model=SessionCreateResponse)
-def create_session(body: SessionCreateRequest, db: Session = Depends(get_db)):
+def create_session(body: SessionCreateRequest, db: Session = Depends(get_sync_db)):
     """Create a session record before media starts."""
     canon = _get_canonicalizer(db)
     try:
@@ -90,7 +90,7 @@ def create_session(body: SessionCreateRequest, db: Session = Depends(get_db)):
 @router.post("/session/{session_id}/upload")
 def upload_session_artifacts(
     session_id: str,
-    db: Session = Depends(get_db),
+    db: Session = Depends(get_sync_db),
     transcript: str = Form("[]"),
     audio: UploadFile | None = File(None),
     video: UploadFile | None = File(None),
@@ -142,7 +142,7 @@ def upload_session_artifacts(
 
 
 @router.post("/session/{session_id}/complete", response_model=SessionCompleteResponse)
-def complete_session(session_id: str, db: Session = Depends(get_db)):
+def complete_session(session_id: str, db: Session = Depends(get_sync_db)):
     """Mark upload complete and transition to processing.
 
     This endpoint is called after /upload has persisted all artifacts.
