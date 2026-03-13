@@ -5,83 +5,686 @@
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 <title>CounselAI Live</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0a1628;--panel:#0f1f35;--panel-2:#0c1a30;--teal:#46d9d1;--blue:#2f7bf6;--text:#e6f2ff;--muted:#9bb3d3;--danger:#ff7b7b;--glow:0 0 30px rgba(70,217,209,.45)}
-*{box-sizing:border-box}
-body{margin:0;font-family:"Space Grotesk","IBM Plex Sans",system-ui,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 15% 0%,#133056 0%,transparent 60%),linear-gradient(160deg,#081223,var(--bg));min-height:100vh}
-.app{max-width:1100px;margin:0 auto;padding:28px 20px 40px}
-.card{background:linear-gradient(180deg,#10233e,var(--panel));border:1px solid rgba(70,217,209,.2);border-radius:20px;padding:22px;box-shadow:0 18px 60px rgba(0,0,0,.35)}
-.hidden{display:none}
-h1,h2,h3{margin:0 0 14px;letter-spacing:.3px}
-label{display:block;margin:14px 0 6px;color:var(--muted);font-size:.92rem}
-input,select,button{font:inherit;border-radius:12px;border:1px solid rgba(70,217,209,.2);background:#0c1b31;color:var(--text);padding:12px 14px;width:100%}
-button{cursor:pointer;background:linear-gradient(135deg,var(--teal),var(--blue));border:none;color:#031321;font-weight:600;transition:transform .2s ease,box-shadow .2s ease}
-button:hover{transform:translateY(-1px);box-shadow:0 8px 18px rgba(47,123,246,.35)}
-button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
-.grid{display:grid;gap:16px}
-.two{grid-template-columns:1fr 1fr}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}
-.status{display:flex;align-items:center;gap:10px;color:var(--muted);font-size:.95rem}
-.status .dot{width:10px;height:10px;border-radius:50%;background:var(--teal);box-shadow:0 0 10px rgba(70,217,209,.6)}
-.debug-line{color:var(--muted);font-size:.8rem;opacity:.95}
-.timer{font-variant-numeric:tabular-nums;color:var(--text)}
-.live-grid{display:flex;flex-direction:column;gap:18px}
-.top-row{display:flex;gap:18px;align-items:flex-start}
-.preview{width:280px;aspect-ratio:4/3;border-radius:16px;overflow:hidden;border:2px solid rgba(70,217,209,.7);box-shadow:0 12px 30px rgba(0,0,0,.4);background:#081424}
-.preview video{width:100%;height:100%;object-fit:cover}
-.orb-wrap{display:flex;align-items:center;justify-content:center}
-.orb{position:relative;width:100px;height:100px;border-radius:50%;background:radial-gradient(circle at 30% 30%,#7fffe9 0%,#3dc5c0 35%,#2461b8 75%);box-shadow:var(--glow);animation:orbFloat 4s ease-in-out infinite}
-.orb.speaking{box-shadow:0 0 40px rgba(70,217,209,.9)}
-.orb.speaking::before,
-.orb.speaking::after{
-  content:"";
-  position:absolute;
-  inset:-10px;
-  border-radius:50%;
-  border:2px solid rgba(70,217,209,0.4);
-  animation:ripple 1.5s ease-out infinite;
+:root {
+  --bg-start: #1a0a2e;
+  --bg-mid: #16213e;
+  --bg-end: #0a1628;
+  --glass: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.12);
+  --glass-hover: rgba(255, 255, 255, 0.1);
+  --accent: #7c5cfc;
+  --accent-glow: rgba(124, 92, 252, 0.4);
+  --accent-soft: #a78bfa;
+  --teal: #5eead4;
+  --teal-glow: rgba(94, 234, 212, 0.3);
+  --text: #f1f0f7;
+  --text-soft: #b4b0c8;
+  --text-muted: #7e7a94;
+  --danger: #f87171;
+  --danger-glow: rgba(248, 113, 113, 0.3);
+  --success: #34d399;
+  --warning: #fbbf24;
+  --radius: 20px;
+  --radius-sm: 12px;
 }
-.orb.speaking::after{inset:-22px;animation-delay:.6s}
-@keyframes orbFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@keyframes ripple{0%{transform:scale(0.85);opacity:.65}100%{transform:scale(1.35);opacity:0}}
-.case-card{background:var(--panel-2);border-radius:16px;padding:16px;border:1px solid rgba(47,123,246,.25);min-height:100%;flex:1}
-.case-text{white-space:pre-wrap;color:var(--text);line-height:1.4}
-.transcript{background:#0b182c;border-radius:16px;padding:14px;max-height:40vh;overflow:auto;border:1px solid rgba(47,123,246,.25)}
-.bottom-row{display:flex;align-items:center;justify-content:center;gap:16px}
-.entry{margin:8px 0;display:flex;gap:10px}
-.entry .tag{font-weight:600;color:var(--teal);min-width:90px}
-.entry.ai .tag{color:var(--blue)}
-.meta{color:var(--muted);font-size:.95rem}
-.metrics{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(160px,1fr))}
-.metric{background:#0c1b31;border-radius:12px;padding:12px;border:1px solid rgba(70,217,209,.2)}
-.metric .label{color:var(--muted);font-size:.85rem}
-.metric .value{font-size:1.2rem;font-weight:600}
-.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#1b2a48;border:1px solid rgba(255,123,123,.6);padding:10px 14px;border-radius:10px;color:var(--text);display:none;z-index:20}
-@media (max-width:900px){.top-row{flex-direction:column}.preview{width:100%}.bottom-row{flex-direction:column;gap:12px}}
-@media (max-width:760px){.two{grid-template-columns:1fr}}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+  color: var(--text);
+  background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-mid) 50%, var(--bg-end) 100%);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(ellipse at 20% 20%, rgba(124, 92, 252, 0.08) 0%, transparent 50%),
+              radial-gradient(ellipse at 80% 80%, rgba(94, 234, 212, 0.05) 0%, transparent 50%);
+  pointer-events: none;
+  z-index: 0;
+}
+
+.app {
+  position: relative;
+  z-index: 1;
+  max-width: 1080px;
+  margin: 0 auto;
+  padding: 24px 16px 60px;
+}
+
+.glass {
+  background: var(--glass);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius);
+  transition: background 0.3s ease, border-color 0.3s ease;
+}
+
+.glass:hover { border-color: rgba(255, 255, 255, 0.18); }
+
+.hidden { display: none !important; }
+
+/* --- Typography --- */
+h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
+h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; }
+h3 { font-size: 1.1rem; font-weight: 600; }
+
+/* --- Topbar --- */
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 0;
+  margin-bottom: 20px;
+}
+
+.topbar .brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  font-size: 1.1rem;
+}
+
+.brand-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.topbar a {
+  color: var(--accent-soft);
+  text-decoration: none;
+  font-size: 0.9rem;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(124, 92, 252, 0.2);
+  transition: all 0.25s ease;
+}
+
+.topbar a:hover {
+  background: rgba(124, 92, 252, 0.1);
+  border-color: rgba(124, 92, 252, 0.4);
+}
+
+/* --- Forms --- */
+label {
+  display: block;
+  margin: 14px 0 6px;
+  color: var(--text-soft);
+  font-size: 0.85rem;
+  font-weight: 500;
+  letter-spacing: 0.02em;
+}
+
+input, select {
+  font-family: inherit;
+  font-size: 0.95rem;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);
+  color: var(--text);
+  padding: 12px 14px;
+  width: 100%;
+  outline: none;
+  transition: border-color 0.25s ease, box-shadow 0.25s ease;
+}
+
+input:focus, select:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.15);
+}
+
+select option { background: #1a1a2e; color: var(--text); }
+
+/* --- Buttons --- */
+.btn {
+  font-family: inherit;
+  font-size: 0.95rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 14px 24px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.25s ease;
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+}
+
+.btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.btn:hover::after { opacity: 1; }
+.btn:active { transform: scale(0.97); }
+
+.btn-primary {
+  background: linear-gradient(135deg, var(--accent), #6366f1);
+  color: #fff;
+  box-shadow: 0 4px 20px var(--accent-glow);
+}
+
+.btn-primary:hover {
+  box-shadow: 0 6px 30px rgba(124, 92, 252, 0.5);
+  transform: translateY(-1px);
+}
+
+.btn-primary:active { transform: translateY(0) scale(0.98); }
+
+.btn-danger {
+  background: linear-gradient(135deg, var(--danger), #dc2626);
+  color: #fff;
+  box-shadow: 0 4px 16px var(--danger-glow);
+}
+
+.btn-danger:hover { box-shadow: 0 6px 24px rgba(248, 113, 113, 0.4); }
+
+.btn-ghost {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-soft);
+  border: 1px solid var(--glass-border);
+}
+
+.btn-ghost:hover { background: rgba(255, 255, 255, 0.1); }
+
+/* --- Grid --- */
+.grid { display: grid; gap: 14px; }
+.grid-2 { grid-template-columns: 1fr 1fr; }
+
+/* --- Welcome Screen --- */
+.welcome-card {
+  padding: 32px 28px;
+  animation: slideUp 0.5s ease;
+}
+
+.welcome-header {
+  text-align: center;
+  margin-bottom: 28px;
+}
+
+.welcome-header h1 {
+  background: linear-gradient(135deg, var(--text), var(--accent-soft));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  margin-bottom: 8px;
+}
+
+.welcome-header p {
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.welcome-emoji {
+  font-size: 2.5rem;
+  margin-bottom: 12px;
+  display: block;
+}
+
+/* --- Live Session Screen --- */
+.live-card {
+  padding: 20px;
+  animation: fadeIn 0.4s ease;
+}
+
+.session-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.session-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.status-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+.status-dot.speaking {
+  background: var(--accent);
+  box-shadow: 0 0 14px var(--accent-glow);
+}
+
+#status-text {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--text-soft);
+}
+
+.session-timer {
+  font-size: 1.3rem;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.05);
+  padding: 6px 16px;
+  border-radius: 30px;
+  border: 1px solid var(--glass-border);
+}
+
+#rtc-debug {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  margin-top: 2px;
+  font-family: 'Inter', monospace;
+}
+
+/* --- Live Layout --- */
+.live-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.top-row {
+  display: flex;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.preview {
+  width: 260px;
+  min-width: 260px;
+  aspect-ratio: 4/3;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid rgba(124, 92, 252, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  position: relative;
+}
+
+.preview video { width: 100%; height: 100%; object-fit: cover; }
+
+.preview::after {
+  content: '📹';
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  font-size: 0.7rem;
+  background: rgba(0,0,0,0.5);
+  padding: 3px 7px;
+  border-radius: 6px;
+}
+
+.case-card {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 16px;
+  border: 1px solid var(--glass-border);
+  overflow-y: auto;
+  max-height: 220px;
+}
+
+.case-card h3 {
+  color: var(--accent-soft);
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 10px;
+}
+
+.case-text {
+  white-space: pre-wrap;
+  color: var(--text-soft);
+  line-height: 1.55;
+  font-size: 0.88rem;
+}
+
+/* --- Audio Visualizer --- */
+.visualizer-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px 0;
+}
+
+#waveform-canvas {
+  width: 100%;
+  max-width: 500px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+}
+
+/* --- Orb --- */
+.orb-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.orb {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 30% 30%, #c4b5fd 0%, var(--accent) 40%, #4338ca 80%);
+  box-shadow: 0 0 30px var(--accent-glow);
+  animation: orbFloat 4s ease-in-out infinite;
+  transition: box-shadow 0.4s ease;
+}
+
+.orb.speaking {
+  box-shadow: 0 0 50px rgba(124, 92, 252, 0.7);
+  animation: orbFloat 4s ease-in-out infinite, orbPulse 0.8s ease-in-out infinite;
+}
+
+.orb.speaking::before,
+.orb.speaking::after {
+  content: '';
+  position: absolute;
+  inset: -12px;
+  border-radius: 50%;
+  border: 2px solid rgba(124, 92, 252, 0.3);
+  animation: ripple 1.8s ease-out infinite;
+}
+
+.orb.speaking::after {
+  inset: -24px;
+  animation-delay: 0.6s;
+}
+
+/* --- Transcript --- */
+.transcript {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  padding: 16px;
+  max-height: 38vh;
+  min-height: 120px;
+  overflow-y: auto;
+  border: 1px solid var(--glass-border);
+  scroll-behavior: smooth;
+}
+
+.transcript::-webkit-scrollbar { width: 5px; }
+.transcript::-webkit-scrollbar-track { background: transparent; }
+.transcript::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
+
+.entry {
+  margin: 10px 0;
+  display: flex;
+  gap: 12px;
+  animation: slideIn 0.3s ease;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  transition: background 0.2s ease;
+}
+
+.entry:hover { background: rgba(255, 255, 255, 0.03); }
+
+.entry .tag {
+  font-weight: 600;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  min-width: 85px;
+  padding-top: 2px;
+  color: var(--teal);
+}
+
+.entry.ai .tag { color: var(--accent-soft); }
+
+.entry .body {
+  color: var(--text-soft);
+  line-height: 1.5;
+  font-size: 0.9rem;
+}
+
+/* --- Bottom Controls --- */
+.bottom-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding-top: 4px;
+}
+
+.bottom-row .btn { width: auto; min-width: 160px; }
+
+#enable-audio-btn {
+  display: none;
+  max-width: 240px;
+}
+
+/* --- Event Log Panel --- */
+.event-log-panel {
+  margin-top: 16px;
+  padding: 16px;
+}
+
+.event-log-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.event-log-header h3 {
+  font-size: 0.9rem;
+  color: var(--text-soft);
+}
+
+.event-log-actions { display: flex; gap: 6px; }
+
+.btn-tiny {
+  font-family: inherit;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--glass-border);
+  color: var(--text-muted);
+  padding: 4px 10px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.75rem;
+  transition: all 0.2s ease;
+}
+
+.btn-tiny:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-soft); }
+
+#event-log {
+  max-height: 300px;
+  overflow: auto;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  font-size: 0.73rem;
+  line-height: 1.6;
+  color: var(--text-muted);
+  white-space: pre-wrap;
+  word-break: break-all;
+  margin: 0;
+  font-family: 'Inter', monospace;
+}
+
+/* --- Summary Screen --- */
+.summary-card {
+  padding: 28px 24px;
+  animation: slideUp 0.5s ease;
+}
+
+.summary-card h2 {
+  margin-bottom: 20px;
+  text-align: center;
+}
+
+.summary-grid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
+
+.summary-section {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  padding: 18px;
+  border: 1px solid var(--glass-border);
+}
+
+.summary-section strong {
+  display: block;
+  font-size: 0.85rem;
+  color: var(--accent-soft);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.summary-section .meta {
+  color: var(--text-soft);
+  font-size: 0.9rem;
+  line-height: 1.55;
+}
+
+.summary-full { grid-column: 1 / -1; }
+
+.metrics {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+/* --- Toast --- */
+.toast {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  background: rgba(30, 20, 60, 0.95);
+  backdrop-filter: blur(16px);
+  border: 1px solid var(--danger);
+  padding: 12px 20px;
+  border-radius: var(--radius-sm);
+  color: var(--text);
+  display: none;
+  z-index: 100;
+  font-size: 0.88rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+  animation: toastIn 0.3s ease;
+}
+
+/* --- Animations --- */
+@keyframes slideUp {
+  from { opacity: 0; transform: translateY(20px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes orbFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+@keyframes orbPulse {
+  0%, 100% { transform: scale(1) translateY(0); }
+  50% { transform: scale(1.06) translateY(-6px); }
+}
+
+@keyframes ripple {
+  0% { transform: scale(0.85); opacity: 0.6; }
+  100% { transform: scale(1.4); opacity: 0; }
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+}
+
+/* --- Responsive --- */
+@media (max-width: 768px) {
+  .app { padding: 16px 12px 40px; }
+  .welcome-card, .summary-card { padding: 20px 16px; }
+  .grid-2 { grid-template-columns: 1fr; }
+  .summary-grid { grid-template-columns: 1fr; }
+  .top-row { flex-direction: column; }
+  .preview { width: 100%; min-width: unset; }
+  .bottom-row { flex-direction: column; gap: 10px; }
+  .bottom-row .btn { width: 100%; }
+  h1 { font-size: 1.4rem; }
+  .session-timer { font-size: 1.1rem; }
+  .case-card { max-height: 160px; }
+}
+
+@media (max-width: 480px) {
+  .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+  .session-header { flex-direction: column; align-items: flex-start; }
+}
 </style>
 </head>
 <body>
 <div class="app">
-  <div class="topbar" style="margin-bottom:18px;">
-    <h3 style="margin:0;">CounselAI Live</h3>
-    <a href="/dashboard" style="color:var(--teal);text-decoration:none;font-weight:600;">Sessions Dashboard</a>
+  <div class="topbar">
+    <div class="brand"><span class="brand-dot"></span> CounselAI</div>
+    <a href="/dashboard">📊 Sessions Dashboard</a>
   </div>
-  <section id="welcome" class="card">
-    <h1>Welcome to CounselAI Live</h1>
-    <div class="grid two">
+
+  <!-- ===== WELCOME SCREEN ===== -->
+  <section id="welcome" class="glass welcome-card">
+    <div class="welcome-header">
+      <span class="welcome-emoji">🎓</span>
+      <h1>Start Your Session</h1>
+      <p>A safe space to explore, reflect, and grow</p>
+    </div>
+    <div class="grid grid-2">
       <div>
-        <label for="student-name">Student name</label>
-        <input id="student-name" placeholder="Avery Lee" />
+        <label for="student-name">Your Name</label>
+        <input id="student-name" placeholder="e.g. Priya, Arjun..." />
       </div>
       <div>
         <label for="class-name">Class</label>
         <select id="class-name">
-                <option value="9">9</option>
-                <option value="10">10</option>
-                <option value="11">11</option>
-                <option value="12">12</option>
-              </select>
+          <option value="9">Class 9</option>
+          <option value="10">Class 10</option>
+          <option value="11">Class 11</option>
+          <option value="12">Class 12</option>
+        </select>
       </div>
       <div>
         <label for="section-name">Section</label>
@@ -89,130 +692,151 @@ button.danger{background:linear-gradient(135deg,#ff7b7b,#e04242);color:#1b0b0b}
       </div>
       <div>
         <label for="school-name">School</label>
-        <input id="school-name" placeholder="Springfield High" />
+        <input id="school-name" placeholder="Your school name" />
       </div>
       <div>
         <label for="student-age">Age</label>
         <input id="student-age" type="number" min="10" max="20" value="15" />
       </div>
+      <div>
+        <label for="ai-model">AI Model</label>
+        <select id="ai-model">
+          <option value="gemini">Google Gemini Live</option>
+          <option value="openai">OpenAI GPT Realtime</option>
+        </select>
+      </div>
     </div>
-    <label for="ai-model">AI Model</label>
-    <select id="ai-model">
-      <option value="gemini">Google Gemini Live</option>
-      <option value="openai">OpenAI GPT Realtime</option>
-    </select>
-    <label for="case-study">Case study</label>
+    <label for="case-study">Case Study</label>
     <select id="case-study"></select>
-    <div style="margin-top:18px;">
-      <button id="start-btn">Start session</button>
+    <div style="margin-top: 22px;">
+      <button id="start-btn" class="btn btn-primary">✨ Start Session</button>
     </div>
   </section>
 
-  <section id="live" class="card hidden">
-      <div class="topbar">
+  <!-- ===== LIVE SESSION SCREEN ===== -->
+  <section id="live" class="glass live-card hidden">
+    <div class="session-header">
       <div>
-        <div class="status"><span class="dot"></span><span id="status-text">Connecting...</span></div>
-        <div class="debug-line" id="rtc-debug">RTC: idle</div>
+        <div class="session-status">
+          <span class="status-dot" id="status-dot"></span>
+          <span id="status-text">Connecting...</span>
+        </div>
+        <div id="rtc-debug">RTC: idle</div>
       </div>
-      <div class="timer" id="timer">00:00</div>
+      <div class="session-timer" id="timer">00:00</div>
     </div>
+
     <div class="live-grid">
       <div class="top-row">
-        <div class="preview" id="preview-wrap"><video id="preview" autoplay muted playsinline></video></div>
+        <div class="preview" id="preview-wrap">
+          <video id="preview" autoplay muted playsinline></video>
+        </div>
         <div class="case-card">
-          <h3>Case Study</h3>
+          <h3>📋 Case Study</h3>
           <div id="case-study-text" class="case-text">Select a case study to view the full text.</div>
         </div>
       </div>
+
+      <div class="visualizer-wrap">
+        <canvas id="waveform-canvas"></canvas>
+      </div>
+
       <div class="transcript" id="transcript"></div>
+
       <div class="bottom-row">
         <div class="orb-wrap"><div id="orb" class="orb"></div></div>
-        <button id="enable-audio-btn" style="display:none;max-width:260px;">Enable counsellor audio</button>
-        <button id="end-btn" class="danger">End session</button>
+        <button id="enable-audio-btn" class="btn btn-ghost">🔊 Enable Counsellor Audio</button>
+        <button id="end-btn" class="btn btn-danger">End Session</button>
       </div>
     </div>
   </section>
 
-  <section id="event-log-panel" class="card" style="margin-top:16px;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
-      <h3 style="margin:0;">🔍 Event Log</h3>
-      <div>
-        <button onclick="document.getElementById('event-log').textContent=''" style="background:#1a2a44;border:1px solid rgba(70,217,209,.3);color:#9bb3d3;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.8rem;">Clear</button>
-        <button onclick="navigator.clipboard.writeText(document.getElementById('event-log').textContent)" style="background:#1a2a44;border:1px solid rgba(70,217,209,.3);color:#9bb3d3;padding:4px 10px;border-radius:6px;cursor:pointer;font-size:.8rem;margin-left:4px;">Copy All</button>
+  <!-- ===== EVENT LOG ===== -->
+  <section id="event-log-panel" class="glass event-log-panel" style="margin-top: 16px;">
+    <div class="event-log-header">
+      <h3>🔍 Event Log</h3>
+      <div class="event-log-actions">
+        <button class="btn-tiny" onclick="document.getElementById('event-log').textContent=''">Clear</button>
+        <button class="btn-tiny" onclick="navigator.clipboard.writeText(document.getElementById('event-log').textContent)">Copy</button>
       </div>
     </div>
-    <pre id="event-log" style="max-height:400px;overflow:auto;background:#080f1e;border:1px solid rgba(47,123,246,.25);border-radius:10px;padding:12px;font-size:.78rem;line-height:1.5;color:#8fa8c8;white-space:pre-wrap;word-break:break-all;margin:0;"></pre>
+    <pre id="event-log"></pre>
   </section>
 
-  <section id="summary" class="card hidden">
-    <h2>Session summary</h2>
-    <div class="grid two">
-      <div class="card" style="padding:16px;">
+  <!-- ===== SUMMARY SCREEN ===== -->
+  <section id="summary" class="glass summary-card hidden">
+    <h2>📝 Session Summary</h2>
+    <div class="summary-grid">
+      <div class="summary-section">
+        <strong>Session Info</strong>
         <div class="meta" id="summary-meta"></div>
       </div>
-      <div class="card" style="padding:16px;">
-        <strong>Score metrics</strong>
-        <div class="metrics" id="profile-metrics" style="margin-top:12px;"></div>
+      <div class="summary-section">
+        <strong>Score Metrics</strong>
+        <div class="metrics" id="profile-metrics" style="margin-top: 8px;"></div>
+      </div>
+      <div class="summary-section">
+        <strong>🧠 Personality Snapshot</strong>
+        <div class="meta" id="personality-section"></div>
+      </div>
+      <div class="summary-section">
+        <strong>💡 Cognitive Profile</strong>
+        <div class="meta" id="cognitive-section"></div>
+      </div>
+      <div class="summary-section">
+        <strong>💗 Emotional Profile</strong>
+        <div class="meta" id="emotional-section"></div>
+      </div>
+      <div class="summary-section">
+        <strong>🎯 Behavioral Insights</strong>
+        <div class="meta" id="behavioral-section"></div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong>💬 Conversation Analysis</strong>
+        <div class="meta" id="conversation-section"></div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong>📌 Recommendations</strong>
+        <div id="recommendations" class="meta"></div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong style="color: var(--warning);">⭐ Key Moments</strong>
+        <div class="meta" id="key-moments-section"></div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong style="color: var(--danger);">🚩 Red Flags</strong>
+        <div class="meta" id="red-flags-section"></div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong>Summary</strong>
+        <div class="meta" id="summary-text"></div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong>🎭 Face Analysis</strong>
+        <div class="meta" id="face-analysis-section">Waiting for analysis...</div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong>🎤 Voice Analysis</strong>
+        <div class="meta" id="voice-analysis-section">Waiting for analysis...</div>
+      </div>
+      <div class="summary-section summary-full">
+        <strong>Full Transcript</strong>
+        <div class="meta" id="summary-transcript" style="white-space: pre-wrap;"></div>
       </div>
     </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Personality snapshot</strong>
-      <div class="meta" id="personality-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Cognitive profile</strong>
-      <div class="meta" id="cognitive-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Emotional profile</strong>
-      <div class="meta" id="emotional-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Behavioral insights</strong>
-      <div class="meta" id="behavioral-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Conversation analysis</strong>
-      <div class="meta" id="conversation-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Recommendations</strong>
-      <div id="recommendations" class="meta" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong style="color:#e8c547;">Key moments</strong>
-      <div class="meta" id="key-moments-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong style="color:#e74c3c;">Red flags</strong>
-      <div class="meta" id="red-flags-section" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Summary</strong>
-      <div class="meta" id="summary-text" style="margin-top:8px;"></div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>🎭 Face Analysis</strong>
-      <div class="meta" id="face-analysis-section" style="margin-top:8px;">Waiting for analysis...</div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>🎤 Voice Analysis</strong>
-      <div class="meta" id="voice-analysis-section" style="margin-top:8px;">Waiting for analysis...</div>
-    </div>
-    <div class="card" style="padding:16px;margin-top:16px;">
-      <strong>Full transcript</strong>
-      <div class="meta" id="summary-transcript" style="margin-top:8px;white-space:pre-wrap;"></div>
-    </div>
-    <div style="margin-top:18px;">
-      <button id="new-btn">New session</button>
+    <div style="margin-top: 22px;">
+      <button id="new-btn" class="btn btn-primary">🔄 New Session</button>
     </div>
   </section>
 </div>
+
 <audio id="ai-audio" autoplay playsinline></audio>
 <div class="toast" id="toast"></div>
+
 <script>
 const screens = {welcome:document.getElementById('welcome'),live:document.getElementById('live'),summary:document.getElementById('summary')};
 const statusText = document.getElementById('status-text');
+const statusDot = document.getElementById('status-dot');
 const timerEl = document.getElementById('timer');
 const transcriptEl = document.getElementById('transcript');
 const orb = document.getElementById('orb');
@@ -230,6 +854,65 @@ const emotionalSection = document.getElementById('emotional-section');
 const behavioralSection = document.getElementById('behavioral-section');
 const conversationSection = document.getElementById('conversation-section');
 const recommendationsEl = document.getElementById('recommendations');
+
+/* --- Audio Waveform Visualizer --- */
+const waveCanvas = document.getElementById('waveform-canvas');
+const waveCtx = waveCanvas.getContext('2d');
+let waveAnimId = null;
+let waveAnalyser = null;
+let waveDataArray = null;
+
+function initWaveform(stream) {
+  const actx = new (window.AudioContext || window.webkitAudioContext)();
+  const source = actx.createMediaStreamSource(stream);
+  waveAnalyser = actx.createAnalyser();
+  waveAnalyser.fftSize = 256;
+  waveAnalyser.smoothingTimeConstant = 0.8;
+  source.connect(waveAnalyser);
+  waveDataArray = new Uint8Array(waveAnalyser.frequencyBinCount);
+  resizeWaveCanvas();
+  drawWaveform();
+}
+
+function resizeWaveCanvas() {
+  const rect = waveCanvas.getBoundingClientRect();
+  waveCanvas.width = rect.width * window.devicePixelRatio;
+  waveCanvas.height = rect.height * window.devicePixelRatio;
+  waveCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+}
+
+function drawWaveform() {
+  waveAnimId = requestAnimationFrame(drawWaveform);
+  if (!waveAnalyser) return;
+  waveAnalyser.getByteFrequencyData(waveDataArray);
+
+  const w = waveCanvas.width / window.devicePixelRatio;
+  const h = waveCanvas.height / window.devicePixelRatio;
+  waveCtx.clearRect(0, 0, w, h);
+
+  const bars = 48;
+  const step = Math.floor(waveDataArray.length / bars);
+  const barW = (w / bars) * 0.6;
+  const gap = (w / bars) * 0.4;
+
+  for (let i = 0; i < bars; i++) {
+    const val = waveDataArray[i * step] / 255;
+    const barH = Math.max(2, val * h * 0.85);
+    const x = i * (barW + gap) + gap / 2;
+    const y = (h - barH) / 2;
+
+    const gradient = waveCtx.createLinearGradient(x, y, x, y + barH);
+    gradient.addColorStop(0, 'rgba(124, 92, 252, 0.8)');
+    gradient.addColorStop(1, 'rgba(94, 234, 212, 0.6)');
+    waveCtx.fillStyle = gradient;
+    waveCtx.beginPath();
+    waveCtx.roundRect(x, y, barW, barH, 2);
+    waveCtx.fill();
+  }
+}
+
+window.addEventListener('resize', () => { if (waveAnalyser) resizeWaveCanvas(); });
+
 function uiLog(level, ...args) {
   const el = document.getElementById("event-log");
   const ts = new Date().toLocaleTimeString("en-GB",{hour12:false});
@@ -240,12 +923,13 @@ function uiLog(level, ...args) {
   if (level === "WARN" || level === "ERR") console.warn("[CounselAI]", ...args);
   else console.log("[CounselAI]", ...args);
 }
+
 let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
 let timerStart, timerHandle, currentAiEntry = null;
 let transcriptEntries = [];
 let sessionMeta = null;
-
-    let geminiModelTurnCount = 0;
+let eventCount = 0;
+let geminiModelTurnCount = 0;
 let lastStudentTranscript = '';
 let waitingForStudentTranscript = false;
 let lastUserItemId = null;
@@ -262,7 +946,13 @@ let geminiTranscriptTimer = null;
 let lastTranscriptionTime = 0;
 
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
-function setStatus(text){statusText.textContent = text;}
+function setStatus(text){
+  statusText.textContent = text;
+  if (statusDot) {
+    if (text === 'Speaking...') statusDot.classList.add('speaking');
+    else statusDot.classList.remove('speaking');
+  }
+}
 function showToast(msg){toast.textContent = msg;toast.style.display='block';setTimeout(()=>toast.style.display='none',4000);}
 function formatTime(ms){const s=Math.floor(ms/1000);const m=String(Math.floor(s/60)).padStart(2,'0');const r=String(s%60).padStart(2,'0');return `${m}:${r}`;}
 function setDebug(text){rtcDebug.textContent = text;}
@@ -285,7 +975,7 @@ function tryPlayAiAudio(){
     console.log('[CounselAI] AI audio playback active');
   }).catch(err=>{
     console.warn('[CounselAI] AI audio play blocked:', err);
-    enableAudioBtn.style.display = 'inline-block';
+    enableAudioBtn.style.display = 'inline-flex';
     setStatus('Tap "Enable counsellor audio"');
   });
 }
@@ -307,16 +997,10 @@ function addStudentTranscript(text, source){
   const raw = typeof text === 'string' ? text : String(text ?? '');
   const clean = raw.trim();
   console.log('[CounselAI] Student transcript candidate:', {
-    source: source || 'unknown',
-    raw,
-    clean,
-    waitingForStudentTranscript,
-    lastUserItemId
+    source: source || 'unknown', raw, clean,
+    waitingForStudentTranscript, lastUserItemId
   });
-  if (!clean) {
-    console.log('[CounselAI] Student transcript candidate was empty.');
-    return false;
-  }
+  if (!clean) { console.log('[CounselAI] Student transcript candidate was empty.'); return false; }
   if (clean === lastStudentTranscript) {
     uiLog('WARN', 'Duplicate student transcript observed; keeping capture active.');
   }
@@ -334,7 +1018,6 @@ function collectTranscriptCandidates(value, path = 'msg', out = []){
     return out;
   }
   if (typeof value !== 'object') return out;
-
   if (typeof value.transcript === 'string') out.push({text: value.transcript, source: `${path}.transcript`});
   if (typeof value.text === 'string' && /input_audio|user|conversation\.item|audio_transcription/.test(path)) {
     out.push({text: value.text, source: `${path}.text`});
@@ -342,7 +1025,6 @@ function collectTranscriptCandidates(value, path = 'msg', out = []){
   if (typeof value.delta === 'string' && /audio_transcription/.test(path)) {
     out.push({text: value.delta, source: `${path}.delta`});
   }
-
   Object.keys(value).forEach(key => {
     collectTranscriptCandidates(value[key], `${path}.${key}`, out);
   });
@@ -359,28 +1041,28 @@ function captureUserTranscriptFromMessage(msg, contextType){
     const didCapture = addStudentTranscript(candidate.text, `${contextType || 'event'}:${candidate.source}`);
     captured = didCapture || captured;
   }
-  if (!captured) {
-    uiLog('WARN', 'No student transcript text found for event:', contextType);
-  }
+  if (!captured) { uiLog('WARN', 'No student transcript text found for event:', contextType); }
 }
-function addEntry(role,text){
-  const entry=document.createElement('div');
-  entry.className=`entry ${role}`;
+
+function addEntry(role, text){
+  const entry = document.createElement('div');
+  entry.className = `entry ${role === 'ai' ? 'ai' : ''}`;
   entry.dataset.role = role;
-  const tag=document.createElement('div');
-  tag.className='tag';
-  tag.textContent=role==='ai'?'Counsellor':'Student';
-  const body=document.createElement('div');
-  body.className='body';
-  body.textContent=text;
-  entry.append(tag,body);
+  const tag = document.createElement('div');
+  tag.className = 'tag';
+  tag.textContent = role === 'ai' ? 'Counsellor' : 'Student';
+  const body = document.createElement('div');
+  body.className = 'body';
+  body.textContent = text;
+  entry.append(tag, body);
   transcriptEl.append(entry);
-  transcriptEl.scrollTop=transcriptEl.scrollHeight;
+  transcriptEl.scrollTop = transcriptEl.scrollHeight;
   const data = {role: role === 'ai' ? 'counsellor' : 'student', text: text || ''};
   transcriptEntries.push(data);
   return {body, data};
 }
-function updateTimer(){timerEl.textContent=formatTime(Date.now()-timerStart);}
+
+function updateTimer(){timerEl.textContent = formatTime(Date.now() - timerStart);}
 
 function renderFaceAnalysis(faceData) {
   const el = document.getElementById('face-analysis-section');
@@ -419,14 +1101,14 @@ function renderVoiceAnalysis(voiceData) {
 }
 
 async function startSession(){
-  const name=document.getElementById('student-name').value.trim()||'Student';
-  const className=document.getElementById('class-name').value.trim()||'Class';
-  const section=document.getElementById('section-name').value.trim();
-  const school=document.getElementById('school-name').value.trim();
-  const age=Number(document.getElementById('student-age').value || 15);
-  const scenario=document.getElementById('case-study').value;
+  const name = document.getElementById('student-name').value.trim() || 'Student';
+  const className = document.getElementById('class-name').value.trim() || 'Class';
+  const section = document.getElementById('section-name').value.trim();
+  const school = document.getElementById('school-name').value.trim();
+  const age = Number(document.getElementById('student-age').value || 15);
+  const scenario = document.getElementById('case-study').value;
   sessionMode = document.getElementById('ai-model').value;
-  sessionMeta={name,className,section,school,age,scenario,start:new Date()};
+  sessionMeta = {name, className, section, school, age, scenario, start: new Date()};
   recordedChunks = [];
   transcriptEntries = [];
   currentAiEntry = null;
@@ -440,17 +1122,20 @@ async function startSession(){
   setDebug(sessionMode === 'gemini' ? 'Gemini: connecting' : 'RTC: connecting');
   caseStudyText.textContent = scenario || 'No case study loaded.';
 
-  try{mediaStream = await navigator.mediaDevices.getUserMedia({audio:true,video:true});}
-  catch(err){mediaStream = await navigator.mediaDevices.getUserMedia({audio:true,video:false});}
+  try { mediaStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true}); }
+  catch(err) { mediaStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false}); }
   if (!mediaStream.getAudioTracks().length) throw new Error('No microphone track available.');
+
+  // Init waveform visualizer
+  initWaveform(mediaStream);
 
   preview.srcObject = mediaStream;
   const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
   if (!hasVideoTrack) {
-    previewWrap.style.display='none';
+    previewWrap.style.display = 'none';
     console.warn('[CounselAI] Camera unavailable; recording audio-only.');
   } else {
-    previewWrap.style.display='block';
+    previewWrap.style.display = 'block';
   }
 
   const mimeCandidates = hasVideoTrack
@@ -497,10 +1182,7 @@ async function startOpenAISession(name, scenario){
     console.log('[CounselAI] ontrack:', e.track.kind, 'streams:', e.streams.length);
     const stream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
     aiAudio.srcObject = stream;
-    e.track.onunmute = () => {
-      console.log('[CounselAI] AI track unmuted');
-      tryPlayAiAudio();
-    };
+    e.track.onunmute = () => { console.log('[CounselAI] AI track unmuted'); tryPlayAiAudio(); };
     tryPlayAiAudio();
     updateDebugSnapshot();
   };
@@ -517,12 +1199,7 @@ async function startOpenAISession(name, scenario){
         session:{
           input_audio_transcription:{model:'gpt-4o-transcribe',language:'hi'},
           turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500},
-          audio:{
-            input:{
-              transcription:{model:'gpt-4o-transcribe',language:'hi'},
-              turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500}
-            }
-          }
+          audio:{ input:{ transcription:{model:'gpt-4o-transcribe',language:'hi'}, turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500} } }
         }
       };
       dc.send(JSON.stringify(sessionUpdate));
@@ -545,7 +1222,6 @@ async function startOpenAISession(name, scenario){
 
   const offer = await pc.createOffer();
   await pc.setLocalDescription(offer);
-
   const resp = await fetch(`/api/rtc-connect?scenario=${encodeURIComponent(scenario)}`, {method:'POST',body:pc.localDescription.sdp,headers:{'Content-Type':'application/sdp'}});
   if (resp.status !== 200 && resp.status !== 201) throw new Error(`RTC connect failed (${resp.status})`);
   const answerSdp = await resp.text();
@@ -584,118 +1260,72 @@ function playGeminiAudio(base64Data) {
 }
 
 function createWavBlob(int16Arrays) {
-  // Concatenate all Int16Arrays
   let totalLength = 0;
   for (const arr of int16Arrays) totalLength += arr.length;
   const combined = new Int16Array(totalLength);
   let offset = 0;
-  for (const arr of int16Arrays) {
-    combined.set(arr, offset);
-    offset += arr.length;
-  }
-  
-  const numChannels = 1;
-  const sampleRate = 16000;
-  const bitsPerSample = 16;
+  for (const arr of int16Arrays) { combined.set(arr, offset); offset += arr.length; }
+  const numChannels = 1, sampleRate = 16000, bitsPerSample = 16;
   const byteRate = sampleRate * numChannels * bitsPerSample / 8;
   const blockAlign = numChannels * bitsPerSample / 8;
-  const dataSize = combined.length * 2; // 2 bytes per sample
-  
+  const dataSize = combined.length * 2;
   const buffer = new ArrayBuffer(44 + dataSize);
   const view = new DataView(buffer);
-  
-  // RIFF header
   writeString(view, 0, 'RIFF');
   view.setUint32(4, 36 + dataSize, true);
   writeString(view, 8, 'WAVE');
-  
-  // fmt subchunk
   writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true); // subchunk size
-  view.setUint16(20, 1, true); // PCM format
+  view.setUint32(16, 16, true);
+  view.setUint16(20, 1, true);
   view.setUint16(22, numChannels, true);
   view.setUint32(24, sampleRate, true);
   view.setUint32(28, byteRate, true);
   view.setUint16(32, blockAlign, true);
   view.setUint16(34, bitsPerSample, true);
-  
-  // data subchunk
   writeString(view, 36, 'data');
   view.setUint32(40, dataSize, true);
-  
-  // Write PCM samples
   const dataView = new Int16Array(buffer, 44);
   dataView.set(combined);
-  
   return new Blob([buffer], { type: 'audio/wav' });
 }
 
 function writeString(view, offset, string) {
-  for (let i = 0; i < string.length; i++) {
-    view.setUint8(offset + i, string.charCodeAt(i));
-  }
+  for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
 }
 
 async function startGeminiSession(name, scenario){
   uiLog('INFO', 'Starting Gemini Live session...');
-
-  // Audio capture context at 16kHz for Gemini PCM input
   geminiAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
   const micSource = geminiAudioCtx.createMediaStreamSource(mediaStream);
   const bufferSize = 4096;
   geminiMicProcessor = geminiAudioCtx.createScriptProcessor(bufferSize, 1, 1);
-
-  // Audio playback context at 24kHz for Gemini PCM output
   geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
   geminiPlaybackTime = 0;
 
-  // Connect WebSocket to our server proxy
   const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}`;
   geminiWs = new WebSocket(wsUrl);
 
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Gemini WebSocket connection timed out')), 20000);
-    geminiWs.onopen = () => {
-      uiLog('OK', 'WebSocket connected to server');
-    };
+    geminiWs.onopen = () => { uiLog('OK', 'WebSocket connected to server'); };
     geminiWs.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
-
-      if (msg.type === 'setup_complete') {
-        clearTimeout(timeout);
-        uiLog('OK', 'Gemini session ready');
-        setStatus('Connected');
-        resolve();
-        return;
-      }
-      if (msg.type === 'error') {
-        clearTimeout(timeout);
-        reject(new Error(msg.message || 'Gemini error'));
-        return;
-      }
-
-      // Handle ongoing Gemini messages (after setup)
+      if (msg.type === 'setup_complete') { clearTimeout(timeout); uiLog('OK', 'Gemini session ready'); setStatus('Connected'); resolve(); return; }
+      if (msg.type === 'error') { clearTimeout(timeout); reject(new Error(msg.message || 'Gemini error')); return; }
       handleGeminiMessage(msg);
     };
-    geminiWs.onerror = (err) => {
-      clearTimeout(timeout);
-      reject(new Error('Gemini WebSocket error'));
-    };
-    geminiWs.onclose = () => {
-      uiLog('WARN', 'Gemini WebSocket closed');
-    };
+    geminiWs.onerror = () => { clearTimeout(timeout); reject(new Error('Gemini WebSocket error')); };
+    geminiWs.onclose = () => { uiLog('WARN', 'Gemini WebSocket closed'); };
   });
 
-  // Replace onmessage with ongoing handler now that setup is done
   geminiWs.onmessage = (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
     handleGeminiMessage(msg);
   };
 
-  // Start sending mic audio
   geminiMicProcessor.onaudioprocess = (e) => {
     if (!geminiWs || geminiWs.readyState !== WebSocket.OPEN) return;
     const float32 = e.inputBuffer.getChannelData(0);
@@ -704,70 +1334,37 @@ async function startGeminiSession(name, scenario){
       int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
     }
     const base64 = arrayBufferToBase64(int16.buffer);
-    
-    // Send to Gemini Live
-    geminiWs.send(JSON.stringify({
-      realtimeInput: {
-        mediaChunks: [{
-          data: base64,
-          mimeType: "audio/pcm;rate=16000"
-        }]
-      }
-    }));
-    
-    // Accumulate for periodic transcription
+    geminiWs.send(JSON.stringify({ realtimeInput: { mediaChunks: [{ data: base64, mimeType: "audio/pcm;rate=16000" }] } }));
     geminiTranscriptBuffer.push(int16);
-    
-    // Transcribe every 10 seconds with energy check
+
     const now = Date.now();
     if (now - lastTranscriptionTime > 10000 && geminiTranscriptBuffer.length > 0) {
       lastTranscriptionTime = now;
-      
-      // Check RMS energy - skip if silence
-      let totalSamples = 0;
-      let sumSquares = 0;
+      let totalSamples = 0, sumSquares = 0;
       for (const arr of geminiTranscriptBuffer) {
-        for (let i = 0; i < arr.length; i++) {
-          sumSquares += (arr[i] / 32768) * (arr[i] / 32768);
-          totalSamples++;
-        }
+        for (let i = 0; i < arr.length; i++) { sumSquares += (arr[i] / 32768) * (arr[i] / 32768); totalSamples++; }
       }
       const rms = Math.sqrt(sumSquares / (totalSamples || 1));
-      
-      if (rms < 0.01) {
-        // Too quiet - skip transcription, keep buffer for continuity
-        geminiTranscriptBuffer = [];
-        return;
-      }
-      
-      // Copy buffer and keep last 1 second (16000 samples) as overlap
+      if (rms < 0.01) { geminiTranscriptBuffer = []; return; }
+
       const sendBuffer = geminiTranscriptBuffer.slice();
       const lastChunks = [];
       let kept = 0;
-      for (let i = sendBuffer.length - 1; i >= 0 && kept < 16000; i--) {
-        lastChunks.unshift(sendBuffer[i]);
-        kept += sendBuffer[i].length;
-      }
+      for (let i = sendBuffer.length - 1; i >= 0 && kept < 16000; i--) { lastChunks.unshift(sendBuffer[i]); kept += sendBuffer[i].length; }
       geminiTranscriptBuffer = lastChunks;
-      
-      // Send audio chunks for transcription
+
       (async () => {
         try {
           const audioBlob = createWavBlob(sendBuffer);
           const formData = new FormData();
           formData.append('audio', audioBlob, 'student_audio.wav');
-          const resp = await fetch('/api/gemini-transcribe', {
-            method: 'POST',
-            body: formData
-          });
+          const resp = await fetch('/api/gemini-transcribe', { method: 'POST', body: formData });
           const result = await resp.json();
           if (result.transcript && result.transcript.trim()) {
             addStudentTranscript(result.transcript.trim(), 'gemini:transcribe');
             uiLog('OK', 'Transcribed:', result.transcript.slice(0, 80));
           }
-        } catch (err) {
-          console.error('[CounselAI] Transcription error:', err);
-        }
+        } catch (err) { console.error('[CounselAI] Transcription error:', err); }
       })();
     }
   };
@@ -776,7 +1373,6 @@ async function startGeminiSession(name, scenario){
   geminiMicProcessor.connect(geminiAudioCtx.destination);
   uiLog('OK', 'Mic capture active (16kHz PCM)');
 
-  // Video frame capture — send camera JPEG every 1s to Gemini
   const hasVideo = mediaStream.getVideoTracks().length > 0;
   if (hasVideo) {
     const captureCanvas = document.createElement('canvas');
@@ -789,14 +1385,7 @@ async function startGeminiSession(name, scenario){
       captureCtx.drawImage(preview, 0, 0, captureCanvas.width, captureCanvas.height);
       const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.6);
       const b64 = dataUrl.split(',')[1];
-      geminiWs.send(JSON.stringify({
-        realtimeInput: {
-          mediaChunks: [{
-            data: b64,
-            mimeType: "image/jpeg"
-          }]
-        }
-      }));
+      geminiWs.send(JSON.stringify({ realtimeInput: { mediaChunks: [{ data: b64, mimeType: "image/jpeg" }] } }));
     }, 500);
     uiLog('OK', 'Video frame capture active (2 fps JPEG)');
   } else {
@@ -808,8 +1397,6 @@ async function startGeminiSession(name, scenario){
 function handleGeminiMessage(msg) {
   eventCount++;
   updateDebugSnapshot();
-
-  // Log full message for debugging
   const msgKeys = Object.keys(msg);
   if (msgKeys.length > 0 && !msgKeys.includes('serverContent')) {
     uiLog('INFO', 'Gemini message type:', msgKeys.join(', '));
@@ -817,27 +1404,19 @@ function handleGeminiMessage(msg) {
 
   const serverContent = msg.serverContent;
   if (!serverContent) {
-    // Could be a toolCall or other message type
-    if (msg.type === 'error') {
-      uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
-    }
+    if (msg.type === 'error') uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
     return;
   }
 
-  // Log serverContent structure occasionally
   if (eventCount % 20 === 0) {
-    const scKeys = Object.keys(serverContent);
-    uiLog('INFO', 'serverContent keys:', scKeys.join(', '));
+    uiLog('INFO', 'serverContent keys:', Object.keys(serverContent).join(', '));
   }
 
-  // Model audio/text turn
   if (serverContent.modelTurn && serverContent.modelTurn.parts) {
     orb.classList.add('speaking');
     setStatus('Speaking...');
     for (const part of serverContent.modelTurn.parts) {
-      if (part.inlineData && part.inlineData.data) {
-        playGeminiAudio(part.inlineData.data);
-      }
+      if (part.inlineData && part.inlineData.data) playGeminiAudio(part.inlineData.data);
       if (part.text) {
         if (!currentAiEntry) currentAiEntry = addEntry('ai', '');
         currentAiEntry.body.textContent += part.text;
@@ -847,46 +1426,35 @@ function handleGeminiMessage(msg) {
     }
   }
 
-  // Turn complete
   if (serverContent.turnComplete) {
     orb.classList.remove('speaking');
     if (currentAiEntry) currentAiEntry = null;
     setStatus('Listening...');
   }
 
-  // Input transcription (student speech) - check multiple paths
   let studentText = '';
   if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
     studentText = serverContent.inputTranscription.text.trim();
   }
-  // Also check for alternative paths
   if (serverContent.modelTurn && serverContent.modelTurn.parts) {
     for (const part of serverContent.modelTurn.parts) {
       if (part.thought) {
-        // Thought content may include input reference
         const thoughtText = part.thought || '';
         if (thoughtText && thoughtText.length > 10 && !currentAiEntry) {
-          // This might be a paraphrased student input
-          // Only capture if it looks like user speech (not model thinking)
           const lower = thoughtText.toLowerCase();
           if (lower.includes('student said') || lower.includes('user said')) {
-            // Extract what student said
             const match = thoughtText.match(/(?:student|user)\s*(?:said|spoke)\s*:\s*["']?([^"']+)["']?/i);
-            if (match && match[1]) {
-              studentText = studentText || match[1].trim();
-            }
+            if (match && match[1]) studentText = studentText || match[1].trim();
           }
         }
       }
     }
   }
-  
   if (studentText) {
     addStudentTranscript(studentText, 'gemini:inputTranscription');
     uiLog('OK', 'Student transcript:', studentText.slice(0, 120));
   }
 
-  // Output transcription (counsellor speech text)
   if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
     const txt = serverContent.outputTranscription.text.trim();
     if (txt) {
@@ -900,20 +1468,13 @@ function handleGeminiMessage(msg) {
 
 function handleEventMessage(ev){
   let msg;
-  try{msg=JSON.parse(ev.data);}
-  catch{
-    console.log('[CounselAI] Non-JSON data channel payload:', ev.data);
-    return;
-  }
+  try { msg = JSON.parse(ev.data); } catch { console.log('[CounselAI] Non-JSON data channel payload:', ev.data); return; }
   logRealtimeEvent(msg);
   switch(msg.type){
     case 'response.output_audio_transcript.delta':
     case 'response.audio_transcript.delta':
       orb.classList.add('speaking');
-      if (!currentAiEntry) {
-        const created = addEntry('ai','');
-        currentAiEntry = created;
-      }
+      if (!currentAiEntry) currentAiEntry = addEntry('ai','');
       currentAiEntry.body.textContent += msg.delta || msg.text || '';
       currentAiEntry.data.text = currentAiEntry.body.textContent;
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
@@ -925,9 +1486,7 @@ function handleEventMessage(ev){
         currentAiEntry.body.textContent = msg.transcript || msg.text || currentAiEntry.body.textContent;
         currentAiEntry.data.text = currentAiEntry.body.textContent;
         currentAiEntry = null;
-      } else if (msg.transcript || msg.text) {
-        addEntry('ai', msg.transcript || msg.text);
-      }
+      } else if (msg.transcript || msg.text) { addEntry('ai', msg.transcript || msg.text); }
       break;
     case 'response.output_text.delta':
       if (!currentAiEntry) currentAiEntry = addEntry('ai','');
@@ -956,18 +1515,11 @@ function handleEventMessage(ev){
     case 'session.created':
     case 'session.updated': {
       let pretty = '';
-      try {
-        pretty = JSON.stringify(msg, null, 2);
-      } catch (err) {
-        pretty = `[unstringifiable session event: ${err}]`;
-      }
+      try { pretty = JSON.stringify(msg, null, 2); } catch (err) { pretty = `[unstringifiable session event: ${err}]`; }
       console.log(`[CounselAI] Full ${msg.type} payload:\n${pretty}`);
       const accepted = msg?.session?.input_audio_transcription || msg?.session?.audio?.input?.transcription || (msg?.session?.audio && JSON.stringify(msg.session.audio));
-      if (accepted) {
-        uiLog('OK', '✅ TRANSCRIPTION ACCEPTED:', JSON.stringify(accepted));
-      } else {
-        uiLog('ERR', '❌ TRANSCRIPTION NOT IN SESSION! Keys:', Object.keys(msg?.session || {}).join(', '), 'Full:', JSON.stringify(msg?.session || msg).slice(0, 600));
-      }
+      if (accepted) { uiLog('OK', '✅ TRANSCRIPTION ACCEPTED:', JSON.stringify(accepted)); }
+      else { uiLog('ERR', '❌ TRANSCRIPTION NOT IN SESSION! Keys:', Object.keys(msg?.session || {}).join(', '), 'Full:', JSON.stringify(msg?.session || msg).slice(0, 600)); }
       break;
     }
     case 'conversation.item.input_audio_transcription.completed':
@@ -976,7 +1528,6 @@ function handleEventMessage(ev){
     case 'input_audio_transcription.done': {
       const txt = msg.transcript || msg.text || '';
       const iid = msg.item_id || 'unknown';
-      // Clear accumulated deltas for this item since we have the final version
       if (window._transcriptDeltas) delete window._transcriptDeltas[iid];
       if (txt) {
         addStudentTranscript(txt, msg.type + ':transcript');
@@ -986,7 +1537,6 @@ function handleEventMessage(ev){
     }
     case 'conversation.item.input_audio_transcription.delta':
     case 'input_audio_transcription.delta': {
-      // delta events have .delta field — accumulate per item_id
       const delta = msg.delta || '';
       if (delta) {
         const iid = msg.item_id || 'unknown';
@@ -1006,18 +1556,14 @@ function handleEventMessage(ev){
       }
       break;
     case 'conversation.item.done':
-      // Flush accumulated transcript deltas for this item
       if (msg.item && msg.item.role === 'user') {
         const iid = msg.item?.id || msg.item_id || '';
         if (window._transcriptDeltas && window._transcriptDeltas[iid] && window._transcriptDeltas[iid].trim()) {
           addStudentTranscript(window._transcriptDeltas[iid], 'accumulated_deltas:' + iid);
           uiLog('OK', '🎤 STUDENT TRANSCRIPT (from deltas):', window._transcriptDeltas[iid].slice(0, 100));
           delete window._transcriptDeltas[iid];
-        } else {
-          captureUserTranscriptFromMessage(msg, msg.type);
-        }
+        } else { captureUserTranscriptFromMessage(msg, msg.type); }
       }
-      // Also flush if we have ANY accumulated deltas for any item
       if (window._transcriptDeltas) {
         Object.keys(window._transcriptDeltas).forEach(iid => {
           if (window._transcriptDeltas[iid] && window._transcriptDeltas[iid].trim()) {
@@ -1056,24 +1602,26 @@ function buildMetrics(profile){
     {label:'EQ Score', value: profile?.emotional_profile?.eq_score},
     {label:'Confidence', value: profile?.behavioral_insights?.confidence},
   ].filter(m => m.value != null);
-  if (!metrics.length) {profileMetrics.textContent = 'No scores available.'; return;}
+  if (!metrics.length) { profileMetrics.textContent = 'No scores available.'; return; }
   metrics.forEach(m=>{
     const card = document.createElement('div');
-    card.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;';
-    const label=document.createElement('span');
-    label.textContent=m.label;
-    const bar=document.createElement('div');
-    bar.style.cssText='display:flex;align-items:center;gap:8px;';
-    const track=document.createElement('div');
-    track.style.cssText='width:100px;height:8px;background:rgba(255,255,255,0.1);border-radius:4px;overflow:hidden;';
-    const fill=document.createElement('div');
+    card.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
+    const label = document.createElement('span');
+    label.style.cssText = 'font-size:0.88rem;color:var(--text-soft);';
+    label.textContent = m.label;
+    const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;align-items:center;gap:8px;';
+    const track = document.createElement('div');
+    track.style.cssText = 'width:100px;height:6px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;';
+    const fill = document.createElement('div');
     const pct = Math.min(100, (m.value/10)*100);
-    fill.style.cssText='height:100%;border-radius:4px;background:'+( pct>=70?'#2ecc71':pct>=40?'#f1c40f':'#e74c3c')+';width:'+pct+'%;';
+    fill.style.cssText = 'height:100%;border-radius:4px;transition:width 1s ease;background:' + (pct>=70?'var(--success)':pct>=40?'var(--warning)':'var(--danger)') + ';width:' + pct + '%;';
     track.appendChild(fill);
-    const num=document.createElement('strong');
-    num.textContent=m.value+'/10';
-    bar.append(track,num);
-    card.append(label,bar);
+    const num = document.createElement('strong');
+    num.style.cssText = 'font-size:0.85rem;min-width:36px;text-align:right;';
+    num.textContent = m.value + '/10';
+    bar.append(track, num);
+    card.append(label, bar);
     profileMetrics.appendChild(card);
   });
 }
@@ -1081,21 +1629,20 @@ function buildMetrics(profile){
 function renderRecommendations(profile){
   recommendationsEl.innerHTML = '';
   const list = Array.isArray(profile?.recommendations) ? profile.recommendations : [];
-  if (list.length === 0) {recommendationsEl.textContent = 'No recommendations returned.';return;}
+  if (list.length === 0) { recommendationsEl.textContent = 'No recommendations returned.'; return; }
   const ul = document.createElement('ul');
-  ul.style.margin = '0';
-  ul.style.paddingLeft = '18px';
-  list.forEach(item=>{const li=document.createElement('li');li.textContent=item;ul.appendChild(li);});
+  ul.style.cssText = 'margin:0;padding-left:18px;color:var(--text-soft);';
+  list.forEach(item => { const li = document.createElement('li'); li.style.marginBottom = '6px'; li.textContent = item; ul.appendChild(li); });
   recommendationsEl.appendChild(ul);
 }
 
 function renderSection(sectionEl, items){
   sectionEl.innerHTML = '';
-  if (!items.length) {sectionEl.textContent = 'No data returned.';return;}
+  if (!items.length) { sectionEl.textContent = 'No data returned.'; return; }
   const list = document.createElement('div');
-  items.forEach(item=>{
+  items.forEach(item => {
     const row = document.createElement('div');
-    row.style.marginBottom = '8px';
+    row.style.cssText = 'margin-bottom:8px;color:var(--text-soft);font-size:0.9rem;line-height:1.5;';
     row.textContent = item;
     list.appendChild(row);
   });
@@ -1142,33 +1689,30 @@ function renderProfileSections(profile){
   ].filter(Boolean);
   renderSection(conversationSection, conversationItems);
 
-  // Key moments
   const keyMomentsEl = document.getElementById('key-moments-section');
   const moments = Array.isArray(profile?.key_moments) ? profile.key_moments : [];
   if (moments.length) {
     keyMomentsEl.innerHTML = '';
     moments.forEach(m => {
       const d = document.createElement('div');
-      d.style.cssText = 'margin-bottom:12px;padding:10px;border-left:3px solid #e8c547;background:rgba(232,197,71,0.08);border-radius:4px;';
-      d.innerHTML = '<div style="font-style:italic;margin-bottom:4px;">"' + (m.quote||'').replace(/</g,'&lt;') + '"</div><div style="color:#aaa;font-size:0.9em;">' + (m.insight||'').replace(/</g,'&lt;') + '</div>';
+      d.style.cssText = 'margin-bottom:12px;padding:10px;border-left:3px solid var(--warning);background:rgba(251,191,36,0.06);border-radius:4px;';
+      d.innerHTML = '<div style="font-style:italic;margin-bottom:4px;color:var(--text);">"' + (m.quote||'').replace(/</g,'&lt;') + '"</div><div style="color:var(--text-muted);font-size:0.85rem;">' + (m.insight||'').replace(/</g,'&lt;') + '</div>';
       keyMomentsEl.appendChild(d);
     });
   } else { keyMomentsEl.textContent = 'No key moments identified.'; }
 
-  // Red flags
   const redFlagsEl = document.getElementById('red-flags-section');
   const flags = Array.isArray(profile?.red_flags) ? profile.red_flags : [];
   if (flags.length) {
     redFlagsEl.innerHTML = '';
     flags.forEach(f => {
       const d = document.createElement('div');
-      d.style.cssText = 'margin-bottom:6px;padding:6px 10px;background:rgba(231,76,60,0.1);border-radius:4px;';
+      d.style.cssText = 'margin-bottom:6px;padding:8px 12px;background:rgba(248,113,113,0.08);border-radius:6px;color:var(--danger);font-size:0.9rem;';
       d.textContent = '⚠ ' + f;
       redFlagsEl.appendChild(d);
     });
   } else { redFlagsEl.textContent = 'No red flags identified.'; }
 
-  // Summary text
   const summaryTextEl = document.getElementById('summary-text');
   summaryTextEl.textContent = profile?.summary || 'No summary available.';
 }
@@ -1176,6 +1720,8 @@ function renderProfileSections(profile){
 async function endSession(){
   setStatus('Processing...');
   clearInterval(timerHandle);
+  if (waveAnimId) { cancelAnimationFrame(waveAnimId); waveAnimId = null; }
+
   const videoBlob = await new Promise(resolve => {
     if (!recorder || recorder.state === 'inactive') return resolve(null);
     let resolved = false;
@@ -1189,18 +1735,12 @@ async function endSession(){
       resolve(blob);
     };
     try { recorder.requestData(); } catch (err) { console.warn('[CounselAI] requestData failed:', err); }
-    const stopTimer = setTimeout(() => {
-      console.warn('[CounselAI] Recorder stop timeout, resolving with current chunks');
-      finish();
-    }, 3000);
+    const stopTimer = setTimeout(() => { console.warn('[CounselAI] Recorder stop timeout'); finish(); }, 3000);
     const previousOnStop = recorder.onstop;
-    recorder.onstop = (event) => {
-      clearTimeout(stopTimer);
-      if (typeof previousOnStop === 'function') previousOnStop(event);
-      finish();
-    };
+    recorder.onstop = (event) => { clearTimeout(stopTimer); if (typeof previousOnStop === 'function') previousOnStop(event); finish(); };
     recorder.stop();
   });
+
   if (sessionMode === 'gemini') {
     if (geminiVideoInterval) { clearInterval(geminiVideoInterval); geminiVideoInterval = null; }
     if (geminiTranscriptTimer) { clearTimeout(geminiTranscriptTimer); geminiTranscriptTimer = null; }
@@ -1214,34 +1754,30 @@ async function endSession(){
     if (dataChannel) dataChannel.close();
     if (pc) pc.close();
   }
-  if (mediaStream) mediaStream.getTracks().forEach(t=>t.stop());
+  if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
 
-  const duration = formatTime(Date.now()-timerStart);
-  document.getElementById('summary-meta').textContent = `${sessionMeta.name} • ${sessionMeta.className} • ${duration}`;
+  const duration = formatTime(Date.now() - timerStart);
+  document.getElementById('summary-meta').textContent = `${sessionMeta.name} • Class ${sessionMeta.className} • ${duration}`;
   const summaryTranscriptEl = document.getElementById('summary-transcript');
   const formatTranscriptForDisplay = entries => entries.map(e => `${e.role === 'counsellor' ? 'Counsellor' : 'Student'}: ${e.text}`).join('\n');
   const safeTranscriptEntries = transcriptEntries.filter(e => e && e.text && e.text.trim());
   summaryTranscriptEl.textContent = safeTranscriptEntries.length ? formatTranscriptForDisplay(safeTranscriptEntries) : transcriptEl.textContent.trim();
   showScreen('summary');
 
-  // Show loading state
   [personalitySection, cognitiveSection, emotionalSection, behavioralSection, conversationSection].forEach(el => el.textContent = 'Analyzing...');
   recommendationsEl.textContent = 'Generating recommendations...';
   profileMetrics.textContent = 'Computing scores...';
 
-  try{
+  try {
     const fd = new FormData();
     const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
     console.log('[CounselAI] Final video blob size:', safeBlob.size);
     if (safeBlob.size === 0) {
-      console.warn('[CounselAI] Empty recording blob. Analysis may fail.');
+      console.warn('[CounselAI] Empty recording blob.');
       showToast('Recording was empty. Check mic/camera permissions and try again.');
     }
     fd.append('video', safeBlob, 'session.webm');
-    // Build transcript from in-memory buffer; fallback to DOM if needed.
-    let finalTranscript = transcriptEntries
-      .filter(e => e && e.text && e.text.trim())
-      .map(e => ({role: e.role, text: e.text.trim()}));
+    let finalTranscript = transcriptEntries.filter(e => e && e.text && e.text.trim()).map(e => ({role: e.role, text: e.text.trim()}));
     if (finalTranscript.length === 0) {
       transcriptEl.querySelectorAll('.entry').forEach(el => {
         const role = el.classList.contains('ai') ? 'counsellor' : 'student';
@@ -1251,13 +1787,7 @@ async function endSession(){
       });
     }
     const transcriptJson = JSON.stringify(finalTranscript);
-    console.log('[CounselAI] transcript JSON length:', transcriptJson.length);
-    console.log('[CounselAI] transcript entries:', finalTranscript.length);
-    const roleCounts = finalTranscript.reduce((acc, item) => {
-      acc[item.role] = (acc[item.role] || 0) + 1;
-      return acc;
-    }, {});
-    console.log('[CounselAI] transcript role counts:', roleCounts);
+    console.log('[CounselAI] transcript JSON length:', transcriptJson.length, 'entries:', finalTranscript.length);
     fd.append('transcript', JSON.stringify(finalTranscript));
     fd.append('student_name', sessionMeta.name);
     fd.append('student_class', sessionMeta.className);
@@ -1277,45 +1807,38 @@ async function endSession(){
       renderProfileSections(profile);
       renderRecommendations(profile);
     } else {
-      renderSection(personalitySection, []);
-      renderSection(cognitiveSection, []);
-      renderSection(emotionalSection, []);
-      renderSection(behavioralSection, []);
-      renderSection(conversationSection, []);
-      recommendationsEl.textContent = 'Analysis unavailable.';
+      renderSection(personalitySection, []); renderSection(cognitiveSection, []);
+      renderSection(emotionalSection, []); renderSection(behavioralSection, []);
+      renderSection(conversationSection, []); recommendationsEl.textContent = 'Analysis unavailable.';
     }
-  }catch(err){ console.error('[CounselAI] Analysis error:', err);
-    renderSection(personalitySection, []);
-    renderSection(cognitiveSection, []);
-    renderSection(emotionalSection, []);
-    renderSection(behavioralSection, []);
-    renderSection(conversationSection, []);
-    recommendationsEl.textContent = 'Analysis unavailable.';
+  } catch(err) {
+    console.error('[CounselAI] Analysis error:', err);
+    renderSection(personalitySection, []); renderSection(cognitiveSection, []);
+    renderSection(emotionalSection, []); renderSection(behavioralSection, []);
+    renderSection(conversationSection, []); recommendationsEl.textContent = 'Analysis unavailable.';
   }
 }
 
-document.getElementById('start-btn').addEventListener('click', ()=>startSession().catch(err=>{showToast(err.message);showScreen('welcome');}));
+document.getElementById('start-btn').addEventListener('click', () => startSession().catch(err => { showToast(err.message); showScreen('welcome'); }));
 document.getElementById('end-btn').addEventListener('click', endSession);
-enableAudioBtn.addEventListener('click', () => {
-  tryPlayAiAudio();
-});
-document.getElementById('new-btn').addEventListener('click', ()=>{location.reload();});
+enableAudioBtn.addEventListener('click', () => { tryPlayAiAudio(); });
+document.getElementById('new-btn').addEventListener('click', () => { location.reload(); });
 
-(async()=>{
-  try{
+(async () => {
+  try {
     const r = await fetch('/api/case-studies');
     const d = await r.json();
     const sel = document.getElementById('case-study');
     sel.innerHTML = '';
-    d.case_studies.forEach(cs=>{
+    d.case_studies.forEach(cs => {
       const o = document.createElement('option');
       o.value = cs.scenario_text;
       o.textContent = cs.id + ' • ' + cs.title + ' (' + cs.target_class + ')';
       sel.appendChild(o);
     });
     if (sel.value) caseStudyText.textContent = sel.value;
-    sel.addEventListener('change', ()=>{caseStudyText.textContent = sel.value;});
-  }catch(e){showToast('Failed to load case studies');}
+    sel.addEventListener('change', () => { caseStudyText.textContent = sel.value; });
+  } catch(e) { showToast('Failed to load case studies'); }
 })();
 </script>
 </body>
