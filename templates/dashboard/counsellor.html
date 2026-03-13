@@ -1,446 +1,165 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>CounselAI — Counsellor Workbench</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Counsellor Workbench — CounselAI</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root {
-  --bg: #0a1628;
-  --panel: #0f1f35;
-  --panel-2: #0c1a30;
-  --teal: #46d9d1;
-  --blue: #2f7bf6;
-  --text: #e6f2ff;
-  --muted: #9bb3d3;
-  --danger: #ff7b7b;
-  --warning: #f5a623;
-  --ok: #55d28b;
-  --glow: 0 0 30px rgba(70,217,209,.45);
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: "Space Grotesk", system-ui, sans-serif;
-  color: var(--text);
-  background: radial-gradient(1200px 600px at 15% 0%, #133056 0%, transparent 60%),
-              linear-gradient(160deg, #081223, var(--bg));
-  min-height: 100vh;
-}
-.app { max-width: 1400px; margin: 0 auto; padding: 24px 20px 40px; }
-
-/* Header */
-.header {
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 24px; flex-wrap: wrap; gap: 12px;
-}
-.header h1 { font-size: 1.6rem; font-weight: 700; }
-.header .subtitle { color: var(--muted); font-size: .95rem; margin-top: 2px; }
-.nav-links { display: flex; gap: 8px; }
-.btn {
-  display: inline-flex; align-items: center; gap: 6px;
-  border: 1px solid rgba(70,217,209,.25); background: #0c1b31;
-  color: var(--text); text-decoration: none; padding: 8px 14px;
-  border-radius: 10px; font-size: .9rem; cursor: pointer;
-  transition: all .2s;
-}
-.btn:hover { border-color: var(--teal); background: rgba(70,217,209,.08); }
-.btn-primary { background: rgba(47,123,246,.2); border-color: rgba(47,123,246,.4); }
-.btn-primary:hover { background: rgba(47,123,246,.35); }
-
-/* Stats bar */
-.stats-bar {
-  display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 12px; margin-bottom: 20px;
-}
-.stat-card {
-  background: linear-gradient(180deg, #10233e, var(--panel));
-  border: 1px solid rgba(70,217,209,.15);
-  border-radius: 14px; padding: 16px;
-}
-.stat-card .label { color: var(--muted); font-size: .85rem; margin-bottom: 4px; }
-.stat-card .value { font-size: 1.5rem; font-weight: 700; }
-.stat-card .value.danger { color: var(--danger); }
-.stat-card .value.warning { color: var(--warning); }
-.stat-card .value.ok { color: var(--ok); }
+:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:24px 20px 48px}
+.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px}
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap}
+.topbar h1{font-size:1.5rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.topbar .sub{color:var(--muted);font-size:.85rem;margin-top:2px}
+.nav{display:flex;gap:8px;flex-wrap:wrap}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s}
+.btn:hover{border-color:var(--violet);background:rgba(139,92,246,.12)}
 
 /* Filters */
-.filters {
-  display: flex; flex-wrap: wrap; gap: 10px; align-items: center;
-  margin-bottom: 16px; padding: 14px 16px;
-  background: linear-gradient(180deg, #10233e, var(--panel));
-  border: 1px solid rgba(70,217,209,.12);
-  border-radius: 14px;
-}
-.filters label { color: var(--muted); font-size: .85rem; }
-.filter-group { display: flex; flex-direction: column; gap: 4px; }
-.filters select, .filters input[type="date"], .filters input[type="text"] {
-  background: #0b182c; border: 1px solid rgba(47,123,246,.25);
-  color: var(--text); padding: 7px 10px; border-radius: 8px;
-  font-family: inherit; font-size: .9rem;
-}
-.filters select:focus, .filters input:focus {
-  outline: none; border-color: var(--teal);
-}
-.filter-actions { display: flex; gap: 8px; align-items: flex-end; margin-left: auto; }
+.filters{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
+.filters select,.filters input{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:.85rem}
+.filters select:focus,.filters input:focus{outline:none;border-color:var(--violet)}
 
-/* Table */
-.card {
-  background: linear-gradient(180deg, #10233e, var(--panel));
-  border: 1px solid rgba(70,217,209,.2);
-  border-radius: 20px; padding: 0; overflow: hidden;
-  box-shadow: 0 18px 60px rgba(0,0,0,.35);
-}
-.table-wrap { overflow: auto; }
-table { width: 100%; border-collapse: collapse; min-width: 900px; }
-th, td { text-align: left; padding: 12px 14px; border-bottom: 1px solid rgba(47,123,246,.12); }
-th {
-  color: var(--muted); font-weight: 500; font-size: .88rem;
-  background: #0c1a30; position: sticky; top: 0; z-index: 2;
-}
-tr.session-row { cursor: pointer; transition: background .15s; }
-tr.session-row:hover { background: rgba(70,217,209,.06); }
+/* Layout */
+.main-grid{display:grid;grid-template-columns:320px 1fr;gap:20px}
+@media(max-width:900px){.main-grid{grid-template-columns:1fr}}
 
-/* Chips & badges */
-.chip {
-  display: inline-block; padding: 3px 10px; border-radius: 999px;
-  font-size: .8rem; font-weight: 500;
-}
-.chip-status {
-  background: rgba(85,210,139,.15); border: 1px solid rgba(85,210,139,.3); color: var(--ok);
-}
-.chip-status.processing {
-  background: rgba(47,123,246,.15); border-color: rgba(47,123,246,.3); color: var(--blue);
-}
-.chip-status.failed {
-  background: rgba(255,123,123,.15); border-color: rgba(255,123,123,.3); color: var(--danger);
-}
-.badge-flag {
-  display: inline-flex; align-items: center; gap: 4px;
-  padding: 3px 10px; border-radius: 999px; font-size: .8rem; font-weight: 600;
-}
-.badge-flag.high { background: rgba(255,123,123,.2); color: var(--danger); }
-.badge-flag.medium { background: rgba(245,166,35,.2); color: var(--warning); }
-.badge-flag.low { background: rgba(85,210,139,.15); color: var(--ok); }
-.badge-flag.none { background: rgba(155,179,211,.1); color: var(--muted); }
+/* Student list */
+.student-list{max-height:70vh;overflow-y:auto;padding-right:6px}
+.student-card{padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:10px;cursor:pointer;transition:all .2s}
+.student-card:hover,.student-card.active{border-color:var(--violet);background:rgba(139,92,246,.08)}
+.student-card .name{font-weight:600;font-size:.95rem;margin-bottom:2px}
+.student-card .meta{font-size:.78rem;color:var(--muted)}
+.student-card .badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.badge{font-size:.7rem;padding:2px 8px;border-radius:12px;font-weight:500}
+.badge-risk{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.2)}
+.badge-ok{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)}
+.badge-sessions{background:rgba(99,102,241,.12);color:var(--indigo);border:1px solid rgba(99,102,241,.25)}
 
-/* Empty state */
-.empty-state {
-  display: flex; flex-direction: column; align-items: center;
-  justify-content: center; padding: 60px 20px; color: var(--muted);
-}
-.empty-state .icon { font-size: 3rem; margin-bottom: 12px; opacity: .5; }
+/* Right panel */
+.panel-empty{display:flex;align-items:center;justify-content:center;min-height:300px;color:var(--muted);font-size:.95rem}
+.session-list .s-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:all .2s}
+.s-row:hover{border-color:var(--violet)}
+.s-row .s-date{font-size:.85rem;font-weight:500}
+.s-row .s-meta{font-size:.78rem;color:var(--muted)}
+.chip{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:500}
+.chip-ok{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25)}
+.chip-warn{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
+.chip-danger{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.25)}
 
-/* Pagination */
-.pagination {
-  display: flex; justify-content: space-between; align-items: center;
-  padding: 12px 16px; border-top: 1px solid rgba(47,123,246,.12);
-}
-.pagination .info { color: var(--muted); font-size: .88rem; }
-.pagination .nav { display: flex; gap: 8px; }
+/* Notes */
+.notes-area{width:100%;min-height:80px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:.85rem;resize:vertical}
+.notes-area:focus{outline:none;border-color:var(--violet)}
 
-/* Loading */
-.spinner {
-  display: inline-block; width: 20px; height: 20px;
-  border: 2px solid rgba(70,217,209,.3); border-top-color: var(--teal);
-  border-radius: 50%; animation: spin .6s linear infinite;
-}
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading-row td { text-align: center; padding: 40px; }
-
-@media (max-width: 760px) {
-  .stats-bar { grid-template-columns: 1fr 1fr; }
-  .filters { flex-direction: column; }
-  .filter-actions { margin-left: 0; width: 100%; }
-}
+/* Chart */
+.chart-wrap{position:relative;height:200px;margin-top:12px}
+h2{font-size:1.1rem;margin-bottom:14px}
+h3{font-size:.95rem;margin-bottom:10px;color:var(--violet)}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- Header -->
-  <div class="header">
-    <div>
-      <h1>🧠 Counsellor Workbench</h1>
-      <div class="subtitle">Review sessions, assess evidence, triage red flags</div>
-    </div>
-    <div class="nav-links">
+  <div class="topbar">
+    <div><h1>📋 Counsellor Workbench</h1><div class="sub">Student management &amp; session history</div></div>
+    <div class="nav">
       <a class="btn" href="/">Live Session</a>
-      <a class="btn" href="/dashboard">Legacy Dashboard</a>
+      <a class="btn" href="/api/v1/dashboard">Admin Dashboard</a>
     </div>
   </div>
 
-  <!-- Stats bar -->
-  <div class="stats-bar" id="stats-bar">
-    <div class="stat-card">
-      <div class="label">Total Sessions</div>
-      <div class="value" id="stat-total">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Completed</div>
-      <div class="value ok" id="stat-completed">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Red Flags</div>
-      <div class="value danger" id="stat-flags">—</div>
-    </div>
-    <div class="stat-card">
-      <div class="label">Processing</div>
-      <div class="value warning" id="stat-processing">—</div>
-    </div>
-  </div>
-
-  <!-- Filters -->
   <div class="filters">
-    <div class="filter-group">
-      <label>School</label>
-      <select id="filter-school">
-        <option value="">All schools</option>
-        {% for s in schools %}
-        <option value="{{ s.id }}">{{ s.name }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="filter-group">
-      <label>Grade</label>
-      <select id="filter-grade">
-        <option value="">All grades</option>
-        {% for g in grades %}
-        <option value="{{ g }}">{{ g }}</option>
-        {% endfor %}
-      </select>
-    </div>
-    <div class="filter-group">
-      <label>Red Flags</label>
-      <select id="filter-flags">
-        <option value="">Any</option>
-        <option value="true">Has flags</option>
-        <option value="false">No flags</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label>Status</label>
-      <select id="filter-status">
-        <option value="">All active</option>
-        <option value="completed">Completed</option>
-        <option value="processing">Processing</option>
-        <option value="failed">Failed</option>
-      </select>
-    </div>
-    <div class="filter-group">
-      <label>From</label>
-      <input type="date" id="filter-from" />
-    </div>
-    <div class="filter-group">
-      <label>To</label>
-      <input type="date" id="filter-to" />
-    </div>
-    <div class="filter-group">
-      <label>Search</label>
-      <input type="text" id="filter-search" placeholder="Student name..." />
-    </div>
-    <div class="filter-actions">
-      <button class="btn btn-primary" onclick="applyFilters()">Apply</button>
-      <button class="btn" onclick="resetFilters()">Reset</button>
-    </div>
+    <select id="filter-school"><option value="">All Schools</option>
+      {% for s in schools %}<option value="{{ s.id }}">{{ s.name }}</option>{% endfor %}
+    </select>
+    <select id="filter-grade"><option value="">All Classes</option>
+      {% for g in grades %}<option value="{{ g }}">Class {{ g }}</option>{% endfor %}
+    </select>
+    <input type="search" id="filter-search" placeholder="Search students…">
   </div>
 
-  <!-- Sessions table -->
-  <div class="card">
-    <div class="table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>Student</th>
-            <th>Grade</th>
-            <th>School</th>
-            <th>Case Study</th>
-            <th>Date</th>
-            <th>Duration</th>
-            <th>Status</th>
-            <th>Red Flags</th>
-          </tr>
-        </thead>
-        <tbody id="sessions-body">
-          <tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading sessions...</td></tr>
-        </tbody>
-      </table>
+  <div class="main-grid">
+    <div class="glass">
+      <h2>Students</h2>
+      <div class="student-list" id="student-list">
+        <div class="panel-empty">Loading…</div>
+      </div>
     </div>
-    <div class="pagination" id="pagination" style="display:none;">
-      <div class="info" id="page-info"></div>
-      <div class="nav">
-        <button class="btn" id="btn-prev" onclick="prevPage()">← Prev</button>
-        <button class="btn" id="btn-next" onclick="nextPage()">Next →</button>
+    <div>
+      <div class="glass" id="right-panel">
+        <div class="panel-empty">Select a student to view details</div>
       </div>
     </div>
   </div>
 </div>
 
 <script>
-const LIMIT = 25;
-let currentOffset = 0;
-let currentTotal = 0;
+const listEl=document.getElementById('student-list'),panelEl=document.getElementById('right-panel');
+const filterSchool=document.getElementById('filter-school'),filterGrade=document.getElementById('filter-grade'),filterSearch=document.getElementById('filter-search');
+let allStudents=[],currentStudent=null;
 
-function esc(text) {
-  return String(text || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtDate(v){if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})}
 
-function formatDate(iso) {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  return d.toLocaleDateString('en-IN', { day:'numeric', month:'short', year:'numeric' })
-    + ' ' + d.toLocaleTimeString('en-IN', { hour:'2-digit', minute:'2-digit' });
-}
+async function loadStudents(){
+  try{
+    const res=await fetch('/api/v1/counsellor/students');const data=await res.json();
+    allStudents=Array.isArray(data.students)?data.students:Array.isArray(data)?data:[];
+    renderList();
+  }catch(e){listEl.innerHTML='<div class="panel-empty">Failed to load students.</div>'}}
 
-function formatDuration(sec) {
-  if (sec == null) return '—';
-  const m = Math.floor(sec / 60);
-  const s = Math.floor(sec % 60);
-  return `${m}m ${String(s).padStart(2,'0')}s`;
-}
+function renderList(){
+  const school=filterSchool.value,grade=filterGrade.value,q=filterSearch.value.toLowerCase();
+  let filtered=allStudents;
+  if(school)filtered=filtered.filter(s=>s.school_id==school);
+  if(grade)filtered=filtered.filter(s=>String(s.grade)==grade);
+  if(q)filtered=filtered.filter(s=>(s.name||'').toLowerCase().includes(q));
+  if(!filtered.length){listEl.innerHTML='<div class="panel-empty">No students found.</div>';return}
+  listEl.innerHTML=filtered.map(s=>{
+    const hasRisk=s.risk_level==='high';
+    return`<div class="student-card${currentStudent===s.id?' active':''}" data-id="${s.id}">
+      <div class="name">${esc(s.name)}</div>
+      <div class="meta">Class ${esc(s.grade||'—')}${s.section?' · '+esc(s.section):''}${s.school_name?' · '+esc(s.school_name):''}</div>
+      <div class="badges">${hasRisk?'<span class="badge badge-risk">⚠ At Risk</span>':'<span class="badge badge-ok">✓ OK</span>'}
+        <span class="badge badge-sessions">${s.session_count||0} sessions</span></div></div>`}).join('');
+  listEl.querySelectorAll('.student-card').forEach(c=>c.addEventListener('click',()=>selectStudent(c.dataset.id)))}
 
-function getFilterParams() {
-  const params = new URLSearchParams();
-  const school = document.getElementById('filter-school').value;
-  const grade = document.getElementById('filter-grade').value;
-  const flags = document.getElementById('filter-flags').value;
-  const status = document.getElementById('filter-status').value;
-  const from = document.getElementById('filter-from').value;
-  const to = document.getElementById('filter-to').value;
-  const search = document.getElementById('filter-search').value.trim();
+async function selectStudent(id){
+  currentStudent=id;renderList();
+  panelEl.innerHTML='<div class="panel-empty">Loading…</div>';
+  try{
+    const res=await fetch(`/api/v1/counsellor/students/${id}`);const data=await res.json();
+    const s=data.student||data;const sessions=data.sessions||[];
+    panelEl.innerHTML=`
+      <h2>${esc(s.name||'Student')}</h2>
+      <div style="color:var(--muted);font-size:.85rem;margin-bottom:16px">Class ${esc(s.grade||'—')}${s.section?' · Section '+esc(s.section):''}${s.school_name?' · '+esc(s.school_name):''}</div>
+      <h3>Session History (${sessions.length})</h3>
+      <div class="session-list">${sessions.length?sessions.map(ss=>`
+        <a href="/api/v1/dashboard/counsellor/session/${ss.id}" style="text-decoration:none;color:inherit">
+        <div class="s-row"><div><div class="s-date">${fmtDate(ss.created_at||ss.started_at)}</div>
+        <div class="s-meta">${esc(ss.case_study_id||'General')} · ${ss.duration_seconds?Math.round(ss.duration_seconds/60)+'m':'—'}</div></div>
+        <span class="chip ${ss.risk_level==='high'?'chip-danger':ss.risk_level==='medium'?'chip-warn':'chip-ok'}">${esc(ss.dominant_emotion||'—')}</span></div></a>`).join(''):'<div class="panel-empty">No sessions yet.</div>'}</div>
+      <div style="margin-top:20px"><h3>Quick Notes</h3>
+        <textarea class="notes-area" id="notes-${id}" placeholder="Add observations, follow-up notes…">${esc(s.notes||'')}</textarea>
+        <button class="btn" style="margin-top:8px" onclick="saveNotes('${id}')">Save Notes</button></div>
+      <div style="margin-top:20px"><h3>Session Trend</h3><div class="chart-wrap"><canvas id="chart-${id}"></canvas></div></div>`;
+    if(sessions.length>1){
+      const ctx=document.getElementById(`chart-${id}`).getContext('2d');
+      new Chart(ctx,{type:'line',data:{labels:sessions.slice(-10).map(s=>fmtDate(s.created_at)),datasets:[{label:'Confidence',data:sessions.slice(-10).map(s=>s.confidence_score||0),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af'}}},scales:{x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.05)'}}}}});}
+  }catch(e){panelEl.innerHTML='<div class="panel-empty">Failed to load student details.</div>'}}
 
-  if (school) params.set('school_id', school);
-  if (grade) params.set('grade', grade);
-  if (flags) params.set('red_flag', flags);
-  if (status) params.set('status', status);
-  if (from) params.set('date_from', from);
-  if (to) params.set('date_to', to);
-  if (search) params.set('search', search);
-  params.set('limit', LIMIT);
-  params.set('offset', currentOffset);
-  return params;
-}
+async function saveNotes(id){
+  const text=document.getElementById(`notes-${id}`).value;
+  try{await fetch(`/api/v1/counsellor/students/${id}/notes`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({notes:text})})}catch(e){}}
 
-function applyFilters() {
-  currentOffset = 0;
-  loadSessions();
-}
-
-function resetFilters() {
-  document.getElementById('filter-school').value = '';
-  document.getElementById('filter-grade').value = '';
-  document.getElementById('filter-flags').value = '';
-  document.getElementById('filter-status').value = '';
-  document.getElementById('filter-from').value = '';
-  document.getElementById('filter-to').value = '';
-  document.getElementById('filter-search').value = '';
-  currentOffset = 0;
-  loadSessions();
-}
-
-function prevPage() {
-  if (currentOffset >= LIMIT) {
-    currentOffset -= LIMIT;
-    loadSessions();
-  }
-}
-
-function nextPage() {
-  if (currentOffset + LIMIT < currentTotal) {
-    currentOffset += LIMIT;
-    loadSessions();
-  }
-}
-
-function statusChip(status) {
-  const cls = status === 'completed' ? '' : status === 'processing' ? ' processing' : ' failed';
-  return `<span class="chip chip-status${cls}">${esc(status)}</span>`;
-}
-
-function flagBadge(count, severity) {
-  if (count === 0) return `<span class="badge-flag none">✓ None</span>`;
-  const icon = severity === 'high' ? '🔴' : severity === 'medium' ? '🟡' : '🟢';
-  return `<span class="badge-flag ${severity}">${icon} ${count} flag${count > 1 ? 's' : ''}</span>`;
-}
-
-async function loadSessions() {
-  const body = document.getElementById('sessions-body');
-  body.innerHTML = '<tr class="loading-row"><td colspan="8"><div class="spinner"></div> Loading...</td></tr>';
-
-  try {
-    const params = getFilterParams();
-    const res = await fetch(`/api/v1/dashboard/counsellor/queue?${params}`);
-    const data = await res.json();
-
-    currentTotal = data.total || 0;
-    const items = data.items || [];
-
-    // Update stats
-    const flagged = items.filter(i => i.red_flag_count > 0).length;
-    const processing = items.filter(i => i.status === 'processing').length;
-    const completed = items.filter(i => i.status === 'completed').length;
-    document.getElementById('stat-total').textContent = currentTotal;
-    document.getElementById('stat-completed').textContent = completed;
-    document.getElementById('stat-flags').textContent = flagged;
-    document.getElementById('stat-processing').textContent = processing;
-
-    if (!items.length) {
-      body.innerHTML = `
-        <tr><td colspan="8">
-          <div class="empty-state">
-            <div class="icon">📋</div>
-            <div>No sessions match your filters</div>
-          </div>
-        </td></tr>`;
-      document.getElementById('pagination').style.display = 'none';
-      return;
-    }
-
-    body.innerHTML = items.map(s => `
-      <tr class="session-row" onclick="openSession('${s.session_id}')">
-        <td><strong>${esc(s.student_name)}</strong></td>
-        <td>${esc(s.student_grade)}</td>
-        <td>${esc(s.school_name || '—')}</td>
-        <td>${esc(s.case_study_id)}</td>
-        <td>${formatDate(s.started_at)}</td>
-        <td>${formatDuration(s.duration_seconds)}</td>
-        <td>${statusChip(s.status)}</td>
-        <td>${flagBadge(s.red_flag_count, s.max_severity)}</td>
-      </tr>
-    `).join('');
-
-    // Pagination
-    const pag = document.getElementById('pagination');
-    if (currentTotal > LIMIT) {
-      pag.style.display = 'flex';
-      const start = currentOffset + 1;
-      const end = Math.min(currentOffset + LIMIT, currentTotal);
-      document.getElementById('page-info').textContent = `${start}–${end} of ${currentTotal}`;
-      document.getElementById('btn-prev').disabled = currentOffset === 0;
-      document.getElementById('btn-next').disabled = currentOffset + LIMIT >= currentTotal;
-    } else {
-      pag.style.display = 'none';
-    }
-
-  } catch (err) {
-    body.innerHTML = `<tr><td colspan="8">
-      <div class="empty-state">
-        <div class="icon">⚠️</div>
-        <div>Failed to load sessions: ${esc(err.message)}</div>
-      </div>
-    </td></tr>`;
-  }
-}
-
-function openSession(id) {
-  window.location.href = `/api/v1/dashboard/counsellor/sessions/${id}`;
-}
-
-// Search on Enter
-document.getElementById('filter-search').addEventListener('keydown', e => {
-  if (e.key === 'Enter') applyFilters();
-});
-
-loadSessions();
+filterSchool.addEventListener('change',renderList);
+filterGrade.addEventListener('change',renderList);
+filterSearch.addEventListener('input',renderList);
+loadStudents();
 </script>
 </body>
 </html>

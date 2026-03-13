@@ -1,382 +1,173 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ data.student.full_name }} — My Insights | CounselAI</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root {
-  --bg: #0a1628;
-  --panel: #0f1f35;
-  --panel-2: #0c1a30;
-  --teal: #46d9d1;
-  --blue: #2f7bf6;
-  --purple: #a78bfa;
-  --amber: #f6c445;
-  --green: #55d28b;
-  --text: #e6f2ff;
-  --muted: #9bb3d3;
-  --radius: 20px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: "Space Grotesk", system-ui, sans-serif;
-  color: var(--text);
-  background: radial-gradient(1200px 600px at 15% 0%, #133056 0%, transparent 60%),
-              linear-gradient(160deg, #081223, var(--bg));
-  min-height: 100vh;
-}
-.app { max-width: 960px; margin: 0 auto; padding: 32px 20px 60px; }
+:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:32px 20px 60px}
 
-/* ── Header ─────────────────────────────────────── */
-.header {
-  text-align: center;
-  margin-bottom: 36px;
-}
-.header h1 {
-  font-size: 2rem;
-  font-weight: 700;
-  margin-bottom: 6px;
-  background: linear-gradient(135deg, var(--teal), var(--blue));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-.header .subtitle {
-  color: var(--muted);
-  font-size: 1rem;
-}
-.header .grade-badge {
-  display: inline-block;
-  margin-top: 10px;
-  padding: 5px 14px;
-  border-radius: 999px;
-  font-size: .85rem;
-  background: rgba(70, 217, 209, .12);
-  border: 1px solid rgba(70, 217, 209, .3);
-  color: var(--teal);
-}
+.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px}
 
-/* ── Stats row ──────────────────────────────────── */
-.stats-row {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
-  gap: 14px;
-  margin-bottom: 32px;
-}
-.stat-card {
-  background: linear-gradient(180deg, #10233e, var(--panel));
-  border: 1px solid rgba(70, 217, 209, .18);
-  border-radius: 16px;
-  padding: 18px 16px;
-  text-align: center;
-}
-.stat-card .num {
-  font-size: 1.8rem;
-  font-weight: 700;
-  color: var(--teal);
-}
-.stat-card .label {
-  font-size: .85rem;
-  color: var(--muted);
-  margin-top: 4px;
-}
+/* Header */
+.header{text-align:center;margin-bottom:32px}
+.header h1{font-size:1.8rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+.header .subtitle{color:var(--muted);font-size:.95rem}
+.grade-badge{display:inline-block;margin-top:8px;padding:4px 14px;border-radius:20px;font-size:.82rem;font-weight:600;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:var(--violet)}
 
-/* ── Cards ──────────────────────────────────────── */
-.card {
-  background: linear-gradient(180deg, #10233e, var(--panel));
-  border: 1px solid rgba(70, 217, 209, .18);
-  border-radius: var(--radius);
-  padding: 24px;
-  margin-bottom: 20px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, .25);
-}
-.card h2 {
-  font-size: 1.15rem;
-  font-weight: 600;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-.card h2 .icon { font-size: 1.3rem; }
+/* Stats */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
+.stat-card{text-align:center;padding:18px 14px}
+.stat-card .val{font-size:1.6rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-card .label{font-size:.75rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
 
-/* ── Tag lists (strengths, interests) ───────────── */
-.tags {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-.tag {
-  display: inline-block;
-  padding: 6px 14px;
-  border-radius: 999px;
-  font-size: .88rem;
-  font-weight: 500;
-}
-.tag.strength {
-  background: rgba(85, 210, 139, .12);
-  border: 1px solid rgba(85, 210, 139, .3);
-  color: var(--green);
-}
-.tag.interest {
-  background: rgba(167, 139, 250, .12);
-  border: 1px solid rgba(167, 139, 250, .3);
-  color: var(--purple);
-}
-.tag.growth {
-  background: rgba(246, 196, 69, .12);
-  border: 1px solid rgba(246, 196, 69, .3);
-  color: var(--amber);
-}
+/* Tags */
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.tag{padding:5px 12px;border-radius:20px;font-size:.8rem;font-weight:500}
+.tag-strength{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)}
+.tag-interest{background:rgba(99,102,241,.1);color:var(--indigo);border:1px solid rgba(99,102,241,.2)}
+.tag-growth{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
+.tag-step{background:rgba(139,92,246,.1);color:var(--violet);border:1px solid rgba(139,92,246,.2)}
 
-/* ── Bullet lists ───────────────────────────────── */
-.items-list {
-  list-style: none;
-  padding: 0;
-}
-.items-list li {
-  padding: 10px 14px;
-  margin-bottom: 8px;
-  border-radius: 12px;
-  background: rgba(47, 123, 246, .06);
-  border-left: 3px solid var(--blue);
-  font-size: .95rem;
-  line-height: 1.5;
-}
+h2{font-size:1.1rem;margin-bottom:12px;font-weight:600}
+h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
+.muted{color:var(--muted)}
 
-/* ── Summary / encouragement ────────────────────── */
-.summary-text {
-  font-size: 1rem;
-  line-height: 1.7;
-  color: var(--text);
-}
-.encouragement {
-  margin-top: 12px;
-  padding: 16px 20px;
-  border-radius: 16px;
-  background: linear-gradient(135deg, rgba(70, 217, 209, .08), rgba(47, 123, 246, .08));
-  border: 1px solid rgba(70, 217, 209, .2);
-  font-size: 1rem;
-  line-height: 1.6;
-  color: var(--teal);
-  text-align: center;
-  font-weight: 500;
-}
+/* Summary card */
+.summary-text{font-size:.95rem;line-height:1.6;color:var(--text)}
+.encouragement{margin-top:12px;padding:12px 16px;border-radius:12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);font-size:.9rem;color:var(--green)}
 
-/* ── Growth timeline ────────────────────────────── */
-.timeline { position: relative; padding-left: 28px; }
-.timeline::before {
-  content: '';
-  position: absolute;
-  left: 10px;
-  top: 0;
-  bottom: 0;
-  width: 2px;
-  background: linear-gradient(to bottom, var(--teal), var(--blue), var(--purple));
-  border-radius: 2px;
-}
-.timeline-item {
-  position: relative;
-  margin-bottom: 20px;
-  padding: 16px 18px;
-  background: rgba(15, 31, 53, .6);
-  border: 1px solid rgba(70, 217, 209, .12);
-  border-radius: 14px;
-}
-.timeline-item::before {
-  content: '';
-  position: absolute;
-  left: -23px;
-  top: 20px;
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--teal);
-  box-shadow: 0 0 10px rgba(70, 217, 209, .5);
-}
-.timeline-date {
-  font-size: .82rem;
-  color: var(--muted);
-  margin-bottom: 6px;
-}
-.timeline-topic {
-  font-size: .9rem;
-  font-weight: 600;
-  color: var(--blue);
-  margin-bottom: 6px;
-}
-.timeline-summary {
-  font-size: .9rem;
-  color: var(--text);
-  line-height: 1.5;
-}
-.timeline-strengths {
-  margin-top: 8px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-}
-.mini-tag {
-  font-size: .78rem;
-  padding: 3px 10px;
-  border-radius: 999px;
-  background: rgba(85, 210, 139, .1);
-  border: 1px solid rgba(85, 210, 139, .25);
-  color: var(--green);
-}
+/* Growth timeline */
+.timeline{position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--purple),var(--indigo),rgba(99,102,241,.2))}
+.timeline-item{position:relative;margin-bottom:20px;padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
+.timeline-item::before{content:'';position:absolute;left:-20px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--violet);border:2px solid var(--bg)}
+.timeline-date{font-size:.78rem;color:var(--muted);margin-bottom:4px}
+.timeline-case{font-size:.85rem;font-weight:600;color:var(--violet);margin-bottom:6px}
+.timeline-summary{font-size:.88rem;line-height:1.5;color:var(--text)}
 
-/* ── Empty state ────────────────────────────────── */
-.empty-state {
-  text-align: center;
-  padding: 40px 20px;
-  color: var(--muted);
-}
-.empty-state .emoji { font-size: 3rem; margin-bottom: 12px; }
-.empty-state p { font-size: 1rem; }
+/* Chart */
+.chart-wrap{position:relative;height:220px;margin-top:10px}
 
-/* ── Back link ──────────────────────────────────── */
-.back-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: .9rem;
-  margin-bottom: 20px;
-  transition: color .2s;
-}
-.back-link:hover { color: var(--teal); }
+/* Empty */
+.empty-state{text-align:center;padding:48px 20px}
+.empty-state .emoji{font-size:3rem;margin-bottom:12px}
+.empty-state .title{font-size:1.2rem;font-weight:600;margin-bottom:6px}
+.empty-state .desc{color:var(--muted);font-size:.9rem;max-width:400px;margin:0 auto}
 
-/* ── Responsive ─────────────────────────────────── */
-@media (max-width: 600px) {
-  .header h1 { font-size: 1.5rem; }
-  .card { padding: 18px 16px; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
+@media(max-width:700px){.grid-2{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div class="app">
-  <a class="back-link" href="/dashboard">← Back to Dashboard</a>
-
-  <!-- Header -->
   <div class="header">
-    <h1>{{ data.student.full_name }}'s Insights</h1>
-    <div class="subtitle">Your personal growth journey</div>
-    <div class="grade-badge">
-      Class {{ data.student.grade }}{% if data.student.section %} — {{ data.student.section }}{% endif %}
-    </div>
+    <h1>{{ data.student.full_name }}</h1>
+    <div class="subtitle">Your personal growth insights</div>
+    <div class="grade-badge">Class {{ data.student.grade }}{% if data.student.section %} — {{ data.student.section }}{% endif %}</div>
   </div>
 
   {% if data.stats.total_sessions == 0 %}
-  <!-- Empty state -->
-  <div class="card">
-    <div class="empty-state">
-      <div class="emoji">🌱</div>
-      <p>No sessions yet! Complete your first counselling session to see your personal insights here.</p>
-    </div>
+  <div class="glass empty-state">
+    <div class="emoji">🌱</div>
+    <div class="title">Your journey starts here</div>
+    <div class="desc">Once you complete your first counselling session, you'll see your strengths, interests, and growth areas here.</div>
   </div>
-
   {% else %}
 
   <!-- Stats -->
   <div class="stats-row">
-    <div class="stat-card">
-      <div class="num">{{ data.stats.total_sessions }}</div>
-      <div class="label">Sessions Completed</div>
-    </div>
-    <div class="stat-card">
-      <div class="num">{{ data.stats.topics_explored | length }}</div>
-      <div class="label">Topics Explored</div>
-    </div>
-    <div class="stat-card">
-      <div class="num">{{ data.all_strengths | length }}</div>
-      <div class="label">Strengths Found</div>
-    </div>
-    <div class="stat-card">
-      <div class="num">{{ data.all_interests | length }}</div>
-      <div class="label">Interests Discovered</div>
-    </div>
+    <div class="glass stat-card"><div class="val">{{ data.stats.total_sessions }}</div><div class="label">Sessions</div></div>
+    <div class="glass stat-card"><div class="val">{{ data.stats.topics_explored | length }}</div><div class="label">Topics Explored</div></div>
+    <div class="glass stat-card"><div class="val">{{ data.all_strengths | length }}</div><div class="label">Strengths Found</div></div>
+    <div class="glass stat-card"><div class="val">{{ data.all_interests | length }}</div><div class="label">Interests</div></div>
   </div>
 
-  <!-- Summary -->
+  <!-- Latest Summary -->
   {% if data.latest.summary %}
-  <div class="card">
-    <h2><span class="icon">📝</span> Your Latest Summary</h2>
+  <div class="glass">
+    <h2>📝 Latest Insights</h2>
     <div class="summary-text">{{ data.latest.summary }}</div>
     {% if data.latest.encouragement %}
-    <div class="encouragement">{{ data.latest.encouragement }}</div>
+    <div class="encouragement">💪 {{ data.latest.encouragement }}</div>
     {% endif %}
   </div>
   {% endif %}
 
-  <!-- Strengths -->
-  {% if data.latest.strengths or data.all_strengths %}
-  <div class="card">
-    <h2><span class="icon">💪</span> Your Strengths</h2>
-    <div class="tags">
-      {% for s in (data.latest.strengths if data.latest.strengths else data.all_strengths) %}
-      <span class="tag strength">{{ s }}</span>
-      {% endfor %}
+  <!-- Strengths & Interests -->
+  <div class="grid-2">
+    {% if data.latest.strengths or data.all_strengths %}
+    <div class="glass">
+      <h2>💎 Your Strengths</h2>
+      <div class="tags">
+        {% for s in (data.latest.strengths if data.latest.strengths else data.all_strengths) %}
+        <span class="tag tag-strength">{{ s }}</span>
+        {% endfor %}
+      </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- Interests -->
-  {% if data.latest.interests or data.all_interests %}
-  <div class="card">
-    <h2><span class="icon">🎯</span> Your Interests</h2>
-    <div class="tags">
-      {% for i in (data.latest.interests if data.latest.interests else data.all_interests) %}
-      <span class="tag interest">{{ i }}</span>
-      {% endfor %}
+    {% if data.latest.interests or data.all_interests %}
+    <div class="glass">
+      <h2>🎯 Your Interests</h2>
+      <div class="tags">
+        {% for i in (data.latest.interests if data.latest.interests else data.all_interests) %}
+        <span class="tag tag-interest">{{ i }}</span>
+        {% endfor %}
+      </div>
     </div>
+    {% endif %}
   </div>
-  {% endif %}
 
-  <!-- Growth areas -->
-  {% if data.latest.growth_areas %}
-  <div class="card">
-    <h2><span class="icon">🌱</span> Areas to Explore</h2>
-    <div class="tags">
-      {% for g in data.latest.growth_areas %}
-      <span class="tag growth">{{ g }}</span>
-      {% endfor %}
+  <!-- Growth Areas & Next Steps -->
+  <div class="grid-2">
+    {% if data.latest.growth_areas %}
+    <div class="glass">
+      <h2>🌱 Growth Areas</h2>
+      <div class="tags">
+        {% for g in data.latest.growth_areas %}
+        <span class="tag tag-growth">{{ g }}</span>
+        {% endfor %}
+      </div>
     </div>
-  </div>
-  {% endif %}
+    {% endif %}
 
-  <!-- Next steps -->
-  {% if data.latest.suggested_next_steps %}
-  <div class="card">
-    <h2><span class="icon">🚀</span> What You Can Try Next</h2>
-    <ul class="items-list">
-      {% for step in data.latest.suggested_next_steps %}
-      <li>{{ step }}</li>
-      {% endfor %}
-    </ul>
+    {% if data.latest.suggested_next_steps %}
+    <div class="glass">
+      <h2>🚀 Next Steps</h2>
+      <div class="tags">
+        {% for step in data.latest.suggested_next_steps %}
+        <span class="tag tag-step">{{ step }}</span>
+        {% endfor %}
+      </div>
+    </div>
+    {% endif %}
   </div>
-  {% endif %}
 
-  <!-- Growth Journey / Timeline -->
+  <!-- Growth Journey Timeline -->
   {% if data.growth_snapshots | length > 1 %}
-  <div class="card">
-    <h2><span class="icon">📈</span> Your Growth Journey</h2>
+  <div class="glass">
+    <h2>📈 Your Growth Journey</h2>
+    <div class="chart-wrap"><canvas id="growthChart"></canvas></div>
+  </div>
+
+  <div class="glass">
+    <h2>🗓 Session Timeline</h2>
     <div class="timeline">
       {% for snap in data.growth_snapshots %}
       <div class="timeline-item">
         <div class="timeline-date">{{ snap.date[:10] if snap.date else 'Date unavailable' }}</div>
-        <div class="timeline-topic">{{ snap.case_study_id | replace("-", " ") | replace("_", " ") | title }}</div>
-        {% if snap.summary %}
-        <div class="timeline-summary">{{ snap.summary }}</div>
-        {% endif %}
+        <div class="timeline-case">{{ snap.case_study_id | replace("-", " ") | replace("_", " ") | title }}</div>
+        {% if snap.summary %}<div class="timeline-summary">{{ snap.summary }}</div>{% endif %}
         {% if snap.strengths %}
-        <div class="timeline-strengths">
-          {% for s in snap.strengths[:4] %}
-          <span class="mini-tag">{{ s }}</span>
-          {% endfor %}
+        <div class="tags" style="margin-top:8px">
+          {% for s in snap.strengths[:4] %}<span class="tag tag-strength">{{ s }}</span>{% endfor %}
         </div>
         {% endif %}
       </div>
@@ -387,5 +178,23 @@ body {
 
   {% endif %}
 </div>
+
+{% if data.growth_snapshots is defined and data.growth_snapshots | length > 1 %}
+<script>
+const snapshots = [
+  {% for snap in data.growth_snapshots %}
+  {date:'{{ snap.date[:10] if snap.date else "?" }}',strengths:{{ snap.strengths|length if snap.strengths else 0 }},interests:{{ snap.interests|length if snap.interests else 0 }}},
+  {% endfor %}
+];
+if(snapshots.length>1){
+  new Chart(document.getElementById('growthChart'),{type:'line',data:{
+    labels:snapshots.map(s=>s.date),
+    datasets:[
+      {label:'Strengths',data:snapshots.map(s=>s.strengths),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',tension:.4,fill:true},
+      {label:'Interests',data:snapshots.map(s=>s.interests),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.4,fill:true}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af',font:{family:'Inter'}}}},scales:{x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.04)'}},y:{beginAtZero:true,ticks:{color:'#9ca3af',stepSize:1},grid:{color:'rgba(255,255,255,.04)'}}}}});
+}
+</script>
+{% endif %}
 </body>
 </html>

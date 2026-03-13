@@ -1,370 +1,196 @@
 <!doctype html>
 <html lang="en">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{{ school.name }} — School Analytics | CounselAI</title>
-<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0a1628;--panel:#0f1f35;--panel-2:#0c1a30;--teal:#46d9d1;--blue:#2f7bf6;--text:#e6f2ff;--muted:#9bb3d3;--danger:#ff7b7b;--warn:#fbbf24;--ok:#55d28b;--glow:0 0 30px rgba(70,217,209,.45)}
+:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
 *{box-sizing:border-box;margin:0;padding:0}
-body{font-family:"Space Grotesk","IBM Plex Sans",system-ui,sans-serif;color:var(--text);background:radial-gradient(1200px 600px at 15% 0%,#133056 0%,transparent 60%),linear-gradient(160deg,#081223,var(--bg));min-height:100vh}
-.app{max-width:1300px;margin:0 auto;padding:28px 20px 60px}
-
-/* Header */
+body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
+body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
+.app{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:24px 20px 60px}
+.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px}
 .header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
-.header h1{font-size:1.6rem;letter-spacing:.3px}
-.header .meta{color:var(--muted);font-size:.9rem}
-.back-link{color:var(--teal);text-decoration:none;font-size:.9rem;border:1px solid rgba(70,217,209,.25);padding:7px 14px;border-radius:10px;transition:border-color .2s}
-.back-link:hover{border-color:var(--teal)}
+.header h1{font-size:1.5rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header .meta{color:var(--muted);font-size:.85rem}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);transition:all .2s}
+.btn:hover{border-color:var(--violet)}
 
-/* Cards */
-.card{background:linear-gradient(180deg,#10233e,var(--panel));border:1px solid rgba(70,217,209,.2);border-radius:16px;padding:20px;box-shadow:0 12px 40px rgba(0,0,0,.3)}
-.card h2{font-size:1.1rem;margin-bottom:14px;color:var(--teal);letter-spacing:.2px}
-.card h3{font-size:.95rem;margin-bottom:10px;color:var(--muted)}
+.privacy{background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);border-radius:12px;padding:12px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted)}
 
-/* Stat grid */
-.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
-.stat{background:#0b182c;border:1px solid rgba(47,123,246,.2);border-radius:12px;padding:16px;text-align:center}
-.stat .value{font-size:2rem;font-weight:700;color:var(--teal)}
-.stat .label{font-size:.82rem;color:var(--muted);margin-top:4px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
+.stat{background:var(--surface);backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center}
+.stat .value{font-size:1.8rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat .label{font-size:.78rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
 
-/* Grid layouts */
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:24px}
-.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-bottom:24px}
-@media(max-width:900px){.grid-2,.grid-3{grid-template-columns:1fr}}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
+@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
 
-/* Tables */
-.table-wrap{overflow-x:auto;border:1px solid rgba(47,123,246,.2);border-radius:12px;background:#0b182c}
-table{width:100%;border-collapse:collapse;min-width:400px}
-th,td{text-align:left;padding:10px 14px;border-bottom:1px solid rgba(47,123,246,.15)}
-th{color:var(--muted);font-weight:500;font-size:.85rem;background:#0c1a30}
-td{font-size:.9rem}
+h2{font-size:1.05rem;margin-bottom:14px;font-weight:600}
+h3{font-size:.9rem;margin-bottom:10px;color:var(--violet)}
 
 /* Bars */
 .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
-.bar-label{min-width:140px;font-size:.85rem;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar-track{flex:1;height:22px;background:#0b182c;border-radius:6px;overflow:hidden;border:1px solid rgba(47,123,246,.15)}
-.bar-fill{height:100%;border-radius:6px;transition:width .4s ease;display:flex;align-items:center;padding:0 8px;font-size:.75rem;font-weight:600;color:#fff;min-width:fit-content}
-.bar-fill.teal{background:linear-gradient(90deg,#2a8a85,var(--teal))}
-.bar-fill.blue{background:linear-gradient(90deg,#1e5bb8,var(--blue))}
-.bar-fill.danger{background:linear-gradient(90deg,#b83e3e,var(--danger))}
-.bar-fill.warn{background:linear-gradient(90deg,#a67c1a,var(--warn))}
-.bar-fill.ok{background:linear-gradient(90deg,#2d8a53,var(--ok))}
+.bar-label{min-width:130px;font-size:.82rem;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar-track{flex:1;height:24px;background:var(--surface-2);border-radius:6px;overflow:hidden;border:1px solid var(--border)}
+.bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:.72rem;font-weight:600;color:#fff;min-width:fit-content;transition:width .4s}
+.bar-fill.purple{background:linear-gradient(90deg,#5b21b6,var(--purple))}
+.bar-fill.indigo{background:linear-gradient(90deg,#4338ca,var(--indigo))}
+.bar-fill.rose{background:linear-gradient(90deg,#be123c,var(--rose))}
+.bar-fill.green{background:linear-gradient(90deg,#059669,var(--green))}
 
-/* Chips */
-.chip{display:inline-block;padding:3px 8px;border-radius:999px;font-size:.78rem;font-weight:500}
-.chip.high{background:rgba(255,123,123,.2);color:var(--danger);border:1px solid rgba(255,123,123,.3)}
-.chip.medium{background:rgba(251,191,36,.15);color:var(--warn);border:1px solid rgba(251,191,36,.3)}
-.chip.low{background:rgba(85,210,139,.15);color:var(--ok);border:1px solid rgba(85,210,139,.3)}
+.chip{display:inline-block;padding:3px 8px;border-radius:20px;font-size:.75rem;font-weight:500;margin-right:6px}
+.chip.high{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.25)}
+.chip.medium{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
+.chip.low{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25)}
 
-/* Status badges */
-.status{display:inline-block;padding:3px 8px;border-radius:6px;font-size:.78rem}
-.status.completed{background:rgba(85,210,139,.15);color:var(--ok)}
-.status.processing{background:rgba(47,123,246,.15);color:var(--blue)}
-.status.failed{background:rgba(255,123,123,.15);color:var(--danger)}
-.status.draft{background:rgba(155,179,211,.15);color:var(--muted)}
+.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);background:var(--surface-2)}
+table{width:100%;border-collapse:collapse;min-width:400px}
+th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border)}
+th{color:var(--muted);font-weight:500;font-size:.8rem;text-transform:uppercase;letter-spacing:.3px;background:rgba(255,255,255,.02)}
+td{font-size:.88rem}
 
-/* Trend chart (CSS-only simple bars) */
-.trend-chart{display:flex;align-items:flex-end;gap:4px;height:120px;padding:8px 0}
-.trend-bar{flex:1;background:linear-gradient(180deg,var(--teal),#2a8a85);border-radius:4px 4px 0 0;min-width:16px;position:relative;transition:height .3s}
-.trend-bar:hover{opacity:.85}
-.trend-bar .tip{position:absolute;bottom:100%;left:50%;transform:translateX(-50%);background:#0c1a30;border:1px solid rgba(70,217,209,.3);border-radius:6px;padding:4px 8px;font-size:.72rem;white-space:nowrap;display:none;z-index:10}
-.trend-bar:hover .tip{display:block}
+.chart-wrap{position:relative;height:200px;margin-top:8px}
 
-/* Privacy notice */
-.privacy-notice{background:rgba(70,217,209,.08);border:1px solid rgba(70,217,209,.2);border-radius:10px;padding:12px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted)}
-.privacy-notice .icon{font-size:1.2rem}
-
-/* Empty state */
-.empty{text-align:center;padding:32px;color:var(--muted);font-size:.9rem}
+.status{display:inline-block;padding:3px 8px;border-radius:6px;font-size:.75rem}
+.status.completed{background:rgba(52,211,153,.12);color:var(--green)}
+.status.processing{background:rgba(99,102,241,.12);color:var(--indigo)}
+.status.failed{background:rgba(251,113,133,.12);color:var(--rose)}
+.empty{text-align:center;padding:24px;color:var(--muted);font-size:.88rem}
 </style>
 </head>
 <body>
 <div class="app">
-  <!-- Header -->
   <div class="header">
-    <div>
-      <h1>📊 {{ school.name }}</h1>
-      <div class="meta">
-        {% if school.board %}{{ school.board }}{% endif %}
-        {% if school.city %} · {{ school.city }}{% endif %}
-        · School Analytics Dashboard
-      </div>
+    <div><h1>📊 {{ school.name }}</h1>
+      <div class="meta">{% if school.board %}{{ school.board }}{% endif %}{% if school.city %} · {{ school.city }}{% endif %} · School Wellness Analytics</div>
     </div>
-    <a href="/dashboard" class="back-link">← All Sessions</a>
+    <a href="/dashboard" class="btn">← All Sessions</a>
   </div>
 
-  <!-- Privacy notice -->
-  <div class="privacy-notice">
-    <span class="icon">🔒</span>
-    <span>All data on this dashboard is <strong>aggregate only</strong>. No individual student names, narratives, or session-level details are displayed.</span>
-  </div>
+  <div class="privacy"><span>🔒</span><span>All data is <strong>aggregate only</strong>. No individual student names or session details are shown.</span></div>
 
-  <!-- Top-level stats -->
   <div class="stats">
-    <div class="stat">
-      <div class="value">{{ school.total_students }}</div>
-      <div class="label">Total Students</div>
-    </div>
-    <div class="stat">
-      <div class="value">{{ school.total_sessions }}</div>
-      <div class="label">Total Sessions</div>
-    </div>
-    <div class="stat">
-      <div class="value">{{ school.completed_sessions }}</div>
-      <div class="label">Completed</div>
-    </div>
-    <div class="stat">
-      <div class="value">
-        {% if school.avg_duration_seconds %}
-          {{ (school.avg_duration_seconds / 60)|round(1) }}m
-        {% else %}
-          —
-        {% endif %}
-      </div>
-      <div class="label">Avg Duration</div>
-    </div>
-    <div class="stat">
-      <div class="value">{{ school.red_flag_summary.total_flags }}</div>
-      <div class="label">Total Red Flags</div>
-    </div>
+    <div class="stat"><div class="value">{{ school.total_students }}</div><div class="label">Students</div></div>
+    <div class="stat"><div class="value">{{ school.total_sessions }}</div><div class="label">Sessions</div></div>
+    <div class="stat"><div class="value">{{ school.completed_sessions }}</div><div class="label">Completed</div></div>
+    <div class="stat"><div class="value">{% if school.avg_duration_seconds %}{{ (school.avg_duration_seconds / 60)|round(1) }}m{% else %}—{% endif %}</div><div class="label">Avg Duration</div></div>
+    <div class="stat"><div class="value">{{ school.red_flag_summary.total_flags }}</div><div class="label">Red Flags</div></div>
   </div>
 
-  <!-- Grade Distribution + Red Flag Summary -->
   <div class="grid-2">
-    <!-- Grade distribution -->
-    <div class="card">
-      <h2>Grade Distribution</h2>
+    <div class="glass"><h2>Grade Distribution</h2>
       {% if school.grade_distribution %}
         {% set max_sessions = namespace(val=1) %}
+        {% for g in school.grade_distribution %}{% if g.session_count > max_sessions.val %}{% set max_sessions.val = g.session_count %}{% endif %}{% endfor %}
         {% for g in school.grade_distribution %}
-          {% if g.session_count > max_sessions.val %}{% set max_sessions.val = g.session_count %}{% endif %}
-        {% endfor %}
-        {% for g in school.grade_distribution %}
-        <div class="bar-row">
-          <div class="bar-label">Grade {{ g.grade }}</div>
-          <div class="bar-track">
-            <div class="bar-fill teal" style="width:{{ (g.session_count / max_sessions.val * 100)|round(1) }}%">
-              {{ g.student_count }} students · {{ g.session_count }} sessions
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="empty">No grade data available</div>
-      {% endif %}
+        <div class="bar-row"><div class="bar-label">Class {{ g.grade }}</div>
+          <div class="bar-track"><div class="bar-fill purple" style="width:{{ (g.session_count / max_sessions.val * 100)|round(1) }}%">{{ g.student_count }} students · {{ g.session_count }} sessions</div></div>
+        </div>{% endfor %}
+      {% else %}<div class="empty">No grade data available</div>{% endif %}
     </div>
 
-    <!-- Red flag summary -->
-    <div class="card">
-      <h2>Red Flag Overview</h2>
+    <div class="glass"><h2>Red Flag Overview</h2>
       {% if school.red_flag_summary.total_flags > 0 %}
-        <div style="margin-bottom:14px">
-          {% for sev, cnt in school.red_flag_summary.by_severity.items() %}
-            <span class="chip {{ sev }}" style="margin-right:6px">{{ sev|upper }}: {{ cnt }}</span>
-          {% endfor %}
-        </div>
+        <div style="margin-bottom:14px">{% for sev, cnt in school.red_flag_summary.by_severity.items() %}<span class="chip {{ sev }}">{{ sev|upper }}: {{ cnt }}</span>{% endfor %}</div>
         <h3>Most Common Flags</h3>
         {% set max_flag = namespace(val=1) %}
+        {% for key, cnt in school.red_flag_summary.by_key.items() %}{% if cnt > max_flag.val %}{% set max_flag.val = cnt %}{% endif %}{% endfor %}
         {% for key, cnt in school.red_flag_summary.by_key.items() %}
-          {% if cnt > max_flag.val %}{% set max_flag.val = cnt %}{% endif %}
-        {% endfor %}
-        {% for key, cnt in school.red_flag_summary.by_key.items() %}
-        <div class="bar-row">
-          <div class="bar-label">{{ key|replace("_", " ")|title }}</div>
-          <div class="bar-track">
-            <div class="bar-fill danger" style="width:{{ (cnt / max_flag.val * 100)|round(1) }}%">{{ cnt }}</div>
-          </div>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="empty">No red flags recorded</div>
-      {% endif %}
+        <div class="bar-row"><div class="bar-label">{{ key|replace("_", " ")|title }}</div>
+          <div class="bar-track"><div class="bar-fill rose" style="width:{{ (cnt / max_flag.val * 100)|round(1) }}%">{{ cnt }}</div></div>
+        </div>{% endfor %}
+      {% else %}<div class="empty">No red flags recorded</div>{% endif %}
     </div>
   </div>
 
-  <!-- Topic Clusters + Construct Distribution -->
   <div class="grid-2">
-    <!-- Topic clusters -->
-    <div class="card">
-      <h2>Top Discussion Topics</h2>
+    <div class="glass"><h2>Top Discussion Topics</h2>
       {% if school.topic_clusters %}
         {% set max_topic = namespace(val=1) %}
+        {% for t in school.topic_clusters %}{% if t.occurrences > max_topic.val %}{% set max_topic.val = t.occurrences %}{% endif %}{% endfor %}
         {% for t in school.topic_clusters %}
-          {% if t.occurrences > max_topic.val %}{% set max_topic.val = t.occurrences %}{% endif %}
-        {% endfor %}
-        {% for t in school.topic_clusters %}
-        <div class="bar-row">
-          <div class="bar-label">{{ t.topic_key|replace("_", " ")|title }}</div>
-          <div class="bar-track">
-            <div class="bar-fill blue" style="width:{{ (t.occurrences / max_topic.val * 100)|round(1) }}%">
-              {{ t.occurrences }}{% if t.avg_reliability %} · rel {{ t.avg_reliability }}{% endif %}
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="empty">No topic data available yet</div>
-      {% endif %}
+        <div class="bar-row"><div class="bar-label">{{ t.topic_key|replace("_", " ")|title }}</div>
+          <div class="bar-track"><div class="bar-fill indigo" style="width:{{ (t.occurrences / max_topic.val * 100)|round(1) }}%">{{ t.occurrences }}{% if t.avg_reliability %} · rel {{ t.avg_reliability }}{% endif %}</div></div>
+        </div>{% endfor %}
+      {% else %}<div class="empty">No topic data yet</div>{% endif %}
     </div>
 
-    <!-- Construct distribution -->
-    <div class="card">
-      <h2>Construct Analysis</h2>
+    <div class="glass"><h2>Construct Analysis</h2>
       {% if school.construct_distribution %}
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr>
-                <th>Construct</th>
-                <th>Total</th>
-                <th>Supported</th>
-                <th>Mixed</th>
-                <th>Weak</th>
-                <th>Avg Score</th>
-              </tr>
-            </thead>
-            <tbody>
-              {% for c in school.construct_distribution %}
-              <tr>
-                <td>{{ c.label }}</td>
-                <td>{{ c.total }}</td>
-                <td><span style="color:var(--ok)">{{ c.supported }}</span></td>
-                <td><span style="color:var(--warn)">{{ c.mixed }}</span></td>
-                <td><span style="color:var(--danger)">{{ c.weak }}</span></td>
-                <td>{% if c.avg_score %}{{ c.avg_score }}{% else %}—{% endif %}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="empty">No construct data available yet</div>
-      {% endif %}
+        <div class="table-wrap"><table><thead><tr><th>Construct</th><th>Total</th><th>Supported</th><th>Mixed</th><th>Weak</th><th>Avg</th></tr></thead><tbody>
+          {% for c in school.construct_distribution %}<tr>
+            <td>{{ c.label }}</td><td>{{ c.total }}</td>
+            <td style="color:var(--green)">{{ c.supported }}</td>
+            <td style="color:var(--amber)">{{ c.mixed }}</td>
+            <td style="color:var(--rose)">{{ c.weak }}</td>
+            <td>{{ c.avg_score or '—' }}</td>
+          </tr>{% endfor %}
+        </tbody></table></div>
+      {% else %}<div class="empty">No construct data yet</div>{% endif %}
     </div>
   </div>
 
   <!-- Session Trend -->
-  <div class="card" style="margin-bottom:24px">
+  <div class="glass">
     <h2>Session Trend Over Time</h2>
     {% if school.session_trend %}
-      {% set max_trend = namespace(val=1) %}
-      {% for t in school.session_trend %}
-        {% if t.session_count > max_trend.val %}{% set max_trend.val = t.session_count %}{% endif %}
-      {% endfor %}
-      <div class="trend-chart">
-        {% for t in school.session_trend %}
-        <div class="trend-bar" style="height:{{ (t.session_count / max_trend.val * 100)|round(1) }}%">
-          <div class="tip">
-            {{ t.period[:10] if t.period else '?' }}<br>
-            {{ t.session_count }} sessions · {{ t.unique_students }} students
-          </div>
-        </div>
-        {% endfor %}
-      </div>
-      <div style="display:flex;justify-content:space-between;color:var(--muted);font-size:.75rem;padding:0 2px">
-        {% if school.session_trend|length > 0 %}
-          <span>{{ school.session_trend[0].period[:10] if school.session_trend[0].period else '' }}</span>
-          <span>{{ school.session_trend[-1].period[:10] if school.session_trend[-1].period else '' }}</span>
-        {% endif %}
-      </div>
-    {% else %}
-      <div class="empty">No trend data available yet</div>
-    {% endif %}
+    <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
+    {% else %}<div class="empty">No trend data yet</div>{% endif %}
   </div>
 
-  <!-- Section Breakdown + Pipeline Health -->
   <div class="grid-2">
-    <!-- Section breakdown -->
-    <div class="card">
-      <h2>Section Breakdown</h2>
+    <div class="glass"><h2>Section Breakdown</h2>
       {% if school.section_distribution %}
-        <div class="table-wrap">
-          <table>
-            <thead>
-              <tr><th>Grade</th><th>Section</th><th>Students</th><th>Sessions</th></tr>
-            </thead>
-            <tbody>
-              {% for s in school.section_distribution %}
-              <tr>
-                <td>{{ s.grade }}</td>
-                <td>{{ s.section }}</td>
-                <td>{{ s.student_count }}</td>
-                <td>{{ s.session_count }}</td>
-              </tr>
-              {% endfor %}
-            </tbody>
-          </table>
-        </div>
-      {% else %}
-        <div class="empty">No section data available</div>
-      {% endif %}
+        <div class="table-wrap"><table><thead><tr><th>Class</th><th>Section</th><th>Students</th><th>Sessions</th></tr></thead><tbody>
+          {% for s in school.section_distribution %}<tr><td>{{ s.grade }}</td><td>{{ s.section }}</td><td>{{ s.student_count }}</td><td>{{ s.session_count }}</td></tr>{% endfor %}
+        </tbody></table></div>
+      {% else %}<div class="empty">No section data</div>{% endif %}
     </div>
 
-    <!-- Pipeline health -->
-    <div class="card">
-      <h2>Processing Pipeline</h2>
+    <div class="glass"><h2>Processing Pipeline</h2>
       {% if school.batch_summary and school.batch_summary.by_status %}
         {% for status, cnt in school.batch_summary.by_status.items() %}
-        <div class="bar-row">
-          <div class="bar-label">
-            <span class="status {{ status }}">{{ status }}</span>
-          </div>
-          <div class="bar-track">
-            <div class="bar-fill {% if status == 'completed' %}ok{% elif status == 'failed' %}danger{% elif status == 'processing' %}blue{% else %}teal{% endif %}"
-                 style="width:{{ (cnt / school.total_sessions * 100)|round(1) if school.total_sessions else 0 }}%">
-              {{ cnt }}
-            </div>
-          </div>
-        </div>
-        {% endfor %}
-      {% else %}
-        <div class="empty">No processing data available</div>
-      {% endif %}
+        <div class="bar-row"><div class="bar-label"><span class="status {{ status }}">{{ status }}</span></div>
+          <div class="bar-track"><div class="bar-fill {% if status == 'completed' %}green{% elif status == 'failed' %}rose{% else %}indigo{% endif %}" style="width:{{ (cnt / school.total_sessions * 100)|round(1) if school.total_sessions else 0 }}%">{{ cnt }}</div></div>
+        </div>{% endfor %}
+      {% else %}<div class="empty">No processing data</div>{% endif %}
     </div>
   </div>
 
-  <!-- Class Insights (if grade filter applied) -->
   {% if school.class_insights %}
-  <div class="card" style="margin-bottom:24px">
-    <h2>Class Insights — Grade {{ school.class_insights.grade }}</h2>
+  <div class="glass"><h2>Class Insights — Grade {{ school.class_insights.grade }}</h2>
     <div class="stats" style="margin-bottom:16px">
-      <div class="stat">
-        <div class="value">{{ school.class_insights.student_count }}</div>
-        <div class="label">Students</div>
-      </div>
-      <div class="stat">
-        <div class="value">{{ school.class_insights.session_count }}</div>
-        <div class="label">Sessions</div>
-      </div>
-      <div class="stat">
-        <div class="value">{{ school.class_insights.completed_sessions }}</div>
-        <div class="label">Completed</div>
-      </div>
-      <div class="stat">
-        <div class="value">{{ school.class_insights.red_flag_total }}</div>
-        <div class="label">Red Flags</div>
-      </div>
+      <div class="stat"><div class="value">{{ school.class_insights.student_count }}</div><div class="label">Students</div></div>
+      <div class="stat"><div class="value">{{ school.class_insights.session_count }}</div><div class="label">Sessions</div></div>
+      <div class="stat"><div class="value">{{ school.class_insights.completed_sessions }}</div><div class="label">Completed</div></div>
+      <div class="stat"><div class="value">{{ school.class_insights.red_flag_total }}</div><div class="label">Red Flags</div></div>
     </div>
     {% if school.class_insights.top_topics %}
       <h3>Top Topics</h3>
       {% set max_ct = namespace(val=1) %}
+      {% for t in school.class_insights.top_topics %}{% if t.count > max_ct.val %}{% set max_ct.val = t.count %}{% endif %}{% endfor %}
       {% for t in school.class_insights.top_topics %}
-        {% if t.count > max_ct.val %}{% set max_ct.val = t.count %}{% endif %}
-      {% endfor %}
-      {% for t in school.class_insights.top_topics %}
-      <div class="bar-row">
-        <div class="bar-label">{{ t.topic_key|replace("_", " ")|title }}</div>
-        <div class="bar-track">
-          <div class="bar-fill blue" style="width:{{ (t.count / max_ct.val * 100)|round(1) }}%">{{ t.count }}</div>
-        </div>
-      </div>
-      {% endfor %}
+      <div class="bar-row"><div class="bar-label">{{ t.topic_key|replace("_", " ")|title }}</div>
+        <div class="bar-track"><div class="bar-fill indigo" style="width:{{ (t.count / max_ct.val * 100)|round(1) }}%">{{ t.count }}</div></div>
+      </div>{% endfor %}
     {% endif %}
-  </div>
-  {% endif %}
-
+  </div>{% endif %}
 </div>
+
+{% if school.session_trend %}
+<script>
+const labels=[{% for t in school.session_trend %}'{{ t.period[:10] if t.period else "?" }}',{% endfor %}];
+const sessions=[{% for t in school.session_trend %}{{ t.session_count }},{% endfor %}];
+const students=[{% for t in school.session_trend %}{{ t.unique_students }},{% endfor %}];
+new Chart(document.getElementById('trendChart'),{type:'line',data:{labels,datasets:[
+  {label:'Sessions',data:sessions,borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.4,fill:true},
+  {label:'Unique Students',data:students,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.4,fill:true}
+]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af'}}},scales:{x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.04)'}}}}});
+</script>
+{% endif %}
 </body>
 </html>
