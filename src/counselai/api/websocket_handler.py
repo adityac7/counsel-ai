@@ -3,6 +3,12 @@
 Manages the bidirectional browser <-> Gemini pipeline:
 - browser_to_gemini: receives audio/video from browser, forwards to Gemini
 - gemini_to_browser: receives model output, forwards to browser
+
+Includes:
+- Audio format validation and decode error handling
+- Energy-based VAD to filter silence/noise before forwarding
+- Audio level metering sent to frontend
+- Thinking token filtering (part.thought)
 """
 
 import asyncio
@@ -13,10 +19,19 @@ import logging
 from google.genai import types as gt
 from starlette.websockets import WebSocket, WebSocketDisconnect
 
+from counselai.api.audio_utils import (
+    compute_audio_level,
+    is_speech,
+    validate_pcm_format,
+)
+
 logger = logging.getLogger(__name__)
 
 # Keepalive interval in seconds
 _KEEPALIVE_INTERVAL = 15
+
+# How often to send audio level updates to the frontend (every N chunks)
+_LEVEL_METER_INTERVAL = 3
 
 
 async def browser_to_gemini(ws: WebSocket, session) -> None:
@@ -24,12 +39,21 @@ async def browser_to_gemini(ws: WebSocket, session) -> None:
 
     Expects JSON messages with the structure:
         {"realtimeInput": {"mediaChunks": [{"mimeType": "...", "data": "base64..."}]}}
+
+    Features:
+    - Validates PCM format before forwarding
+    - Filters silence/noise via energy-based VAD
+    - Sends audio level metrics to frontend for visualization
+    - Handles decode errors gracefully (log + skip)
     """
+    chunk_count = 0
+
     try:
         while True:
             raw = await ws.receive_text()
             if not raw or not raw.strip():
                 continue
+
             try:
                 msg = json.loads(raw)
             except json.JSONDecodeError:
@@ -43,8 +67,41 @@ async def browser_to_gemini(ws: WebSocket, session) -> None:
                 b64data = chunk.get("data", "")
                 if not b64data:
                     continue
-                decoded = base64.b64decode(b64data)
+
+                # Decode base64 with error handling
+                try:
+                    decoded = base64.b64decode(b64data)
+                except Exception as exc:
+                    logger.warning("Base64 decode failed, skipping chunk: %s", exc)
+                    continue
+
                 if mime.startswith("audio/"):
+                    # Validate PCM format
+                    valid, reason = validate_pcm_format(decoded)
+                    if not valid:
+                        logger.debug("Invalid PCM data: %s", reason)
+                        continue
+
+                    # Compute audio level and send to frontend periodically
+                    chunk_count += 1
+                    level = compute_audio_level(decoded)
+
+                    if chunk_count % _LEVEL_METER_INTERVAL == 0:
+                        try:
+                            await ws.send_json({
+                                "type": "audioLevel",
+                                "rms": level.rms,
+                                "peak": level.peak,
+                                "db": level.db,
+                                "isSpeech": level.is_speech,
+                            })
+                        except Exception:
+                            pass  # Don't crash if level send fails
+
+                    # VAD: skip silence/noise to avoid gibberish transcriptions
+                    if not level.is_speech:
+                        continue
+
                     await session.send_realtime_input(
                         audio=gt.Blob(data=decoded, mime_type="audio/pcm")
                     )
@@ -52,6 +109,7 @@ async def browser_to_gemini(ws: WebSocket, session) -> None:
                     await session.send_realtime_input(
                         video=gt.Blob(data=decoded, mime_type=mime)
                     )
+
     except WebSocketDisconnect:
         logger.info("Browser disconnected")
     except asyncio.CancelledError:
@@ -64,7 +122,10 @@ async def gemini_to_browser(ws: WebSocket, session) -> None:
     """Forward Gemini model output to the browser WebSocket.
 
     Handles audio data, text, transcriptions, turn completion,
-    and generation completion events. Filters out thinking tokens.
+    and generation completion events.
+
+    Filters out thinking tokens (part.thought == True) so they
+    never reach the frontend.
     """
     try:
         async for response in session.receive():
@@ -81,7 +142,7 @@ async def gemini_to_browser(ws: WebSocket, session) -> None:
 
             if srv and srv.model_turn and srv.model_turn.parts:
                 for part in srv.model_turn.parts:
-                    # Filter out thinking tokens (part.thought == True)
+                    # Filter out thinking tokens
                     if getattr(part, "thought", False):
                         continue
                     if part.inline_data and part.inline_data.data:

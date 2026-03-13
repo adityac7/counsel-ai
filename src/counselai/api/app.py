@@ -226,106 +226,26 @@ async def gemini_ws_proxy(ws: WebSocket):
             print("[gemini-ws] System instructions sent via client content")
 
             # Send silent audio to trigger initial greeting
-            sample_rate = 24000
-            duration_ms = 100
-            num_samples = int(sample_rate * duration_ms / 1000)
-            silent_audio = struct.pack("<" + "h" * num_samples, *([0] * num_samples))
+            from counselai.api.audio_utils import generate_silent_audio
+            silent_audio = generate_silent_audio()
             await session.send_realtime_input(
                 audio=gt.Blob(data=silent_audio, mime_type="audio/pcm")
             )
             await session.send_realtime_input(audio_stream_end=True)
             print("[gemini-ws] Trigger audio sent - waiting for model to greet...")
 
-            async def browser_to_gemini():
-                try:
-                    while True:
-                        data = await ws.receive_text()
-                        msg = json.loads(data)
-                        ri = msg.get("realtimeInput", {})
-                        chunks = ri.get("mediaChunks", [])
-                        for chunk in chunks:
-                            mime = chunk.get("mimeType", "")
-                            b64data = chunk.get("data", "")
-                            raw = base64.b64decode(b64data)
-                            if mime.startswith("audio/"):
-                                await session.send_realtime_input(
-                                    audio=gt.Blob(data=raw, mime_type="audio/pcm")
-                                )
-                            elif mime.startswith("image/"):
-                                await session.send_realtime_input(
-                                    video=gt.Blob(data=raw, mime_type=mime)
-                                )
-                except WebSocketDisconnect:
-                    print("[gemini-ws] Browser disconnected")
-                except Exception as e:
-                    print(f"[gemini-ws] browser->gemini error: {e}")
-
-            async def gemini_to_browser():
-                msg_count = 0
-                counsellor_audio_chunks = []
-                try:
-                    async for response in session.receive():
-                        msg_count += 1
-                        out = {"serverContent": {}}
-                        sc = out["serverContent"]
-                        srv = response.server_content
-
-                        audio_data = None
-                        text_data = None
-                        if srv and srv.model_turn and srv.model_turn.parts:
-                            for part in srv.model_turn.parts:
-                                if part.inline_data and part.inline_data.data:
-                                    audio_data = part.inline_data.data
-                                if part.text:
-                                    text_data = part.text
-
-                        if audio_data:
-                            sc["modelTurn"] = {
-                                "parts": [
-                                    {
-                                        "inlineData": {
-                                            "data": base64.b64encode(audio_data).decode(),
-                                            "mimeType": "audio/pcm",
-                                        }
-                                    }
-                                ]
-                            }
-                            counsellor_audio_chunks.append(audio_data)
-
-                        if text_data:
-                            if "modelTurn" not in sc:
-                                sc["modelTurn"] = {"parts": []}
-                            sc["modelTurn"]["parts"].append({"text": text_data})
-
-                        if srv:
-                            if srv.turn_complete:
-                                sc["turnComplete"] = True
-                                counsellor_audio_chunks = []
-                            if srv.input_transcription:
-                                t = getattr(srv.input_transcription, "text", "")
-                                if t and t.strip():
-                                    sc["inputTranscription"] = {"text": t.strip()}
-                            if srv.output_transcription:
-                                t = getattr(srv.output_transcription, "text", "")
-                                if t and t.strip():
-                                    sc["outputTranscription"] = {"text": t.strip()}
-                            if srv.generation_complete:
-                                sc["generationComplete"] = True
-
-                        if response.setup_complete:
-                            continue
-
-                        if sc:
-                            await ws.send_json(out)
-
-                except Exception as e:
-                    print(f"[gemini-ws] gemini->browser error: {e}")
-                    traceback.print_exc()
+            # Reuse the shared handler functions from websocket_handler
+            from counselai.api.websocket_handler import (
+                browser_to_gemini as _b2g,
+                gemini_to_browser as _g2b,
+                keepalive_ping as _keepalive,
+            )
 
             done, pending = await asyncio.wait(
                 [
-                    asyncio.create_task(browser_to_gemini()),
-                    asyncio.create_task(gemini_to_browser()),
+                    asyncio.create_task(_b2g(ws, session)),
+                    asyncio.create_task(_g2b(ws, session)),
+                    asyncio.create_task(_keepalive(ws)),
                 ],
                 return_when=asyncio.FIRST_COMPLETED,
             )
