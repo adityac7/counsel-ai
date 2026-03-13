@@ -10,651 +10,323 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <style>
 :root {
-  --bg-start: #1a0a2e;
-  --bg-mid: #16213e;
-  --bg-end: #0a1628;
-  --glass: rgba(255, 255, 255, 0.06);
-  --glass-border: rgba(255, 255, 255, 0.12);
-  --glass-hover: rgba(255, 255, 255, 0.1);
-  --accent: #7c5cfc;
-  --accent-glow: rgba(124, 92, 252, 0.4);
-  --accent-soft: #a78bfa;
-  --teal: #5eead4;
-  --teal-glow: rgba(94, 234, 212, 0.3);
-  --text: #f1f0f7;
-  --text-soft: #b4b0c8;
-  --text-muted: #7e7a94;
-  --danger: #f87171;
-  --danger-glow: rgba(248, 113, 113, 0.3);
-  --success: #34d399;
-  --warning: #fbbf24;
-  --radius: 20px;
-  --radius-sm: 12px;
+  --bg-start: #1a0a2e; --bg-mid: #16213e; --bg-end: #0a1628; --glass: rgba(255, 255, 255, 0.06);
+  --glass-border: rgba(255, 255, 255, 0.12);--glass-hover: rgba(255, 255, 255, 0.1); --accent: #7c5cfc;
+  --accent-glow: rgba(124, 92, 252, 0.4);--accent-soft: #a78bfa; --teal: #5eead4; --teal-glow: rgba(94, 234, 212, 0.3);
+  --text: #f1f0f7;--text-soft: #b4b0c8; --text-muted: #7e7a94; --danger: #f87171;
+  --danger-glow: rgba(248, 113, 113, 0.3);--success: #34d399; --warning: #fbbf24; --radius: 20px; --radius-sm: 12px;
 }
-
 * { box-sizing: border-box; margin: 0; padding: 0; }
-
 body {
-  font-family: 'Inter', system-ui, -apple-system, sans-serif;
-  color: var(--text);
-  background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-mid) 50%, var(--bg-end) 100%);
-  min-height: 100vh;
+  font-family: 'Inter', system-ui, -apple-system, sans-serif; color: var(--text);
+  background: linear-gradient(135deg, var(--bg-start) 0%, var(--bg-mid) 50%, var(--bg-end) 100%);min-height: 100vh;
   overflow-x: hidden;
 }
-
 body::before {
-  content: '';
-  position: fixed;
-  top: -50%;
-  left: -50%;
-  width: 200%;
-  height: 200%;
+  content: ''; position: fixed; top: -50%; left: -50%; width: 200%; height: 200%;
   background: radial-gradient(ellipse at 20% 20%, rgba(124, 92, 252, 0.08) 0%, transparent 50%),
-              radial-gradient(ellipse at 80% 80%, rgba(94, 234, 212, 0.05) 0%, transparent 50%);
-  pointer-events: none;
-  z-index: 0;
+  radial-gradient(ellipse at 80% 80%, rgba(94, 234, 212, 0.05) 0%, transparent 50%);pointer-events: none; z-index: 0;
 }
-
 .app {
-  position: relative;
-  z-index: 1;
-  max-width: 1080px;
-  margin: 0 auto;
-  padding: 24px 16px 60px;
+  position: relative; z-index: 1; max-width: 1080px; margin: 0 auto; padding: 24px 16px 60px;
 }
-
 .glass {
-  background: var(--glass);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius);
-  transition: background 0.3s ease, border-color 0.3s ease;
+  background: var(--glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);border-radius: var(--radius); transition: background 0.3s ease, border-color 0.3s ease;
 }
-
 .glass:hover { border-color: rgba(255, 255, 255, 0.18); }
-
 .hidden { display: none !important; }
-
 /* --- Typography --- */
 h1 { font-size: 1.75rem; font-weight: 700; letter-spacing: -0.02em; }
 h2 { font-size: 1.4rem; font-weight: 600; letter-spacing: -0.01em; }
 h3 { font-size: 1.1rem; font-weight: 600; }
-
 /* --- Topbar --- */
 .topbar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 16px 0;
-  margin-bottom: 20px;
+  display: flex; align-items: center; justify-content: space-between; padding: 16px 0; margin-bottom: 20px;
 }
-
 .topbar .brand {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-weight: 700;
-  font-size: 1.1rem;
+  display: flex; align-items: center; gap: 10px; font-weight: 700; font-size: 1.1rem;
 }
-
 .brand-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--accent);
-  box-shadow: 0 0 12px var(--accent-glow);
+  width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 12px var(--accent-glow);
 }
-
 .topbar a {
-  color: var(--accent-soft);
-  text-decoration: none;
-  font-size: 0.9rem;
-  font-weight: 500;
-  padding: 8px 16px;
-  border-radius: var(--radius-sm);
-  border: 1px solid rgba(124, 92, 252, 0.2);
-  transition: all 0.25s ease;
+  color: var(--accent-soft); text-decoration: none; font-size: 0.9rem; font-weight: 500; padding: 8px 16px;
+  border-radius: var(--radius-sm);border: 1px solid rgba(124, 92, 252, 0.2); transition: all 0.25s ease;
 }
-
 .topbar a:hover {
-  background: rgba(124, 92, 252, 0.1);
-  border-color: rgba(124, 92, 252, 0.4);
+  background: rgba(124, 92, 252, 0.1); border-color: rgba(124, 92, 252, 0.4);
 }
-
 /* --- Forms --- */
 label {
-  display: block;
-  margin: 14px 0 6px;
-  color: var(--text-soft);
-  font-size: 0.85rem;
-  font-weight: 500;
-  letter-spacing: 0.02em;
+  display: block; margin: 14px 0 6px; color: var(--text-soft); font-size: 0.85rem; font-weight: 500; letter-spacing: 0.02em;
 }
-
 input, select {
-  font-family: inherit;
-  font-size: 0.95rem;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--glass-border);
-  background: rgba(255, 255, 255, 0.04);
-  color: var(--text);
-  padding: 12px 14px;
-  width: 100%;
-  outline: none;
+  font-family: inherit; font-size: 0.95rem; border-radius: var(--radius-sm); border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.04);color: var(--text); padding: 12px 14px; width: 100%; outline: none;
   transition: border-color 0.25s ease, box-shadow 0.25s ease;
 }
-
 input:focus, select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.15);
+  border-color: var(--accent); box-shadow: 0 0 0 3px rgba(124, 92, 252, 0.15);
 }
-
 select option { background: #1a1a2e; color: var(--text); }
-
 /* --- Buttons --- */
 .btn {
-  font-family: inherit;
-  font-size: 0.95rem;
-  font-weight: 600;
-  border: none;
-  border-radius: var(--radius-sm);
-  padding: 14px 24px;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  transition: all 0.25s ease;
-  position: relative;
-  overflow: hidden;
-  width: 100%;
+  font-family: inherit; font-size: 0.95rem; font-weight: 600; border: none; border-radius: var(--radius-sm);
+  padding: 14px 24px;cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+  transition: all 0.25s ease;position: relative; overflow: hidden; width: 100%;
 }
-
 .btn::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
-  opacity: 0;
-  transition: opacity 0.25s ease;
+  content: ''; position: absolute; inset: 0; background: linear-gradient(135deg, rgba(255,255,255,0.1), transparent);
+  opacity: 0;transition: opacity 0.25s ease;
 }
-
 .btn:hover::after { opacity: 1; }
 .btn:active { transform: scale(0.97); }
-
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #6366f1);
-  color: #fff;
-  box-shadow: 0 4px 20px var(--accent-glow);
+  background: linear-gradient(135deg, var(--accent), #6366f1); color: #fff; box-shadow: 0 4px 20px var(--accent-glow);
 }
-
 .btn-primary:hover {
-  box-shadow: 0 6px 30px rgba(124, 92, 252, 0.5);
-  transform: translateY(-1px);
+  box-shadow: 0 6px 30px rgba(124, 92, 252, 0.5); transform: translateY(-1px);
 }
-
 .btn-primary:active { transform: translateY(0) scale(0.98); }
-
 .btn-danger {
-  background: linear-gradient(135deg, var(--danger), #dc2626);
-  color: #fff;
-  box-shadow: 0 4px 16px var(--danger-glow);
+  background: linear-gradient(135deg, var(--danger), #dc2626); color: #fff; box-shadow: 0 4px 16px var(--danger-glow);
 }
-
 .btn-danger:hover { box-shadow: 0 6px 24px rgba(248, 113, 113, 0.4); }
-
 .btn-ghost {
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-soft);
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.06); color: var(--text-soft); border: 1px solid var(--glass-border);
 }
-
 .btn-ghost:hover { background: rgba(255, 255, 255, 0.1); }
-
 /* --- Grid --- */
 .grid { display: grid; gap: 14px; }
 .grid-2 { grid-template-columns: 1fr 1fr; }
-
 /* --- Welcome Screen --- */
 .welcome-card {
-  padding: 32px 28px;
-  animation: slideUp 0.5s ease;
+  padding: 32px 28px; animation: slideUp 0.5s ease;
 }
-
 .welcome-header {
-  text-align: center;
-  margin-bottom: 28px;
+  text-align: center; margin-bottom: 28px;
 }
-
 .welcome-header h1 {
-  background: linear-gradient(135deg, var(--text), var(--accent-soft));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-  margin-bottom: 8px;
+  background: linear-gradient(135deg, var(--text), var(--accent-soft)); -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;background-clip: text; margin-bottom: 8px;
 }
-
 .welcome-header p {
-  color: var(--text-muted);
-  font-size: 0.9rem;
+  color: var(--text-muted); font-size: 0.9rem;
 }
-
 .welcome-emoji {
-  font-size: 2.5rem;
-  margin-bottom: 12px;
-  display: block;
+  font-size: 2.5rem; margin-bottom: 12px; display: block;
 }
-
 /* --- Live Session Screen --- */
 .live-card {
-  padding: 20px;
-  animation: fadeIn 0.4s ease;
+  padding: 20px; animation: fadeIn 0.4s ease;
 }
-
 .session-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
-  flex-wrap: wrap;
-  gap: 12px;
+  display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; flex-wrap: wrap; gap: 12px;
 }
-
 .session-status {
-  display: flex;
-  align-items: center;
-  gap: 10px;
+  display: flex; align-items: center; gap: 10px;
 }
-
 .status-dot {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-  background: var(--success);
-  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);
-  animation: pulse 2s ease-in-out infinite;
+  width: 10px; height: 10px; border-radius: 50%; background: var(--success);
+  box-shadow: 0 0 10px rgba(52, 211, 153, 0.5);animation: pulse 2s ease-in-out infinite;
 }
-
 .status-dot.speaking {
-  background: var(--accent);
-  box-shadow: 0 0 14px var(--accent-glow);
+  background: var(--accent); box-shadow: 0 0 14px var(--accent-glow);
 }
-
 #status-text {
-  font-size: 0.9rem;
-  font-weight: 500;
-  color: var(--text-soft);
+  font-size: 0.9rem; font-weight: 500; color: var(--text-soft);
 }
-
 .session-timer {
-  font-size: 1.3rem;
-  font-weight: 700;
-  font-variant-numeric: tabular-nums;
-  color: var(--text);
-  letter-spacing: 0.05em;
-  background: rgba(255, 255, 255, 0.05);
-  padding: 6px 16px;
-  border-radius: 30px;
-  border: 1px solid var(--glass-border);
+  font-size: 1.3rem; font-weight: 700; font-variant-numeric: tabular-nums; color: var(--text); letter-spacing: 0.05em;
+  background: rgba(255, 255, 255, 0.05);padding: 6px 16px; border-radius: 30px; border: 1px solid var(--glass-border);
 }
-
 #rtc-debug {
-  font-size: 0.72rem;
-  color: var(--text-muted);
-  margin-top: 2px;
-  font-family: 'Inter', monospace;
+  font-size: 0.72rem; color: var(--text-muted); margin-top: 2px; font-family: 'Inter', monospace;
 }
-
 /* --- Live Layout --- */
 .live-grid {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  display: flex; flex-direction: column; gap: 16px;
 }
-
 .top-row {
-  display: flex;
-  gap: 16px;
-  align-items: stretch;
+  display: flex; gap: 16px; align-items: stretch;
 }
-
 .preview {
-  width: 260px;
-  min-width: 260px;
-  aspect-ratio: 4/3;
-  border-radius: 16px;
-  overflow: hidden;
-  border: 2px solid rgba(124, 92, 252, 0.3);
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
-  background: rgba(0, 0, 0, 0.3);
+  width: 260px; min-width: 260px; aspect-ratio: 4/3; border-radius: 16px; overflow: hidden;
+  border: 2px solid rgba(124, 92, 252, 0.3);box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3); background: rgba(0, 0, 0, 0.3);
   position: relative;
 }
-
 .preview video { width: 100%; height: 100%; object-fit: cover; }
-
 .preview::after {
-  content: '📹';
-  position: absolute;
-  top: 8px;
-  right: 8px;
-  font-size: 0.7rem;
-  background: rgba(0,0,0,0.5);
-  padding: 3px 7px;
-  border-radius: 6px;
+  content: '📹'; position: absolute; top: 8px; right: 8px; font-size: 0.7rem; background: rgba(0,0,0,0.5);
+  padding: 3px 7px;border-radius: 6px;
 }
-
 .case-card {
-  flex: 1;
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
-  padding: 16px;
-  border: 1px solid var(--glass-border);
-  overflow-y: auto;
-  max-height: 220px;
+  flex: 1; background: rgba(255, 255, 255, 0.03); border-radius: 16px; padding: 16px;
+  border: 1px solid var(--glass-border);overflow-y: auto; max-height: 220px;
 }
-
 .case-card h3 {
-  color: var(--accent-soft);
-  font-size: 0.85rem;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  margin-bottom: 10px;
+  color: var(--accent-soft); font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 10px;
 }
-
 .case-text {
-  white-space: pre-wrap;
-  color: var(--text-soft);
-  line-height: 1.55;
-  font-size: 0.88rem;
+  white-space: pre-wrap; color: var(--text-soft); line-height: 1.55; font-size: 0.88rem;
 }
-
 /* --- Audio Visualizer --- */
 .visualizer-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 12px 0;
+  display: flex; align-items: center; justify-content: center; padding: 12px 0;
 }
-
 #waveform-canvas {
-  width: 100%;
-  max-width: 500px;
-  height: 60px;
-  border-radius: var(--radius-sm);
+  width: 100%; max-width: 500px; height: 60px; border-radius: var(--radius-sm);
 }
-
 /* --- Orb --- */
 .orb-wrap {
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: flex; align-items: center; justify-content: center;
 }
-
 .orb {
-  position: relative;
-  width: 80px;
-  height: 80px;
-  border-radius: 50%;
+  position: relative; width: 80px; height: 80px; border-radius: 50%;
   background: radial-gradient(circle at 30% 30%, #c4b5fd 0%, var(--accent) 40%, #4338ca 80%);
-  box-shadow: 0 0 30px var(--accent-glow);
-  animation: orbFloat 4s ease-in-out infinite;
-  transition: box-shadow 0.4s ease;
+  box-shadow: 0 0 30px var(--accent-glow);animation: orbFloat 4s ease-in-out infinite; transition: box-shadow 0.4s ease;
 }
-
 .orb.speaking {
-  box-shadow: 0 0 50px rgba(124, 92, 252, 0.7);
-  animation: orbFloat 4s ease-in-out infinite, orbPulse 0.8s ease-in-out infinite;
+  box-shadow: 0 0 50px rgba(124, 92, 252, 0.7); animation: orbFloat 4s ease-in-out infinite, orbPulse 0.8s ease-in-out infinite;
 }
-
 .orb.speaking::before,
 .orb.speaking::after {
-  content: '';
-  position: absolute;
-  inset: -12px;
-  border-radius: 50%;
-  border: 2px solid rgba(124, 92, 252, 0.3);
+  content: ''; position: absolute; inset: -12px; border-radius: 50%; border: 2px solid rgba(124, 92, 252, 0.3);
   animation: ripple 1.8s ease-out infinite;
 }
-
 .orb.speaking::after {
-  inset: -24px;
-  animation-delay: 0.6s;
+  inset: -24px; animation-delay: 0.6s;
 }
-
 /* --- Transcript --- */
 .transcript {
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 16px;
-  padding: 16px;
-  max-height: 38vh;
-  min-height: 120px;
-  overflow-y: auto;
-  border: 1px solid var(--glass-border);
-  scroll-behavior: smooth;
+  background: rgba(0, 0, 0, 0.2); border-radius: 16px; padding: 16px; max-height: 38vh; min-height: 120px;
+  overflow-y: auto;border: 1px solid var(--glass-border); scroll-behavior: smooth;
 }
-
 .transcript::-webkit-scrollbar { width: 5px; }
 .transcript::-webkit-scrollbar-track { background: transparent; }
 .transcript::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 4px; }
-
 .entry {
-  margin: 10px 0;
-  display: flex;
-  gap: 12px;
-  animation: slideIn 0.3s ease;
-  padding: 8px 12px;
-  border-radius: var(--radius-sm);
-  transition: background 0.2s ease;
+  margin: 10px 0; display: flex; gap: 12px; animation: slideIn 0.3s ease; padding: 8px 12px;
+  border-radius: var(--radius-sm);transition: background 0.2s ease;
 }
-
 .entry:hover { background: rgba(255, 255, 255, 0.03); }
-
 .entry .tag {
-  font-weight: 600;
-  font-size: 0.8rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-  min-width: 85px;
-  padding-top: 2px;
-  color: var(--teal);
+  font-weight: 600; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; min-width: 85px;
+  padding-top: 2px;color: var(--teal);
 }
-
 .entry.ai .tag { color: var(--accent-soft); }
-
 .entry .body {
-  color: var(--text-soft);
-  line-height: 1.5;
-  font-size: 0.9rem;
+  color: var(--text-soft); line-height: 1.5; font-size: 0.9rem;
 }
-
 /* --- Bottom Controls --- */
 .bottom-row {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 16px;
-  padding-top: 4px;
+  display: flex; align-items: center; justify-content: center; gap: 16px; padding-top: 4px;
 }
-
 .bottom-row .btn { width: auto; min-width: 160px; }
-
 #enable-audio-btn {
-  display: none;
-  max-width: 240px;
+  display: none; max-width: 240px;
 }
-
 /* --- Event Log Panel --- */
 .event-log-panel {
-  margin-top: 16px;
-  padding: 16px;
+  margin-top: 16px; padding: 16px;
 }
-
 .event-log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  margin-bottom: 10px;
+  display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;
 }
-
 .event-log-header h3 {
-  font-size: 0.9rem;
-  color: var(--text-soft);
+  font-size: 0.9rem; color: var(--text-soft);
 }
-
 .event-log-actions { display: flex; gap: 6px; }
-
 .btn-tiny {
-  font-family: inherit;
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--glass-border);
-  color: var(--text-muted);
-  padding: 4px 10px;
-  border-radius: 6px;
-  cursor: pointer;
-  font-size: 0.75rem;
-  transition: all 0.2s ease;
+  font-family: inherit; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--glass-border);
+  color: var(--text-muted);padding: 4px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; transition: all 0.2s ease;
 }
-
 .btn-tiny:hover { background: rgba(255, 255, 255, 0.1); color: var(--text-soft); }
-
 #event-log {
-  max-height: 300px;
-  overflow: auto;
-  background: rgba(0, 0, 0, 0.25);
-  border: 1px solid var(--glass-border);
-  border-radius: var(--radius-sm);
-  padding: 12px;
-  font-size: 0.73rem;
-  line-height: 1.6;
-  color: var(--text-muted);
-  white-space: pre-wrap;
-  word-break: break-all;
-  margin: 0;
-  font-family: 'Inter', monospace;
+  max-height: 300px; overflow: auto; background: rgba(0, 0, 0, 0.25); border: 1px solid var(--glass-border);
+  border-radius: var(--radius-sm);padding: 12px; font-size: 0.73rem; line-height: 1.6; color: var(--text-muted);
+  white-space: pre-wrap;word-break: break-all; margin: 0; font-family: 'Inter', monospace;
 }
-
 /* --- Summary Screen --- */
 .summary-card {
-  padding: 28px 24px;
-  animation: slideUp 0.5s ease;
+  padding: 28px 24px; animation: slideUp 0.5s ease;
 }
-
 .summary-card h2 {
-  margin-bottom: 20px;
-  text-align: center;
+  margin-bottom: 20px; text-align: center;
 }
-
 .summary-grid { display: grid; gap: 14px; grid-template-columns: 1fr 1fr; }
-
 .summary-section {
-  background: rgba(255, 255, 255, 0.03);
-  border-radius: 16px;
-  padding: 18px;
-  border: 1px solid var(--glass-border);
+  background: rgba(255, 255, 255, 0.03); border-radius: 16px; padding: 18px; border: 1px solid var(--glass-border);
 }
-
 .summary-section strong {
-  display: block;
-  font-size: 0.85rem;
-  color: var(--accent-soft);
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
+  display: block; font-size: 0.85rem; color: var(--accent-soft); text-transform: uppercase; letter-spacing: 0.05em;
   margin-bottom: 10px;
 }
-
 .summary-section .meta {
-  color: var(--text-soft);
-  font-size: 0.9rem;
-  line-height: 1.55;
+  color: var(--text-soft); font-size: 0.9rem; line-height: 1.55;
 }
-
 .summary-full { grid-column: 1 / -1; }
-
 .metrics {
-  display: grid;
-  gap: 10px;
-  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
-
 /* --- Toast --- */
 .toast {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%) translateY(20px);
-  background: rgba(30, 20, 60, 0.95);
-  backdrop-filter: blur(16px);
-  border: 1px solid var(--danger);
-  padding: 12px 20px;
-  border-radius: var(--radius-sm);
-  color: var(--text);
-  display: none;
-  z-index: 100;
-  font-size: 0.88rem;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-  animation: toastIn 0.3s ease;
+  position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: rgba(30, 20, 60, 0.95);backdrop-filter: blur(16px); border: 1px solid var(--danger); padding: 12px 20px;
+  border-radius: var(--radius-sm);color: var(--text); display: none; z-index: 100; font-size: 0.88rem;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);animation: toastIn 0.3s ease;
 }
-
 /* --- Animations --- */
 @keyframes slideUp {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+from { opacity: 0; transform: translateY(20px); }
+to { opacity: 1; transform: translateY(0); }
 }
-
 @keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
+from { opacity: 0; }
+to { opacity: 1; }
 }
-
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-8px); }
-  to { opacity: 1; transform: translateX(0); }
+from { opacity: 0; transform: translateX(-8px); }
+to { opacity: 1; transform: translateX(0); }
 }
-
 @keyframes orbFloat {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-6px); }
+0%, 100% { transform: translateY(0); }
+50% { transform: translateY(-6px); }
 }
-
 @keyframes orbPulse {
-  0%, 100% { transform: scale(1) translateY(0); }
-  50% { transform: scale(1.06) translateY(-6px); }
+0%, 100% { transform: scale(1) translateY(0); }
+50% { transform: scale(1.06) translateY(-6px); }
 }
-
 @keyframes ripple {
-  0% { transform: scale(0.85); opacity: 0.6; }
-  100% { transform: scale(1.4); opacity: 0; }
+0% { transform: scale(0.85); opacity: 0.6; }
+100% { transform: scale(1.4); opacity: 0; }
 }
-
 @keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+0%, 100% { opacity: 1; }
+50% { opacity: 0.5; }
 }
-
 @keyframes toastIn {
-  from { opacity: 0; transform: translateX(-50%) translateY(30px); }
-  to { opacity: 1; transform: translateX(-50%) translateY(0); }
+from { opacity: 0; transform: translateX(-50%) translateY(30px); }
+to { opacity: 1; transform: translateX(-50%) translateY(0); }
 }
-
 /* --- Responsive --- */
 @media (max-width: 768px) {
-  .app { padding: 16px 12px 40px; }
-  .welcome-card, .summary-card { padding: 20px 16px; }
-  .grid-2 { grid-template-columns: 1fr; }
-  .summary-grid { grid-template-columns: 1fr; }
-  .top-row { flex-direction: column; }
-  .preview { width: 100%; min-width: unset; }
-  .bottom-row { flex-direction: column; gap: 10px; }
-  .bottom-row .btn { width: 100%; }
-  h1 { font-size: 1.4rem; }
-  .session-timer { font-size: 1.1rem; }
-  .case-card { max-height: 160px; }
+.app { padding: 16px 12px 40px; }
+.welcome-card, .summary-card { padding: 20px 16px; }
+.grid-2 { grid-template-columns: 1fr; }
+.summary-grid { grid-template-columns: 1fr; }
+.top-row { flex-direction: column; }
+.preview { width: 100%; min-width: unset; }
+.bottom-row { flex-direction: column; gap: 10px; }
+.bottom-row .btn { width: 100%; }
+h1 { font-size: 1.4rem; }
+.session-timer { font-size: 1.1rem; }
+.case-card { max-height: 160px; }
 }
-
 @media (max-width: 480px) {
-  .topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
-  .session-header { flex-direction: column; align-items: flex-start; }
+.topbar { flex-direction: column; align-items: flex-start; gap: 8px; }
+.session-header { flex-direction: column; align-items: flex-start; }
 }
 </style>
 </head>
@@ -835,18 +507,12 @@ select option { background: #1a1a2e; color: var(--text); }
 
 <script>
 const screens = {welcome:document.getElementById('welcome'),live:document.getElementById('live'),summary:document.getElementById('summary')};
-const statusText = document.getElementById('status-text');
-const statusDot = document.getElementById('status-dot');
-const timerEl = document.getElementById('timer');
-const transcriptEl = document.getElementById('transcript');
-const orb = document.getElementById('orb');
-const preview = document.getElementById('preview');
-const previewWrap = document.getElementById('preview-wrap');
-const aiAudio = document.getElementById('ai-audio');
-const enableAudioBtn = document.getElementById('enable-audio-btn');
-const rtcDebug = document.getElementById('rtc-debug');
-const toast = document.getElementById('toast');
-const caseStudyText = document.getElementById('case-study-text');
+const statusText = document.getElementById('status-text'); const statusDot = document.getElementById('status-dot');
+const timerEl = document.getElementById('timer'); const transcriptEl = document.getElementById('transcript');
+const orb = document.getElementById('orb'); const preview = document.getElementById('preview');
+const previewWrap = document.getElementById('preview-wrap'); const aiAudio = document.getElementById('ai-audio');
+const enableAudioBtn = document.getElementById('enable-audio-btn'); const rtcDebug = document.getElementById('rtc-debug');
+const toast = document.getElementById('toast'); const caseStudyText = document.getElementById('case-study-text');
 const profileMetrics = document.getElementById('profile-metrics');
 const personalitySection = document.getElementById('personality-section');
 const cognitiveSection = document.getElementById('cognitive-section');
@@ -854,65 +520,38 @@ const emotionalSection = document.getElementById('emotional-section');
 const behavioralSection = document.getElementById('behavioral-section');
 const conversationSection = document.getElementById('conversation-section');
 const recommendationsEl = document.getElementById('recommendations');
-
 /* --- Audio Waveform Visualizer --- */
-const waveCanvas = document.getElementById('waveform-canvas');
-const waveCtx = waveCanvas.getContext('2d');
-let waveAnimId = null;
-let waveAnalyser = null;
+const waveCanvas = document.getElementById('waveform-canvas'); const waveCtx = waveCanvas.getContext('2d');
+let waveAnimId = null; let waveAnalyser = null;
 let waveDataArray = null;
-
 function initWaveform(stream) {
-  const actx = new (window.AudioContext || window.webkitAudioContext)();
-  const source = actx.createMediaStreamSource(stream);
-  waveAnalyser = actx.createAnalyser();
-  waveAnalyser.fftSize = 256;
-  waveAnalyser.smoothingTimeConstant = 0.8;
-  source.connect(waveAnalyser);
-  waveDataArray = new Uint8Array(waveAnalyser.frequencyBinCount);
-  resizeWaveCanvas();
+  const actx = new (window.AudioContext || window.webkitAudioContext)(); const source = actx.createMediaStreamSource(stream);
+  waveAnalyser = actx.createAnalyser(); waveAnalyser.fftSize = 256;
+  waveAnalyser.smoothingTimeConstant = 0.8; source.connect(waveAnalyser);
+  waveDataArray = new Uint8Array(waveAnalyser.frequencyBinCount); resizeWaveCanvas();
   drawWaveform();
 }
-
 function resizeWaveCanvas() {
-  const rect = waveCanvas.getBoundingClientRect();
-  waveCanvas.width = rect.width * window.devicePixelRatio;
-  waveCanvas.height = rect.height * window.devicePixelRatio;
-  waveCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
+  const rect = waveCanvas.getBoundingClientRect(); waveCanvas.width = rect.width * window.devicePixelRatio;
+  waveCanvas.height = rect.height * window.devicePixelRatio; waveCtx.scale(window.devicePixelRatio, window.devicePixelRatio);
 }
-
 function drawWaveform() {
   waveAnimId = requestAnimationFrame(drawWaveform);
   if (!waveAnalyser) return;
-  waveAnalyser.getByteFrequencyData(waveDataArray);
-
-  const w = waveCanvas.width / window.devicePixelRatio;
-  const h = waveCanvas.height / window.devicePixelRatio;
-  waveCtx.clearRect(0, 0, w, h);
-
-  const bars = 48;
-  const step = Math.floor(waveDataArray.length / bars);
-  const barW = (w / bars) * 0.6;
-  const gap = (w / bars) * 0.4;
-
+  waveAnalyser.getByteFrequencyData(waveDataArray); const w = waveCanvas.width / window.devicePixelRatio;
+  const h = waveCanvas.height / window.devicePixelRatio; waveCtx.clearRect(0, 0, w, h);
+  const bars = 48; const step = Math.floor(waveDataArray.length / bars);
+  const barW = (w / bars) * 0.6; const gap = (w / bars) * 0.4;
   for (let i = 0; i < bars; i++) {
-    const val = waveDataArray[i * step] / 255;
-    const barH = Math.max(2, val * h * 0.85);
-    const x = i * (barW + gap) + gap / 2;
-    const y = (h - barH) / 2;
-
-    const gradient = waveCtx.createLinearGradient(x, y, x, y + barH);
-    gradient.addColorStop(0, 'rgba(124, 92, 252, 0.8)');
-    gradient.addColorStop(1, 'rgba(94, 234, 212, 0.6)');
-    waveCtx.fillStyle = gradient;
-    waveCtx.beginPath();
-    waveCtx.roundRect(x, y, barW, barH, 2);
+    const val = waveDataArray[i * step] / 255; const barH = Math.max(2, val * h * 0.85);
+    const x = i * (barW + gap) + gap / 2; const y = (h - barH) / 2;
+    const gradient = waveCtx.createLinearGradient(x, y, x, y + barH); gradient.addColorStop(0, 'rgba(124, 92, 252, 0.8)');
+    gradient.addColorStop(1, 'rgba(94, 234, 212, 0.6)'); waveCtx.fillStyle = gradient;
+    waveCtx.beginPath(); waveCtx.roundRect(x, y, barW, barH, 2);
     waveCtx.fill();
   }
 }
-
 window.addEventListener('resize', () => { if (waveAnalyser) resizeWaveCanvas(); });
-
 function uiLog(level, ...args) {
   const el = document.getElementById("event-log");
   const ts = new Date().toLocaleTimeString("en-GB",{hour12:false});
@@ -923,28 +562,17 @@ function uiLog(level, ...args) {
   if (level === "WARN" || level === "ERR") console.warn("[CounselAI]", ...args);
   else console.log("[CounselAI]", ...args);
 }
-
-let pc, dataChannel, mediaStream, recorder, recordedChunks = [];
-let timerStart, timerHandle, currentAiEntry = null;
-let transcriptEntries = [];
-let sessionMeta = null;
-let eventCount = 0;
-let geminiModelTurnCount = 0;
-let lastStudentTranscript = '';
-let waitingForStudentTranscript = false;
+let pc, dataChannel, mediaStream, recorder, recordedChunks = []; let timerStart, timerHandle, currentAiEntry = null;
+let transcriptEntries = []; let sessionMeta = null;
+let eventCount = 0; let geminiModelTurnCount = 0;
+let lastStudentTranscript = ''; let waitingForStudentTranscript = false;
 let lastUserItemId = null;
 const eventTypeCounts = {};
-let sessionMode = 'openai';
-let geminiWs = null;
-let geminiAudioCtx = null;
-let geminiPlaybackCtx = null;
-let geminiPlaybackTime = 0;
-let geminiMicProcessor = null;
-let geminiVideoInterval = null;
-let geminiTranscriptBuffer = [];
-let geminiTranscriptTimer = null;
-let lastTranscriptionTime = 0;
-
+let sessionMode = 'openai'; let geminiWs = null;
+let geminiAudioCtx = null; let geminiPlaybackCtx = null;
+let geminiPlaybackTime = 0; let geminiMicProcessor = null;
+let geminiVideoInterval = null; let geminiTranscriptBuffer = [];
+let geminiTranscriptTimer = null; let lastTranscriptionTime = 0;
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
 function setStatus(text){
   statusText.textContent = text;
@@ -963,25 +591,21 @@ function updateDebugSnapshot(){
     setDebug(`Gemini WS ${wsState} | Rec ${recState} | Events ${eventCount} | Chunks ${recordedChunks.length} | Transcript ${transcriptEntries.length}`);
   } else {
     const pcState = pc ? `${pc.connectionState}/${pc.iceConnectionState}` : 'none';
-    const dcState = dataChannel ? dataChannel.readyState : 'none';
-    const recState = recorder ? recorder.state : 'none';
+    const dcState = dataChannel ? dataChannel.readyState : 'none'; const recState = recorder ? recorder.state : 'none';
     setDebug(`RTC ${pcState} | DC ${dcState} | Rec ${recState} | Events ${eventCount} | Chunks ${recordedChunks.length} | Transcript ${transcriptEntries.length}`);
   }
 }
 function tryPlayAiAudio(){
   if (!aiAudio.srcObject) return;
   aiAudio.play().then(()=>{
-    enableAudioBtn.style.display = 'none';
-    console.log('[CounselAI] AI audio playback active');
+    enableAudioBtn.style.display = 'none'; console.log('[CounselAI] AI audio playback active');
   }).catch(err=>{
-    console.warn('[CounselAI] AI audio play blocked:', err);
-    enableAudioBtn.style.display = 'inline-flex';
+    console.warn('[CounselAI] AI audio play blocked:', err); enableAudioBtn.style.display = 'inline-flex';
     setStatus('Tap "Enable counsellor audio"');
   });
 }
 function logRealtimeEvent(msg){
-  eventCount += 1;
-  const type = msg && msg.type ? msg.type : 'unknown';
+  eventCount += 1; const type = msg && msg.type ? msg.type : 'unknown';
   eventTypeCounts[type] = (eventTypeCounts[type] || 0) + 1;
   console.log(`[CounselAI] Event #${eventCount}: ${type}`, msg);
   if (/(transcript|input|user)/i.test(type)) {
@@ -994,8 +618,7 @@ function logRealtimeEvent(msg){
   updateDebugSnapshot();
 }
 function addStudentTranscript(text, source){
-  const raw = typeof text === 'string' ? text : String(text ?? '');
-  const clean = raw.trim();
+  const raw = typeof text === 'string' ? text : String(text ?? ''); const clean = raw.trim();
   console.log('[CounselAI] Student transcript candidate:', {
     source: source || 'unknown', raw, clean,
     waitingForStudentTranscript, lastUserItemId
@@ -1004,12 +627,9 @@ function addStudentTranscript(text, source){
   if (clean === lastStudentTranscript) {
     uiLog('WARN', 'Duplicate student transcript observed; keeping capture active.');
   }
-  lastStudentTranscript = clean;
-  addEntry('student', clean);
-  waitingForStudentTranscript = false;
-  return true;
+  lastStudentTranscript = clean; addEntry('student', clean);
+  waitingForStudentTranscript = false; return true;
 }
-
 function collectTranscriptCandidates(value, path = 'msg', out = []){
   if (!value) return out;
   if (typeof value === 'string') return out;
@@ -1030,40 +650,30 @@ function collectTranscriptCandidates(value, path = 'msg', out = []){
   });
   return out;
 }
-
 function captureUserTranscriptFromMessage(msg, contextType){
   const role = msg?.role || msg?.item?.role || msg?.content_part?.role || msg?.item?.author?.role || '';
   const isUserScoped = role === 'user' || waitingForStudentTranscript || /input_audio|audio_transcription|user/.test(contextType || '');
   if (!isUserScoped) return;
-  const candidates = collectTranscriptCandidates(msg);
-  let captured = false;
+  const candidates = collectTranscriptCandidates(msg); let captured = false;
   for (const candidate of candidates) {
     const didCapture = addStudentTranscript(candidate.text, `${contextType || 'event'}:${candidate.source}`);
     captured = didCapture || captured;
   }
   if (!captured) { uiLog('WARN', 'No student transcript text found for event:', contextType); }
 }
-
 function addEntry(role, text){
   const entry = document.createElement('div');
   entry.className = `entry ${role === 'ai' ? 'ai' : ''}`;
-  entry.dataset.role = role;
-  const tag = document.createElement('div');
-  tag.className = 'tag';
-  tag.textContent = role === 'ai' ? 'Counsellor' : 'Student';
-  const body = document.createElement('div');
-  body.className = 'body';
-  body.textContent = text;
-  entry.append(tag, body);
-  transcriptEl.append(entry);
-  transcriptEl.scrollTop = transcriptEl.scrollHeight;
+  entry.dataset.role = role; const tag = document.createElement('div');
+  tag.className = 'tag'; tag.textContent = role === 'ai' ? 'Counsellor' : 'Student';
+  const body = document.createElement('div'); body.className = 'body';
+  body.textContent = text; entry.append(tag, body);
+  transcriptEl.append(entry); transcriptEl.scrollTop = transcriptEl.scrollHeight;
   const data = {role: role === 'ai' ? 'counsellor' : 'student', text: text || ''};
   transcriptEntries.push(data);
   return {body, data};
 }
-
 function updateTimer(){timerEl.textContent = formatTime(Date.now() - timerStart);}
-
 function renderFaceAnalysis(faceData) {
   const el = document.getElementById('face-analysis-section');
   if (!faceData || !faceData.summary) { el.textContent = 'No face data captured (camera may not have been available).'; return; }
@@ -1084,7 +694,6 @@ function renderFaceAnalysis(faceData) {
   }
   el.innerHTML = items.map(i => '<div style="margin-bottom:6px;">' + i + '</div>').join('');
 }
-
 function renderVoiceAnalysis(voiceData) {
   const el = document.getElementById('voice-analysis-section');
   if (!voiceData || !voiceData.speech_rate) { el.textContent = 'No voice data captured.'; return; }
@@ -1099,45 +708,31 @@ function renderVoiceAnalysis(voiceData) {
   ].filter(Boolean);
   el.innerHTML = items.map(i => '<div style="margin-bottom:6px;">' + i + '</div>').join('');
 }
-
 async function startSession(){
   const name = document.getElementById('student-name').value.trim() || 'Student';
   const className = document.getElementById('class-name').value.trim() || 'Class';
   const section = document.getElementById('section-name').value.trim();
   const school = document.getElementById('school-name').value.trim();
   const age = Number(document.getElementById('student-age').value || 15);
-  const scenario = document.getElementById('case-study').value;
-  sessionMode = document.getElementById('ai-model').value;
+  const scenario = document.getElementById('case-study').value; sessionMode = document.getElementById('ai-model').value;
   sessionMeta = {name, className, section, school, age, scenario, start: new Date()};
-  recordedChunks = [];
-  transcriptEntries = [];
-  currentAiEntry = null;
-  eventCount = 0;
-  lastStudentTranscript = '';
-  transcriptEl.innerHTML = '';
-  enableAudioBtn.style.display = 'none';
-  aiAudio.srcObject = null;
-  showScreen('live');
-  setStatus('Connecting...');
+  recordedChunks = []; transcriptEntries = [];
+  currentAiEntry = null; eventCount = 0;
+  lastStudentTranscript = ''; transcriptEl.innerHTML = '';
+  enableAudioBtn.style.display = 'none'; aiAudio.srcObject = null;
+  showScreen('live'); setStatus('Connecting...');
   setDebug(sessionMode === 'gemini' ? 'Gemini: connecting' : 'RTC: connecting');
   caseStudyText.textContent = scenario || 'No case study loaded.';
-
   try { mediaStream = await navigator.mediaDevices.getUserMedia({audio:true, video:true}); }
   catch(err) { mediaStream = await navigator.mediaDevices.getUserMedia({audio:true, video:false}); }
   if (!mediaStream.getAudioTracks().length) throw new Error('No microphone track available.');
-
-  // Init waveform visualizer
-  initWaveform(mediaStream);
-
-  preview.srcObject = mediaStream;
+  initWaveform(mediaStream); preview.srcObject = mediaStream;
   const hasVideoTrack = mediaStream.getVideoTracks().length > 0;
   if (!hasVideoTrack) {
-    previewWrap.style.display = 'none';
-    console.warn('[CounselAI] Camera unavailable; recording audio-only.');
+    previewWrap.style.display = 'none'; console.warn('[CounselAI] Camera unavailable; recording audio-only.');
   } else {
     previewWrap.style.display = 'block';
   }
-
   const mimeCandidates = hasVideoTrack
     ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm;codecs=opus', 'video/webm']
     : ['audio/webm;codecs=opus', 'audio/webm', 'video/webm;codecs=opus', 'video/webm'];
@@ -1152,44 +747,31 @@ async function startSession(){
     console.log('[CounselAI] Recorder chunk:', e.data.size);
     if (e.data && e.data.size > 0) recordedChunks.push(e.data);
     const totalBytes = recordedChunks.reduce((sum, chunk) => sum + (chunk.size || 0), 0);
-    console.log('[CounselAI] Recorder chunks:', recordedChunks.length, 'total bytes:', totalBytes);
-    updateDebugSnapshot();
+    console.log('[CounselAI] Recorder chunks:', recordedChunks.length, 'total bytes:', totalBytes); updateDebugSnapshot();
   };
   recorder.onstop = () => { console.log('[CounselAI] Recorder stopped. Chunks:', recordedChunks.length); updateDebugSnapshot(); };
-  recorder.start(1000);
-  updateDebugSnapshot();
-
+  recorder.start(1000); updateDebugSnapshot();
   if (sessionMode === 'gemini') {
     await startGeminiSession(name, scenario);
   } else {
     await startOpenAISession(name, scenario);
   }
-
-  timerStart = Date.now();
-  timerHandle = setInterval(updateTimer, 500);
-  setStatus('Listening...');
-  updateDebugSnapshot();
+  timerStart = Date.now(); timerHandle = setInterval(updateTimer, 500);
+  setStatus('Listening...'); updateDebugSnapshot();
 }
-
 async function startOpenAISession(name, scenario){
-  pc = new RTCPeerConnection();
-  pc.addTrack(mediaStream.getAudioTracks()[0]);
+  pc = new RTCPeerConnection(); pc.addTrack(mediaStream.getAudioTracks()[0]);
   pc.onconnectionstatechange = () => { console.log('[CounselAI] pc.connectionState:', pc.connectionState); updateDebugSnapshot(); };
   pc.oniceconnectionstatechange = () => { console.log('[CounselAI] pc.iceConnectionState:', pc.iceConnectionState); updateDebugSnapshot(); };
   pc.onicegatheringstatechange = () => { console.log('[CounselAI] pc.iceGatheringState:', pc.iceGatheringState); updateDebugSnapshot(); };
-
   pc.ontrack = e => {
     console.log('[CounselAI] ontrack:', e.track.kind, 'streams:', e.streams.length);
-    const stream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]);
-    aiAudio.srcObject = stream;
+    const stream = e.streams && e.streams[0] ? e.streams[0] : new MediaStream([e.track]); aiAudio.srcObject = stream;
     e.track.onunmute = () => { console.log('[CounselAI] AI track unmuted'); tryPlayAiAudio(); };
-    tryPlayAiAudio();
-    updateDebugSnapshot();
+    tryPlayAiAudio(); updateDebugSnapshot();
   };
-
   function bindDataChannel(dc){
-    dataChannel = dc;
-    uiLog('OK', 'Data channel active:', dc.label);
+    dataChannel = dc; uiLog('OK', 'Data channel active:', dc.label);
     updateDebugSnapshot();
     dc.onmessage = function(e) { handleEventMessage(e); };
     dc.onopen = () => {
@@ -1202,8 +784,7 @@ async function startOpenAISession(name, scenario){
           audio:{ input:{ transcription:{model:'gpt-4o-transcribe',language:'hi'}, turn_detection:{type:'server_vad',threshold:0.5,silence_duration_ms:500} } }
         }
       };
-      dc.send(JSON.stringify(sessionUpdate));
-      uiLog('OK', 'session.update SENT:', JSON.stringify(sessionUpdate.session));
+      dc.send(JSON.stringify(sessionUpdate)); uiLog('OK', 'session.update SENT:', JSON.stringify(sessionUpdate.session));
       setTimeout(()=>{
         const instructions = `Warmly greet ${name} by name, read the case study aloud, then ask: "Iss situation mein tum kya karte? Tell me what comes to your mind first." Case study: ${scenario}`;
         dc.send(JSON.stringify({type:'response.create',response:{instructions}}));
@@ -1219,93 +800,64 @@ async function startOpenAISession(name, scenario){
     console.log('[CounselAI] Remote data channel offered:', evt.channel.label);
     if (!dataChannel || dataChannel.readyState !== 'open') bindDataChannel(evt.channel);
   };
-
-  const offer = await pc.createOffer();
-  await pc.setLocalDescription(offer);
+  const offer = await pc.createOffer(); await pc.setLocalDescription(offer);
   const resp = await fetch(`/api/rtc-connect?scenario=${encodeURIComponent(scenario)}`, {method:'POST',body:pc.localDescription.sdp,headers:{'Content-Type':'application/sdp'}});
   if (resp.status !== 200 && resp.status !== 201) throw new Error(`RTC connect failed (${resp.status})`);
   const answerSdp = await resp.text();
   await pc.setRemoteDescription({type:'answer', sdp: answerSdp});
 }
-
 function arrayBufferToBase64(buffer) {
-  const bytes = new Uint8Array(buffer);
-  let binary = '';
+  const bytes = new Uint8Array(buffer); let binary = '';
   for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
   return btoa(binary);
 }
-
 function base64ToInt16Array(base64) {
-  const binary = atob(base64);
-  const bytes = new Uint8Array(binary.length);
+  const binary = atob(base64); const bytes = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new Int16Array(bytes.buffer);
 }
-
 function playGeminiAudio(base64Data) {
   if (!geminiPlaybackCtx) return;
   const int16 = base64ToInt16Array(base64Data);
   if (int16.length === 0) return;
   const float32 = new Float32Array(int16.length);
   for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
-  const buffer = geminiPlaybackCtx.createBuffer(1, float32.length, 24000);
-  buffer.getChannelData(0).set(float32);
-  const source = geminiPlaybackCtx.createBufferSource();
-  source.buffer = buffer;
-  source.connect(geminiPlaybackCtx.destination);
-  const now = geminiPlaybackCtx.currentTime;
-  const startAt = Math.max(now, geminiPlaybackTime);
-  source.start(startAt);
+  const buffer = geminiPlaybackCtx.createBuffer(1, float32.length, 24000); buffer.getChannelData(0).set(float32);
+  const source = geminiPlaybackCtx.createBufferSource(); source.buffer = buffer;
+  source.connect(geminiPlaybackCtx.destination); const now = geminiPlaybackCtx.currentTime;
+  const startAt = Math.max(now, geminiPlaybackTime); source.start(startAt);
   geminiPlaybackTime = startAt + buffer.duration;
 }
-
 function createWavBlob(int16Arrays) {
   let totalLength = 0;
   for (const arr of int16Arrays) totalLength += arr.length;
-  const combined = new Int16Array(totalLength);
-  let offset = 0;
+  const combined = new Int16Array(totalLength); let offset = 0;
   for (const arr of int16Arrays) { combined.set(arr, offset); offset += arr.length; }
-  const numChannels = 1, sampleRate = 16000, bitsPerSample = 16;
-  const byteRate = sampleRate * numChannels * bitsPerSample / 8;
-  const blockAlign = numChannels * bitsPerSample / 8;
-  const dataSize = combined.length * 2;
-  const buffer = new ArrayBuffer(44 + dataSize);
-  const view = new DataView(buffer);
-  writeString(view, 0, 'RIFF');
-  view.setUint32(4, 36 + dataSize, true);
-  writeString(view, 8, 'WAVE');
-  writeString(view, 12, 'fmt ');
-  view.setUint32(16, 16, true);
-  view.setUint16(20, 1, true);
-  view.setUint16(22, numChannels, true);
-  view.setUint32(24, sampleRate, true);
-  view.setUint32(28, byteRate, true);
-  view.setUint16(32, blockAlign, true);
-  view.setUint16(34, bitsPerSample, true);
-  writeString(view, 36, 'data');
-  view.setUint32(40, dataSize, true);
-  const dataView = new Int16Array(buffer, 44);
+  const numChannels = 1, sampleRate = 16000, bitsPerSample = 16; const byteRate = sampleRate * numChannels * bitsPerSample / 8;
+  const blockAlign = numChannels * bitsPerSample / 8; const dataSize = combined.length * 2;
+  const buffer = new ArrayBuffer(44 + dataSize); const view = new DataView(buffer);
+  writeString(view, 0, 'RIFF'); view.setUint32(4, 36 + dataSize, true);
+  writeString(view, 8, 'WAVE'); writeString(view, 12, 'fmt ');
+  view.setUint32(16, 16, true); view.setUint16(20, 1, true);
+  view.setUint16(22, numChannels, true); view.setUint32(24, sampleRate, true);
+  view.setUint32(28, byteRate, true); view.setUint16(32, blockAlign, true);
+  view.setUint16(34, bitsPerSample, true); writeString(view, 36, 'data');
+  view.setUint32(40, dataSize, true); const dataView = new Int16Array(buffer, 44);
   dataView.set(combined);
   return new Blob([buffer], { type: 'audio/wav' });
 }
-
 function writeString(view, offset, string) {
   for (let i = 0; i < string.length; i++) view.setUint8(offset + i, string.charCodeAt(i));
 }
-
 async function startGeminiSession(name, scenario){
   uiLog('INFO', 'Starting Gemini Live session...');
   geminiAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
-  const micSource = geminiAudioCtx.createMediaStreamSource(mediaStream);
-  const bufferSize = 4096;
+  const micSource = geminiAudioCtx.createMediaStreamSource(mediaStream); const bufferSize = 4096;
   geminiMicProcessor = geminiAudioCtx.createScriptProcessor(bufferSize, 1, 1);
   geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-  geminiPlaybackTime = 0;
-
-  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  geminiPlaybackTime = 0; const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}`;
   geminiWs = new WebSocket(wsUrl);
-
   await new Promise((resolve, reject) => {
     const timeout = setTimeout(() => reject(new Error('Gemini WebSocket connection timed out')), 20000);
     geminiWs.onopen = () => { uiLog('OK', 'WebSocket connected to server'); };
@@ -1319,44 +871,34 @@ async function startGeminiSession(name, scenario){
     geminiWs.onerror = () => { clearTimeout(timeout); reject(new Error('Gemini WebSocket error')); };
     geminiWs.onclose = () => { uiLog('WARN', 'Gemini WebSocket closed'); };
   });
-
   geminiWs.onmessage = (ev) => {
     let msg;
     try { msg = JSON.parse(ev.data); } catch { return; }
     handleGeminiMessage(msg);
   };
-
   geminiMicProcessor.onaudioprocess = (e) => {
     if (!geminiWs || geminiWs.readyState !== WebSocket.OPEN) return;
-    const float32 = e.inputBuffer.getChannelData(0);
-    const int16 = new Int16Array(float32.length);
+    const float32 = e.inputBuffer.getChannelData(0); const int16 = new Int16Array(float32.length);
     for (let i = 0; i < float32.length; i++) {
       int16[i] = Math.max(-32768, Math.min(32767, Math.round(float32[i] * 32767)));
     }
     const base64 = arrayBufferToBase64(int16.buffer);
     geminiWs.send(JSON.stringify({ realtimeInput: { mediaChunks: [{ data: base64, mimeType: "audio/pcm;rate=16000" }] } }));
-    geminiTranscriptBuffer.push(int16);
-
-    const now = Date.now();
+    geminiTranscriptBuffer.push(int16); const now = Date.now();
     if (now - lastTranscriptionTime > 10000 && geminiTranscriptBuffer.length > 0) {
-      lastTranscriptionTime = now;
-      let totalSamples = 0, sumSquares = 0;
+      lastTranscriptionTime = now; let totalSamples = 0, sumSquares = 0;
       for (const arr of geminiTranscriptBuffer) {
         for (let i = 0; i < arr.length; i++) { sumSquares += (arr[i] / 32768) * (arr[i] / 32768); totalSamples++; }
       }
       const rms = Math.sqrt(sumSquares / (totalSamples || 1));
       if (rms < 0.01) { geminiTranscriptBuffer = []; return; }
-
-      const sendBuffer = geminiTranscriptBuffer.slice();
-      const lastChunks = [];
+      const sendBuffer = geminiTranscriptBuffer.slice(); const lastChunks = [];
       let kept = 0;
       for (let i = sendBuffer.length - 1; i >= 0 && kept < 16000; i--) { lastChunks.unshift(sendBuffer[i]); kept += sendBuffer[i].length; }
       geminiTranscriptBuffer = lastChunks;
-
       (async () => {
         try {
-          const audioBlob = createWavBlob(sendBuffer);
-          const formData = new FormData();
+          const audioBlob = createWavBlob(sendBuffer); const formData = new FormData();
           formData.append('audio', audioBlob, 'student_audio.wav');
           const resp = await fetch('/api/gemini-transcribe', { method: 'POST', body: formData });
           const result = await resp.json();
@@ -1368,23 +910,17 @@ async function startGeminiSession(name, scenario){
       })();
     }
   };
-
-  micSource.connect(geminiMicProcessor);
-  geminiMicProcessor.connect(geminiAudioCtx.destination);
-  uiLog('OK', 'Mic capture active (16kHz PCM)');
-
-  const hasVideo = mediaStream.getVideoTracks().length > 0;
+  micSource.connect(geminiMicProcessor); geminiMicProcessor.connect(geminiAudioCtx.destination);
+  uiLog('OK', 'Mic capture active (16kHz PCM)'); const hasVideo = mediaStream.getVideoTracks().length > 0;
   if (hasVideo) {
-    const captureCanvas = document.createElement('canvas');
-    const captureCtx = captureCanvas.getContext('2d');
+    const captureCanvas = document.createElement('canvas'); const captureCtx = captureCanvas.getContext('2d');
     geminiVideoInterval = setInterval(() => {
       if (!geminiWs || geminiWs.readyState !== WebSocket.OPEN) return;
       if (preview.videoWidth === 0) return;
       captureCanvas.width = Math.min(preview.videoWidth, 640);
       captureCanvas.height = Math.round(captureCanvas.width * (preview.videoHeight / preview.videoWidth));
       captureCtx.drawImage(preview, 0, 0, captureCanvas.width, captureCanvas.height);
-      const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.6);
-      const b64 = dataUrl.split(',')[1];
+      const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.6); const b64 = dataUrl.split(',')[1];
       geminiWs.send(JSON.stringify({ realtimeInput: { mediaChunks: [{ data: b64, mimeType: "image/jpeg" }] } }));
     }, 500);
     uiLog('OK', 'Video frame capture active (2 fps JPEG)');
@@ -1393,45 +929,36 @@ async function startGeminiSession(name, scenario){
   }
   setDebug('Gemini: connected | Mic: active' + (hasVideo ? ' | Cam: active' : ''));
 }
-
 function handleGeminiMessage(msg) {
-  eventCount++;
-  updateDebugSnapshot();
+  eventCount++; updateDebugSnapshot();
   const msgKeys = Object.keys(msg);
   if (msgKeys.length > 0 && !msgKeys.includes('serverContent')) {
     uiLog('INFO', 'Gemini message type:', msgKeys.join(', '));
   }
-
   const serverContent = msg.serverContent;
   if (!serverContent) {
     if (msg.type === 'error') uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
     return;
   }
-
   if (eventCount % 20 === 0) {
     uiLog('INFO', 'serverContent keys:', Object.keys(serverContent).join(', '));
   }
-
   if (serverContent.modelTurn && serverContent.modelTurn.parts) {
-    orb.classList.add('speaking');
-    setStatus('Speaking...');
+    orb.classList.add('speaking'); setStatus('Speaking...');
     for (const part of serverContent.modelTurn.parts) {
       if (part.inlineData && part.inlineData.data) playGeminiAudio(part.inlineData.data);
       if (part.text) {
         if (!currentAiEntry) currentAiEntry = addEntry('ai', '');
-        currentAiEntry.body.textContent += part.text;
-        currentAiEntry.data.text = currentAiEntry.body.textContent;
+        currentAiEntry.body.textContent += part.text; currentAiEntry.data.text = currentAiEntry.body.textContent;
         transcriptEl.scrollTop = transcriptEl.scrollHeight;
       }
     }
   }
-
   if (serverContent.turnComplete) {
     orb.classList.remove('speaking');
     if (currentAiEntry) currentAiEntry = null;
     setStatus('Listening...');
   }
-
   let studentText = '';
   if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
     studentText = serverContent.inputTranscription.text.trim();
@@ -1454,18 +981,15 @@ function handleGeminiMessage(msg) {
     addStudentTranscript(studentText, 'gemini:inputTranscription');
     uiLog('OK', 'Student transcript:', studentText.slice(0, 120));
   }
-
   if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
     const txt = serverContent.outputTranscription.text.trim();
     if (txt) {
       if (!currentAiEntry) currentAiEntry = addEntry('ai', '');
-      currentAiEntry.body.textContent += txt;
-      currentAiEntry.data.text = currentAiEntry.body.textContent;
+      currentAiEntry.body.textContent += txt; currentAiEntry.data.text = currentAiEntry.body.textContent;
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
     }
   }
 }
-
 function handleEventMessage(ev){
   let msg;
   try { msg = JSON.parse(ev.data); } catch { console.log('[CounselAI] Non-JSON data channel payload:', ev.data); return; }
@@ -1475,42 +999,35 @@ function handleEventMessage(ev){
     case 'response.audio_transcript.delta':
       orb.classList.add('speaking');
       if (!currentAiEntry) currentAiEntry = addEntry('ai','');
-      currentAiEntry.body.textContent += msg.delta || msg.text || '';
-      currentAiEntry.data.text = currentAiEntry.body.textContent;
-      transcriptEl.scrollTop = transcriptEl.scrollHeight;
-      setStatus('Speaking...');
+      currentAiEntry.body.textContent += msg.delta || msg.text || ''; currentAiEntry.data.text = currentAiEntry.body.textContent;
+      transcriptEl.scrollTop = transcriptEl.scrollHeight; setStatus('Speaking...');
       break;
     case 'response.output_audio_transcript.done':
     case 'response.audio_transcript.done':
       if (currentAiEntry) {
         currentAiEntry.body.textContent = msg.transcript || msg.text || currentAiEntry.body.textContent;
-        currentAiEntry.data.text = currentAiEntry.body.textContent;
-        currentAiEntry = null;
+        currentAiEntry.data.text = currentAiEntry.body.textContent; currentAiEntry = null;
       } else if (msg.transcript || msg.text) { addEntry('ai', msg.transcript || msg.text); }
       break;
     case 'response.output_text.delta':
       if (!currentAiEntry) currentAiEntry = addEntry('ai','');
-      currentAiEntry.body.textContent += msg.delta || '';
-      currentAiEntry.data.text = currentAiEntry.body.textContent;
+      currentAiEntry.body.textContent += msg.delta || ''; currentAiEntry.data.text = currentAiEntry.body.textContent;
       break;
     case 'response.output_text.done':
       if (currentAiEntry) currentAiEntry = null;
       break;
     case 'response.done':
-      orb.classList.remove('speaking');
-      setStatus('Listening...');
+      orb.classList.remove('speaking'); setStatus('Listening...');
       break;
     case 'input_audio_buffer.speech_started':
-      waitingForStudentTranscript = true;
-      console.log('[CounselAI] Student speech started; awaiting transcript.');
+      waitingForStudentTranscript = true; console.log('[CounselAI] Student speech started; awaiting transcript.');
       setStatus('Listening...');
       break;
     case 'input_audio_buffer.speech_stopped':
       setStatus('Processing...');
       break;
     case 'input_audio_buffer.committed':
-      console.log('[CounselAI] input audio committed for transcription.');
-      waitingForStudentTranscript = true;
+      console.log('[CounselAI] input audio committed for transcription.'); waitingForStudentTranscript = true;
       break;
     case 'session.created':
     case 'session.updated': {
@@ -1526,12 +1043,10 @@ function handleEventMessage(ev){
     case 'conversation.item.input_audio_transcription.done':
     case 'input_audio_transcription.completed':
     case 'input_audio_transcription.done': {
-      const txt = msg.transcript || msg.text || '';
-      const iid = msg.item_id || 'unknown';
+      const txt = msg.transcript || msg.text || ''; const iid = msg.item_id || 'unknown';
       if (window._transcriptDeltas) delete window._transcriptDeltas[iid];
       if (txt) {
-        addStudentTranscript(txt, msg.type + ':transcript');
-        uiLog('OK', '🎤 STUDENT TRANSCRIPT:', txt.slice(0, 120));
+        addStudentTranscript(txt, msg.type + ':transcript'); uiLog('OK', '🎤 STUDENT TRANSCRIPT:', txt.slice(0, 120));
       }
       break;
     }
@@ -1542,15 +1057,13 @@ function handleEventMessage(ev){
         const iid = msg.item_id || 'unknown';
         if (!window._transcriptDeltas) window._transcriptDeltas = {};
         if (!window._transcriptDeltas[iid]) window._transcriptDeltas[iid] = '';
-        window._transcriptDeltas[iid] += delta;
-        uiLog('INFO', '🎤 delta chunk [' + iid + ']:', delta.slice(0, 60));
+        window._transcriptDeltas[iid] += delta; uiLog('INFO', '🎤 delta chunk [' + iid + ']:', delta.slice(0, 60));
       }
       break;
     }
     case 'conversation.item.created':
       if ((msg.item && msg.item.role === 'user') || msg.role === 'user') {
-        waitingForStudentTranscript = true;
-        lastUserItemId = (msg.item && msg.item.id) || msg.item_id || null;
+        waitingForStudentTranscript = true; lastUserItemId = (msg.item && msg.item.id) || msg.item_id || null;
         console.log('[CounselAI] User conversation item created; expecting transcript.', {lastUserItemId});
         captureUserTranscriptFromMessage(msg, msg.type);
       }
@@ -1585,7 +1098,6 @@ function handleEventMessage(ev){
   }
   updateDebugSnapshot();
 }
-
 function waitForIce(pc){
   if (pc.iceGatheringState === 'complete') return Promise.resolve();
   return new Promise(resolve=>{
@@ -1593,7 +1105,6 @@ function waitForIce(pc){
     pc.addEventListener('icegatheringstatechange', check);
   });
 }
-
 function buildMetrics(profile){
   profileMetrics.innerHTML = '';
   const metrics = [
@@ -1606,89 +1117,66 @@ function buildMetrics(profile){
   metrics.forEach(m=>{
     const card = document.createElement('div');
     card.style.cssText = 'display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;';
-    const label = document.createElement('span');
-    label.style.cssText = 'font-size:0.88rem;color:var(--text-soft);';
-    label.textContent = m.label;
-    const bar = document.createElement('div');
-    bar.style.cssText = 'display:flex;align-items:center;gap:8px;';
-    const track = document.createElement('div');
+    const label = document.createElement('span'); label.style.cssText = 'font-size:0.88rem;color:var(--text-soft);';
+    label.textContent = m.label; const bar = document.createElement('div');
+    bar.style.cssText = 'display:flex;align-items:center;gap:8px;'; const track = document.createElement('div');
     track.style.cssText = 'width:100px;height:6px;background:rgba(255,255,255,0.08);border-radius:4px;overflow:hidden;';
-    const fill = document.createElement('div');
-    const pct = Math.min(100, (m.value/10)*100);
+    const fill = document.createElement('div'); const pct = Math.min(100, (m.value/10)*100);
     fill.style.cssText = 'height:100%;border-radius:4px;transition:width 1s ease;background:' + (pct>=70?'var(--success)':pct>=40?'var(--warning)':'var(--danger)') + ';width:' + pct + '%;';
-    track.appendChild(fill);
-    const num = document.createElement('strong');
-    num.style.cssText = 'font-size:0.85rem;min-width:36px;text-align:right;';
-    num.textContent = m.value + '/10';
-    bar.append(track, num);
-    card.append(label, bar);
+    track.appendChild(fill); const num = document.createElement('strong');
+    num.style.cssText = 'font-size:0.85rem;min-width:36px;text-align:right;'; num.textContent = m.value + '/10';
+    bar.append(track, num); card.append(label, bar);
     profileMetrics.appendChild(card);
   });
 }
-
 function renderRecommendations(profile){
-  recommendationsEl.innerHTML = '';
-  const list = Array.isArray(profile?.recommendations) ? profile.recommendations : [];
+  recommendationsEl.innerHTML = ''; const list = Array.isArray(profile?.recommendations) ? profile.recommendations : [];
   if (list.length === 0) { recommendationsEl.textContent = 'No recommendations returned.'; return; }
-  const ul = document.createElement('ul');
-  ul.style.cssText = 'margin:0;padding-left:18px;color:var(--text-soft);';
+  const ul = document.createElement('ul'); ul.style.cssText = 'margin:0;padding-left:18px;color:var(--text-soft);';
   list.forEach(item => { const li = document.createElement('li'); li.style.marginBottom = '6px'; li.textContent = item; ul.appendChild(li); });
   recommendationsEl.appendChild(ul);
 }
-
 function renderSection(sectionEl, items){
   sectionEl.innerHTML = '';
   if (!items.length) { sectionEl.textContent = 'No data returned.'; return; }
   const list = document.createElement('div');
   items.forEach(item => {
     const row = document.createElement('div');
-    row.style.cssText = 'margin-bottom:8px;color:var(--text-soft);font-size:0.9rem;line-height:1.5;';
-    row.textContent = item;
+    row.style.cssText = 'margin-bottom:8px;color:var(--text-soft);font-size:0.9rem;line-height:1.5;'; row.textContent = item;
     list.appendChild(row);
   });
   sectionEl.appendChild(list);
 }
-
 function renderProfileSections(profile){
   const traits = Array.isArray(profile?.personality_snapshot?.traits) ? profile.personality_snapshot.traits : [];
   const personalityItems = [
     traits.length ? `Traits: ${traits.join(', ')}` : '',
     profile?.personality_snapshot?.communication_style ? `Communication style: ${profile.personality_snapshot.communication_style}` : '',
     profile?.personality_snapshot?.decision_making ? `Decision making: ${profile.personality_snapshot.decision_making}` : '',
-  ].filter(Boolean);
-  renderSection(personalitySection, personalityItems);
-
+  ].filter(Boolean); renderSection(personalitySection, personalityItems);
   const cognitiveItems = [
     profile?.cognitive_profile?.moral_reasoning_stage ? `Moral reasoning stage: ${profile.cognitive_profile.moral_reasoning_stage}` : '',
     profile?.cognitive_profile?.problem_solving_style ? `Problem solving: ${profile.cognitive_profile.problem_solving_style}` : '',
-  ].filter(Boolean);
-  renderSection(cognitiveSection, cognitiveItems);
-
+  ].filter(Boolean); renderSection(cognitiveSection, cognitiveItems);
   const anxietyMarkers = Array.isArray(profile?.emotional_profile?.anxiety_markers) ? profile.emotional_profile.anxiety_markers : [];
   const emotionalItems = [
     profile?.emotional_profile?.empathy_level ? `Empathy level: ${profile.emotional_profile.empathy_level}` : '',
     profile?.emotional_profile?.stress_response ? `Stress response: ${profile.emotional_profile.stress_response}` : '',
     anxietyMarkers.length ? `Anxiety markers: ${anxietyMarkers.join(', ')}` : '',
     profile?.emotional_profile?.emotional_vocabulary ? `Emotional vocabulary: ${profile.emotional_profile.emotional_vocabulary}` : '',
-  ].filter(Boolean);
-  renderSection(emotionalSection, emotionalItems);
-
+  ].filter(Boolean); renderSection(emotionalSection, emotionalItems);
   const behavioralItems = [
     profile?.behavioral_insights?.leadership_potential ? `Leadership potential: ${profile.behavioral_insights.leadership_potential}` : '',
     profile?.behavioral_insights?.peer_influence ? `Peer influence: ${profile.behavioral_insights.peer_influence}` : '',
     profile?.behavioral_insights?.academic_pressure ? `Academic pressure: ${profile.behavioral_insights.academic_pressure}` : '',
     profile?.behavioral_insights?.resilience ? `Resilience: ${profile.behavioral_insights.resilience}` : '',
-  ].filter(Boolean);
-  renderSection(behavioralSection, behavioralItems);
-
+  ].filter(Boolean); renderSection(behavioralSection, behavioralItems);
   const keyMoments = Array.isArray(profile?.conversation_analysis?.key_moments) ? profile.conversation_analysis.key_moments : [];
   const conversationItems = [
     profile?.conversation_analysis?.evolution_across_rounds ? `Evolution across rounds: ${profile.conversation_analysis.evolution_across_rounds}` : '',
     profile?.conversation_analysis?.consistency ? `Consistency: ${profile.conversation_analysis.consistency}` : '',
     keyMoments.length ? `Key moments: ${keyMoments.join(' | ')}` : '',
-  ].filter(Boolean);
-  renderSection(conversationSection, conversationItems);
-
+  ].filter(Boolean); renderSection(conversationSection, conversationItems);
   const keyMomentsEl = document.getElementById('key-moments-section');
   const moments = Array.isArray(profile?.key_moments) ? profile.key_moments : [];
   if (moments.length) {
@@ -1700,7 +1188,6 @@ function renderProfileSections(profile){
       keyMomentsEl.appendChild(d);
     });
   } else { keyMomentsEl.textContent = 'No key moments identified.'; }
-
   const redFlagsEl = document.getElementById('red-flags-section');
   const flags = Array.isArray(profile?.red_flags) ? profile.red_flags : [];
   if (flags.length) {
@@ -1708,30 +1195,23 @@ function renderProfileSections(profile){
     flags.forEach(f => {
       const d = document.createElement('div');
       d.style.cssText = 'margin-bottom:6px;padding:8px 12px;background:rgba(248,113,113,0.08);border-radius:6px;color:var(--danger);font-size:0.9rem;';
-      d.textContent = '⚠ ' + f;
-      redFlagsEl.appendChild(d);
+      d.textContent = '⚠ ' + f; redFlagsEl.appendChild(d);
     });
   } else { redFlagsEl.textContent = 'No red flags identified.'; }
-
   const summaryTextEl = document.getElementById('summary-text');
   summaryTextEl.textContent = profile?.summary || 'No summary available.';
 }
-
 async function endSession(){
-  setStatus('Processing...');
-  clearInterval(timerHandle);
+  setStatus('Processing...'); clearInterval(timerHandle);
   if (waveAnimId) { cancelAnimationFrame(waveAnimId); waveAnimId = null; }
-
   const videoBlob = await new Promise(resolve => {
     if (!recorder || recorder.state === 'inactive') return resolve(null);
     let resolved = false;
     const finish = () => {
       if (resolved) return;
-      resolved = true;
-      const mime = recorder.mimeType || 'video/webm';
+      resolved = true; const mime = recorder.mimeType || 'video/webm';
       const blob = recordedChunks.length ? new Blob(recordedChunks, {type: mime}) : null;
-      const size = blob ? blob.size : 0;
-      console.log('[CounselAI] Finalized recorder blob size:', size, 'mime:', mime);
+      const size = blob ? blob.size : 0; console.log('[CounselAI] Finalized recorder blob size:', size, 'mime:', mime);
       resolve(blob);
     };
     try { recorder.requestData(); } catch (err) { console.warn('[CounselAI] requestData failed:', err); }
@@ -1740,12 +1220,10 @@ async function endSession(){
     recorder.onstop = (event) => { clearTimeout(stopTimer); if (typeof previousOnStop === 'function') previousOnStop(event); finish(); };
     recorder.stop();
   });
-
   if (sessionMode === 'gemini') {
     if (geminiVideoInterval) { clearInterval(geminiVideoInterval); geminiVideoInterval = null; }
     if (geminiTranscriptTimer) { clearTimeout(geminiTranscriptTimer); geminiTranscriptTimer = null; }
-    geminiTranscriptBuffer = [];
-    lastTranscriptionTime = 0;
+    geminiTranscriptBuffer = []; lastTranscriptionTime = 0;
     if (geminiMicProcessor) { try { geminiMicProcessor.disconnect(); } catch(e){} geminiMicProcessor = null; }
     if (geminiAudioCtx) { try { geminiAudioCtx.close(); } catch(e){} geminiAudioCtx = null; }
     if (geminiPlaybackCtx) { try { geminiPlaybackCtx.close(); } catch(e){} geminiPlaybackCtx = null; }
@@ -1755,7 +1233,6 @@ async function endSession(){
     if (pc) pc.close();
   }
   if (mediaStream) mediaStream.getTracks().forEach(t => t.stop());
-
   const duration = formatTime(Date.now() - timerStart);
   document.getElementById('summary-meta').textContent = `${sessionMeta.name} • Class ${sessionMeta.className} • ${duration}`;
   const summaryTranscriptEl = document.getElementById('summary-transcript');
@@ -1763,11 +1240,8 @@ async function endSession(){
   const safeTranscriptEntries = transcriptEntries.filter(e => e && e.text && e.text.trim());
   summaryTranscriptEl.textContent = safeTranscriptEntries.length ? formatTranscriptForDisplay(safeTranscriptEntries) : transcriptEl.textContent.trim();
   showScreen('summary');
-
   [personalitySection, cognitiveSection, emotionalSection, behavioralSection, conversationSection].forEach(el => el.textContent = 'Analyzing...');
-  recommendationsEl.textContent = 'Generating recommendations...';
-  profileMetrics.textContent = 'Computing scores...';
-
+  recommendationsEl.textContent = 'Generating recommendations...'; profileMetrics.textContent = 'Computing scores...';
   try {
     const fd = new FormData();
     const safeBlob = videoBlob || new Blob([], {type:'video/webm'});
@@ -1788,24 +1262,18 @@ async function endSession(){
     }
     const transcriptJson = JSON.stringify(finalTranscript);
     console.log('[CounselAI] transcript JSON length:', transcriptJson.length, 'entries:', finalTranscript.length);
-    fd.append('transcript', JSON.stringify(finalTranscript));
-    fd.append('student_name', sessionMeta.name);
-    fd.append('student_class', sessionMeta.className);
-    fd.append('student_section', sessionMeta.section || '');
-    fd.append('student_school', sessionMeta.school || '');
-    fd.append('student_age', String(sessionMeta.age || 15));
-    fd.append('session_start_time', sessionMeta.start.toISOString());
-    fd.append('session_end_time', new Date().toISOString());
+    fd.append('transcript', JSON.stringify(finalTranscript)); fd.append('student_name', sessionMeta.name);
+    fd.append('student_class', sessionMeta.className); fd.append('student_section', sessionMeta.section || '');
+    fd.append('student_school', sessionMeta.school || ''); fd.append('student_age', String(sessionMeta.age || 15));
+    fd.append('session_start_time', sessionMeta.start.toISOString()); fd.append('session_end_time', new Date().toISOString());
     const resp = await fetch('/api/analyze-session', {method:'POST', body: fd});
     if (resp.ok) {
       const data = await resp.json();
       const profile = data.profile || {};
-      console.log('[CounselAI] profile received:', JSON.stringify(profile).slice(0, 500));
-      buildMetrics(profile);
+      console.log('[CounselAI] profile received:', JSON.stringify(profile).slice(0, 500)); buildMetrics(profile);
       renderFaceAnalysis(data.face_data || {});
       renderVoiceAnalysis(data.voice_data || {});
-      renderProfileSections(profile);
-      renderRecommendations(profile);
+      renderProfileSections(profile); renderRecommendations(profile);
     } else {
       renderSection(personalitySection, []); renderSection(cognitiveSection, []);
       renderSection(emotionalSection, []); renderSection(behavioralSection, []);
@@ -1818,23 +1286,17 @@ async function endSession(){
     renderSection(conversationSection, []); recommendationsEl.textContent = 'Analysis unavailable.';
   }
 }
-
 document.getElementById('start-btn').addEventListener('click', () => startSession().catch(err => { showToast(err.message); showScreen('welcome'); }));
 document.getElementById('end-btn').addEventListener('click', endSession);
 enableAudioBtn.addEventListener('click', () => { tryPlayAiAudio(); });
 document.getElementById('new-btn').addEventListener('click', () => { location.reload(); });
-
 (async () => {
   try {
-    const r = await fetch('/api/case-studies');
-    const d = await r.json();
-    const sel = document.getElementById('case-study');
-    sel.innerHTML = '';
+    const r = await fetch('/api/case-studies'); const d = await r.json();
+    const sel = document.getElementById('case-study'); sel.innerHTML = '';
     d.case_studies.forEach(cs => {
-      const o = document.createElement('option');
-      o.value = cs.scenario_text;
-      o.textContent = cs.id + ' • ' + cs.title + ' (' + cs.target_class + ')';
-      sel.appendChild(o);
+      const o = document.createElement('option'); o.value = cs.scenario_text;
+      o.textContent = cs.id + ' • ' + cs.title + ' (' + cs.target_class + ')'; sel.appendChild(o);
     });
     if (sel.value) caseStudyText.textContent = sel.value;
     sel.addEventListener('change', () => { caseStudyText.textContent = sel.value; });
