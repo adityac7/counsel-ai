@@ -59,10 +59,14 @@ app = FastAPI(title="CounselAI", version="0.2.0", lifespan=lifespan)
 from counselai.api.routes.gemini_ws import router as gemini_ws_router  # noqa: E402
 from counselai.api.routes.legacy import router as legacy_router  # noqa: E402
 from counselai.api.routes.dashboard import router as dashboard_router  # noqa: E402
+from counselai.api.routes.analytics import router as analytics_router  # noqa: E402
+from counselai.api.routes.analytics import feedback_router  # noqa: E402
 
 app.include_router(gemini_ws_router, prefix="/api", tags=["gemini"])
 app.include_router(legacy_router, prefix="/api", tags=["legacy"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
+app.include_router(analytics_router)  # mounted at /api/analytics (prefix in router)
+app.include_router(feedback_router)  # mounted at /api/sessions (prefix in router)
 
 # ---------------------------------------------------------------------------
 # Provider config (will move to settings.py in Task 2)
