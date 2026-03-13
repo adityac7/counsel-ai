@@ -1,17 +1,17 @@
+"""Alembic environment — sync runner for SQLite migrations."""
+
 from logging.config import fileConfig
 
 from sqlalchemy import engine_from_config, pool
 
 from alembic import context
 
-# Alembic Config object
 config = context.config
 
-# Set up loggers from .ini
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all models so autogenerate picks them up
+# Import models so autogenerate picks them up
 from counselai.storage.db import Base  # noqa: E402
 from counselai.storage import models  # noqa: E402, F401
 
@@ -25,6 +25,7 @@ def run_migrations_offline() -> None:
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
+        render_as_batch=True,  # Required for SQLite ALTER TABLE
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -38,7 +39,9 @@ def run_migrations_online() -> None:
     )
     with connectable.connect() as connection:
         context.configure(
-            connection=connection, target_metadata=target_metadata
+            connection=connection,
+            target_metadata=target_metadata,
+            render_as_batch=True,  # Required for SQLite ALTER TABLE
         )
         with context.begin_transaction():
             context.run_migrations()

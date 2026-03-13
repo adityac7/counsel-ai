@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     """Typed settings for CounselAI — single source of truth."""
 
     # ── Database ────────────────────────────────────────────────────────
-    database_url: str = "postgresql://counselai:counselai@localhost:5432/counselai"
+    database_url: str = "sqlite+aiosqlite:///counselai.db"
 
     # ── Artifact storage ────────────────────────────────────────────────
     artifact_root: str = "artifacts"

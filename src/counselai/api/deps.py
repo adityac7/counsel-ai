@@ -1,15 +1,13 @@
 """Shared FastAPI dependencies (DB sessions, auth hooks, etc.)."""
 
-from typing import Generator
+from typing import AsyncGenerator
 
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from counselai.storage.db import SessionLocal
+from counselai.storage.db import get_db as _get_db
 
 
-def get_db() -> Generator[Session, None, None]:
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """Yield an async DB session for FastAPI route injection."""
+    async for session in _get_db():
+        yield session
