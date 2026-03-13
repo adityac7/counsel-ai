@@ -134,6 +134,19 @@ select option { background: #1a1a2e; color: var(--text); }
 .status-dot.speaking {
   background: var(--accent); box-shadow: 0 0 14px var(--accent-glow);
 }
+.status-dot.reconnecting {
+  background: var(--warning); box-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+  animation: pulse 0.8s ease-in-out infinite;
+}
+.status-dot.error {
+  background: var(--danger); box-shadow: 0 0 10px var(--danger-glow);
+}
+.reconnect-banner {
+  display: none; padding: 10px 16px; background: rgba(251, 191, 36, 0.1); border: 1px solid rgba(251, 191, 36, 0.3);
+  border-radius: var(--radius-sm); color: var(--warning); font-size: 0.85rem; text-align: center; margin-bottom: 12px;
+  animation: fadeIn 0.3s ease;
+}
+.reconnect-banner.visible { display: block; }
 #status-text {
   font-size: 0.9rem; font-weight: 500; color: var(--text-soft);
 }
@@ -398,6 +411,10 @@ h1 { font-size: 1.4rem; }
       <div class="session-timer" id="timer">00:00</div>
     </div>
 
+    <div id="reconnect-banner" class="reconnect-banner">
+      ⏳ Reconnecting to counsellor... please wait
+    </div>
+
     <div class="live-grid">
       <div class="top-row">
         <div class="preview" id="preview-wrap">
@@ -573,12 +590,28 @@ let geminiAudioCtx = null; let geminiPlaybackCtx = null;
 let geminiPlaybackTime = 0; let geminiMicProcessor = null;
 let geminiVideoInterval = null; let geminiTranscriptBuffer = [];
 let geminiTranscriptTimer = null; let lastTranscriptionTime = 0;
+let geminiReconnecting = false; let geminiConnectionState = 'CLOSED';
 function showScreen(name){Object.values(screens).forEach(s=>s.classList.add('hidden'));screens[name].classList.remove('hidden');}
+function setConnectionState(newState) {
+  geminiConnectionState = newState;
+  uiLog('INFO', `Connection state: ${newState}`);
+  const banner = document.getElementById('reconnect-banner');
+  statusDot.classList.remove('speaking', 'reconnecting', 'error');
+  if (newState === 'RECONNECTING') {
+    statusDot.classList.add('reconnecting');
+    banner.classList.add('visible');
+  } else if (newState === 'ERROR') {
+    statusDot.classList.add('error');
+    banner.classList.remove('visible');
+  } else {
+    banner.classList.remove('visible');
+  }
+}
 function setStatus(text){
   statusText.textContent = text;
   if (statusDot) {
+    statusDot.classList.remove('speaking');
     if (text === 'Speaking...') statusDot.classList.add('speaking');
-    else statusDot.classList.remove('speaking');
   }
 }
 function showToast(msg){toast.textContent = msg;toast.style.display='block';setTimeout(()=>toast.style.display='none',4000);}
@@ -858,18 +891,28 @@ async function startGeminiSession(name, scenario){
   geminiPlaybackTime = 0; const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}`;
   geminiWs = new WebSocket(wsUrl);
+  setConnectionState('CONNECTING');
   await new Promise((resolve, reject) => {
-    const timeout = setTimeout(() => reject(new Error('Gemini WebSocket connection timed out')), 20000);
+    const timeout = setTimeout(() => reject(new Error('Gemini WebSocket connection timed out (30s)')), 30000);
     geminiWs.onopen = () => { uiLog('OK', 'WebSocket connected to server'); };
     geminiWs.onmessage = (ev) => {
       let msg;
       try { msg = JSON.parse(ev.data); } catch { return; }
-      if (msg.type === 'setup_complete') { clearTimeout(timeout); uiLog('OK', 'Gemini session ready'); setStatus('Connected'); resolve(); return; }
-      if (msg.type === 'error') { clearTimeout(timeout); reject(new Error(msg.message || 'Gemini error')); return; }
+      if (msg.type === 'setup_complete') { clearTimeout(timeout); uiLog('OK', 'Gemini session ready'); setConnectionState('INITIALIZING'); setStatus('Connected'); resolve(); return; }
+      if (msg.type === 'error') { clearTimeout(timeout); setConnectionState('ERROR'); reject(new Error(msg.message || 'Gemini error')); return; }
       handleGeminiMessage(msg);
     };
-    geminiWs.onerror = () => { clearTimeout(timeout); reject(new Error('Gemini WebSocket error')); };
-    geminiWs.onclose = () => { uiLog('WARN', 'Gemini WebSocket closed'); };
+    geminiWs.onerror = (ev) => { clearTimeout(timeout); setConnectionState('ERROR'); reject(new Error('Gemini WebSocket error')); };
+    geminiWs.onclose = (ev) => {
+      const code = ev.code || 0; const reason = ev.reason || '';
+      const codeLabels = {1000: 'Normal', 1001: 'Going away', 1006: 'Abnormal (no close frame)', 1011: 'Server error'};
+      uiLog('WARN', `WebSocket closed: ${codeLabels[code] || 'code ' + code} — ${reason || 'no reason'}`);
+      setConnectionState('CLOSED');
+      if (!geminiReconnecting && code !== 1000) {
+        setStatus('Disconnected');
+        showToast(`Connection lost (${codeLabels[code] || 'code ' + code}). Session ended.`);
+      }
+    };
   });
   geminiWs.onmessage = (ev) => {
     let msg;
@@ -937,7 +980,33 @@ function handleGeminiMessage(msg) {
   }
   const serverContent = msg.serverContent;
   if (!serverContent) {
-    if (msg.type === 'error') uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
+    if (msg.type === 'keepalive') return; // silently ignore keepalives
+    if (msg.type === 'reconnecting') {
+      geminiReconnecting = true;
+      setConnectionState('RECONNECTING');
+      setStatus(`Reconnecting (${msg.attempt}/${msg.maxAttempts})...`);
+      uiLog('WARN', `Reconnecting attempt ${msg.attempt}/${msg.maxAttempts}`);
+      return;
+    }
+    if (msg.type === 'connection_active') {
+      geminiReconnecting = false;
+      setConnectionState('ACTIVE');
+      setStatus('Listening...');
+      uiLog('OK', 'Connection active');
+      return;
+    }
+    if (msg.type === 'setup_complete') {
+      setConnectionState('INITIALIZING');
+      uiLog('OK', 'Setup complete (reconnected)');
+      return;
+    }
+    if (msg.type === 'error') {
+      setConnectionState('ERROR');
+      const reconnectable = msg.reconnect === true;
+      uiLog('ERR', 'Gemini error:', msg.message || JSON.stringify(msg));
+      if (!reconnectable) showToast(msg.message || 'Gemini error');
+      return;
+    }
     return;
   }
   if (eventCount % 20 === 0) {
