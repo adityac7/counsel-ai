@@ -327,6 +327,13 @@ async def gemini_to_browser(
     except Exception as exc:
         logger.error("gemini->browser error: %s", exc)
         return f"gemini_error: {exc}"
+    else:
+        # session.receive() iterator ended normally — Gemini closed its side.
+        # This is NOT a session end; browser_to_gemini is the authority on lifetime.
+        # Signal a reconnect so the pipeline re-establishes the Gemini session.
+        if not state.is_terminal:
+            logger.warning("[gemini_to_browser] receive() exhausted — Gemini closed its stream, requesting reconnect")
+            return "receive_exhausted"
     return None
 
 

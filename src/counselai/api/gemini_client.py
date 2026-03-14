@@ -56,4 +56,6 @@ def build_live_config() -> gt.LiveConnectConfig:
                 prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
             )
         ),
+        inputAudioTranscription=gt.AudioTranscriptionConfig(),
+        outputAudioTranscription=gt.AudioTranscriptionConfig(),
     )

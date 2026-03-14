@@ -145,19 +145,27 @@ async def _connect_and_init_gemini(
                     result = task.result() if not task.cancelled() and not exc else None
                     logger.info("[pipeline] FIRST_COMPLETED: %s (result=%s, exc=%s)", name, result, exc)
 
-                # Check if gemini_to_browser returned a reason to reconnect
+                # Decide: reconnect Gemini, or end the session?
+                # browser_to_gemini is the authority on session lifetime.
+                # If IT finished, the browser disconnected — session is over.
+                # If gemini_to_browser finished with a reason, reconnect Gemini.
+                browser_disconnected = b2g_task in done
                 reconnect_reason = None
-                for task in done:
-                    result = task.result() if not task.cancelled() else None
-                    if isinstance(result, str):
-                        reconnect_reason = result
+                if not browser_disconnected:
+                    for task in done:
+                        result = task.result() if not task.cancelled() else None
+                        if isinstance(result, str):
+                            reconnect_reason = result
 
                 for task in pending:
                     task.cancel()
                 # Let cancelled tasks finish
                 await asyncio.gather(*pending, return_exceptions=True)
 
-                if reconnect_reason and attempt <= _MAX_RECONNECT_ATTEMPTS:
+                if browser_disconnected:
+                    logger.info("[pipeline] Browser disconnected — ending session")
+                    return
+                elif reconnect_reason and attempt <= _MAX_RECONNECT_ATTEMPTS:
                     logger.warning("[gemini] Pipeline exited: %s — will reconnect", reconnect_reason)
                     continue  # retry
                 else:

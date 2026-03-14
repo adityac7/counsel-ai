@@ -786,6 +786,12 @@ async function startSession(){
   recorder.onstop = () => { console.log('[CounselAI] Recorder stopped. Chunks:', recordedChunks.length); updateDebugSnapshot(); };
   recorder.start(1000); updateDebugSnapshot();
   if (sessionMode === 'gemini') {
+    // Create playback AudioContext HERE in the click handler (user gesture)
+    // so the browser doesn't suspend it due to autoplay policy
+    geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    geminiPlaybackCtx.resume().then(() => uiLog('OK', 'Playback AudioContext resumed (state: ' + geminiPlaybackCtx.state + ')'));
+    uiLog('INFO', 'Playback AudioContext created in click handler, state: ' + geminiPlaybackCtx.state);
+    geminiPlaybackTime = 0;
     await startGeminiSession(name, scenario);
   } else {
     await startOpenAISession(name, scenario);
