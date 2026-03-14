@@ -255,13 +255,13 @@ async def gemini_to_browser(
 
             audio_data = None
             text_data = None
-            has_model_turn = False
+            has_real_content = False  # True only if non-thought content exists
 
             if srv and srv.model_turn and srv.model_turn.parts:
-                has_model_turn = True
                 for part in srv.model_turn.parts:
                     if getattr(part, "thought", False):
-                        continue
+                        continue  # Skip thinking tokens entirely
+                    has_real_content = True
                     if part.inline_data and part.inline_data.data:
                         audio_data = part.inline_data.data
                     if part.text:
@@ -280,8 +280,8 @@ async def gemini_to_browser(
                     ]
                 }
 
-            if not audio_data and not text_data and has_model_turn:
-                logger.debug('Model turn with no audio/text data')
+            if not audio_data and not text_data and not has_real_content and srv and srv.model_turn:
+                logger.debug('Model turn with only thought tokens (filtered)')
             if text_data:
                 if "modelTurn" not in sc:
                     sc["modelTurn"] = {"parts": []}
@@ -291,7 +291,7 @@ async def gemini_to_browser(
                 if srv.turn_complete:
                     sc["turnComplete"] = True
                     watchdog.on_turn_complete()
-                elif has_model_turn:
+                elif has_real_content:
                     if watchdog.on_model_turn():
                         # Watchdog tripped — notify browser and request reset
                         await _safe_send(ws, {
