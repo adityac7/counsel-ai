@@ -858,23 +858,34 @@ function base64ToInt16Array(base64) {
 }
 let audioChunksPlayed = 0;
 function playGeminiAudio(base64Data) {
-  if (!geminiPlaybackCtx) { console.warn('[audio] No playback context'); return; }
-  // Resume suspended AudioContext (mobile browser policy)
-  if (geminiPlaybackCtx.state === 'suspended') {
-    geminiPlaybackCtx.resume().then(() => console.log('[audio] AudioContext resumed'));
+  if (!geminiPlaybackCtx) { uiLog('ERR', '[audio] No playback context!'); return; }
+  // Always try to resume — belt and suspenders for autoplay policy
+  if (geminiPlaybackCtx.state !== 'running') {
+    geminiPlaybackCtx.resume().then(() => {
+      uiLog('OK', '[audio] AudioContext resumed → ' + geminiPlaybackCtx.state);
+    }).catch(e => uiLog('ERR', '[audio] Resume failed: ' + e.message));
   }
   const int16 = base64ToInt16Array(base64Data);
   if (int16.length === 0) return;
+  // Debug: log detailed info on first chunk
+  if (audioChunksPlayed === 0) {
+    const maxVal = int16.reduce((m, v) => Math.max(m, Math.abs(v)), 0);
+    uiLog('INFO', `[audio-debug] ctx.state=${geminiPlaybackCtx.state} sampleRate=${geminiPlaybackCtx.sampleRate} dest.channels=${geminiPlaybackCtx.destination.channelCount} samples=${int16.length} maxAmplitude=${maxVal} base64len=${base64Data.length}`);
+  }
   const float32 = new Float32Array(int16.length);
   for (let i = 0; i < int16.length; i++) float32[i] = int16[i] / 32768.0;
-  const buffer = geminiPlaybackCtx.createBuffer(1, float32.length, 24000); buffer.getChannelData(0).set(float32);
-  const source = geminiPlaybackCtx.createBufferSource(); source.buffer = buffer;
-  source.connect(geminiPlaybackCtx.destination); const now = geminiPlaybackCtx.currentTime;
-  const startAt = Math.max(now, geminiPlaybackTime); source.start(startAt);
+  const buffer = geminiPlaybackCtx.createBuffer(1, float32.length, 24000);
+  buffer.getChannelData(0).set(float32);
+  const source = geminiPlaybackCtx.createBufferSource();
+  source.buffer = buffer;
+  source.connect(geminiPlaybackCtx.destination);
+  const now = geminiPlaybackCtx.currentTime;
+  const startAt = Math.max(now, geminiPlaybackTime);
+  source.start(startAt);
   geminiPlaybackTime = startAt + buffer.duration;
   audioChunksPlayed++;
-  if (audioChunksPlayed === 1) uiLog('OK', 'First audio chunk playing (' + int16.length + ' samples)');
-  if (audioChunksPlayed % 50 === 0) uiLog('INFO', audioChunksPlayed + ' audio chunks played');
+  if (audioChunksPlayed === 1) uiLog('OK', `First audio chunk queued (${int16.length} samples, startAt=${startAt.toFixed(3)}s, duration=${buffer.duration.toFixed(3)}s)`);
+  if (audioChunksPlayed % 50 === 0) uiLog('INFO', audioChunksPlayed + ' audio chunks played, playbackTime=' + geminiPlaybackTime.toFixed(2) + 's');
 }
 function createWavBlob(int16Arrays) {
   let totalLength = 0;
@@ -902,8 +913,13 @@ async function startGeminiSession(name, scenario){
   geminiAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
   const micSource = geminiAudioCtx.createMediaStreamSource(mediaStream); const bufferSize = 4096;
   geminiMicProcessor = geminiAudioCtx.createScriptProcessor(bufferSize, 1, 1);
-  geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-  geminiPlaybackTime = 0; const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  // geminiPlaybackCtx is created in the click handler (user gesture) for autoplay policy
+  if (!geminiPlaybackCtx) {
+    geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    geminiPlaybackCtx.resume();
+    geminiPlaybackTime = 0;
+  }
+  const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}`;
   geminiWs = new WebSocket(wsUrl);
   setConnectionState('CONNECTING');
