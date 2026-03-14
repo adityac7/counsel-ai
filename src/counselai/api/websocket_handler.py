@@ -244,7 +244,7 @@ async def gemini_to_browser(
             if state.is_terminal:
                 break
 
-            logger.debug("gemini response: setup=%s srv=%s", response.setup_complete, bool(response.server_content))
+            logger.info("gemini response: setup=%s srv=%s", response.setup_complete, bool(response.server_content))
             # Skip setup_complete events
             if response.setup_complete:
                 continue
@@ -268,7 +268,7 @@ async def gemini_to_browser(
                         text_data = part.text
 
             if audio_data:
-                logger.debug('Got audio from Gemini: %d bytes', len(audio_data))
+                logger.info('Got audio from Gemini: %d bytes', len(audio_data))
                 sc["modelTurn"] = {
                     "parts": [
                         {
@@ -281,7 +281,7 @@ async def gemini_to_browser(
                 }
 
             if not audio_data and not text_data and not has_real_content and srv and srv.model_turn:
-                logger.debug('Model turn with only thought tokens (filtered)')
+                logger.info('Model turn with only thought tokens (filtered)')
             if text_data:
                 if "modelTurn" not in sc:
                     sc["modelTurn"] = {"parts": []}

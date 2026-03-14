@@ -132,10 +132,18 @@ async def _connect_and_init_gemini(
                 g2b_task = asyncio.create_task(gemini_to_browser(ws, session, state, watchdog))
                 ping_task = asyncio.create_task(keepalive_ping(ws, state))
 
+                task_names = {id(b2g_task): "browser_to_gemini", id(g2b_task): "gemini_to_browser", id(ping_task): "keepalive"}
                 done, pending = await asyncio.wait(
                     [b2g_task, g2b_task, ping_task],
                     return_when=asyncio.FIRST_COMPLETED,
                 )
+
+                # Log which task(s) completed first
+                for task in done:
+                    name = task_names.get(id(task), "unknown")
+                    exc = task.exception() if not task.cancelled() else None
+                    result = task.result() if not task.cancelled() and not exc else None
+                    logger.info("[pipeline] FIRST_COMPLETED: %s (result=%s, exc=%s)", name, result, exc)
 
                 # Check if gemini_to_browser returned a reason to reconnect
                 reconnect_reason = None
