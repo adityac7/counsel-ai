@@ -850,8 +850,13 @@ function base64ToInt16Array(base64) {
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
   return new Int16Array(bytes.buffer);
 }
+let audioChunksPlayed = 0;
 function playGeminiAudio(base64Data) {
-  if (!geminiPlaybackCtx) return;
+  if (!geminiPlaybackCtx) { console.warn('[audio] No playback context'); return; }
+  // Resume suspended AudioContext (mobile browser policy)
+  if (geminiPlaybackCtx.state === 'suspended') {
+    geminiPlaybackCtx.resume().then(() => console.log('[audio] AudioContext resumed'));
+  }
   const int16 = base64ToInt16Array(base64Data);
   if (int16.length === 0) return;
   const float32 = new Float32Array(int16.length);
@@ -861,6 +866,9 @@ function playGeminiAudio(base64Data) {
   source.connect(geminiPlaybackCtx.destination); const now = geminiPlaybackCtx.currentTime;
   const startAt = Math.max(now, geminiPlaybackTime); source.start(startAt);
   geminiPlaybackTime = startAt + buffer.duration;
+  audioChunksPlayed++;
+  if (audioChunksPlayed === 1) uiLog('OK', 'First audio chunk playing (' + int16.length + ' samples)');
+  if (audioChunksPlayed % 50 === 0) uiLog('INFO', audioChunksPlayed + ' audio chunks played');
 }
 function createWavBlob(int16Arrays) {
   let totalLength = 0;
