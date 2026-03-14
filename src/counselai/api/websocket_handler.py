@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 # ---------------------------------------------------------------------------
 _KEEPALIVE_INTERVAL_INIT = 3  # seconds — fast pings during Gemini init
 _KEEPALIVE_INTERVAL_ACTIVE = 15  # seconds — normal pings once active
-_WATCHDOG_MAX_MODEL_TURNS = 10  # consecutive modelTurn events without turnComplete
+_WATCHDOG_EMPTY_TURN_LIMIT = 50  # consecutive empty modelTurns (no audio/text) before force-reset
 _CONNECTION_TIMEOUT = 30  # seconds — max wait for initial Gemini connection
 _MAX_RECONNECT_ATTEMPTS = 2
 _RECONNECT_DELAY = 1.0  # seconds between reconnect attempts
@@ -105,28 +105,34 @@ class ConnectionStateMachine:
 # Watchdog
 # ---------------------------------------------------------------------------
 class ModelTurnWatchdog:
-    """Detect stuck Gemini sessions: >N consecutive modelTurn events without turnComplete."""
+    """Detect stuck Gemini sessions: trips only when receiving many consecutive
+    modelTurn events with NO audio or text content (truly stuck).
+    Normal streaming (100+ audio chunks before turnComplete) is expected."""
 
-    def __init__(self, threshold: int = _WATCHDOG_MAX_MODEL_TURNS):
-        self._consecutive = 0
+    def __init__(self, threshold: int = _WATCHDOG_EMPTY_TURN_LIMIT):
+        self._empty_consecutive = 0
         self._threshold = threshold
         self._tripped = False
 
-    def on_model_turn(self) -> bool:
-        """Record a modelTurn event. Returns True if watchdog has tripped."""
-        self._consecutive += 1
-        if self._consecutive > self._threshold and not self._tripped:
+    def on_model_turn(self, has_content: bool) -> bool:
+        """Record a modelTurn event. Only counts toward watchdog if no content.
+        Returns True if watchdog has tripped."""
+        if has_content:
+            self._empty_consecutive = 0  # Reset — content is flowing
+            return False
+        self._empty_consecutive += 1
+        if self._empty_consecutive > self._threshold and not self._tripped:
             self._tripped = True
             logger.error(
-                "[watchdog] %d consecutive modelTurn events without turnComplete — force-reset needed",
-                self._consecutive,
+                "[watchdog] %d consecutive EMPTY modelTurn events — force-reset needed",
+                self._empty_consecutive,
             )
             return True
         return False
 
     def on_turn_complete(self):
         """Reset the counter on turnComplete."""
-        self._consecutive = 0
+        self._empty_consecutive = 0
         self._tripped = False
 
     @property
@@ -291,8 +297,9 @@ async def gemini_to_browser(
                 if srv.turn_complete:
                     sc["turnComplete"] = True
                     watchdog.on_turn_complete()
-                elif has_real_content:
-                    if watchdog.on_model_turn():
+                elif srv.model_turn:
+                    has_content = bool(audio_data or text_data)
+                    if watchdog.on_model_turn(has_content):
                         # Watchdog tripped — notify browser and request reset
                         await _safe_send(ws, {
                             "type": "error",
