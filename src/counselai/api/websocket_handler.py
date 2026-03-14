@@ -213,10 +213,10 @@ async def browser_to_gemini(ws: WebSocket, session, state: ConnectionStateMachin
                         except Exception:
                             pass  # Don't crash if level send fails
 
-                    # VAD: skip silence/noise to avoid gibberish transcriptions
-                    if not level.is_speech:
-                        continue
-
+                    # Forward ALL audio to Gemini (including silence).
+                    # Gemini has its own internal VAD. If we filter silence
+                    # here, Gemini thinks the session is idle and closes
+                    # the stream after a few seconds of no input.
                     await session.send_realtime_input(
                         audio=gt.Blob(data=decoded, mime_type="audio/pcm")
                     )
