@@ -103,21 +103,23 @@ async def _connect_and_init_gemini(
                 await state.transition(ConnectionState.INITIALIZING)
                 await _safe_send(ws, {"type": "setup_complete"})
 
-                # Send system instructions
+                # Send system instructions with turn_complete=True
+                # so Gemini knows the context is set and it can respond
                 await session.send_client_content(
                     turns=gt.Content(
                         parts=[gt.Part(text=COUNSELLOR_INSTRUCTIONS + scenario)]
                     ),
-                    turn_complete=False,
+                    turn_complete=True,
                 )
-                logger.info("System instructions sent")
+                logger.info("System instructions sent (turn_complete=True)")
 
                 # Send silent audio to trigger initial greeting
+                # Do NOT send audio_stream_end — the stream stays open for
+                # the browser to keep sending audio chunks
                 silent_audio = generate_silent_audio()
                 await session.send_realtime_input(
                     audio=gt.Blob(data=silent_audio, mime_type="audio/pcm")
                 )
-                await session.send_realtime_input(audio_stream_end=True)
                 logger.info("Trigger audio sent, waiting for greeting")
 
                 # Transition to ACTIVE

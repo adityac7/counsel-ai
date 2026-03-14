@@ -238,11 +238,13 @@ async def gemini_to_browser(
     Returns a reason string if the watchdog trips or an error occurs,
     None on clean exit.
     """
+    logger.info("gemini_to_browser started, waiting for Gemini audio...")
     try:
         async for response in session.receive():
             if state.is_terminal:
                 break
 
+            logger.debug("gemini response: setup=%s srv=%s", response.setup_complete, bool(response.server_content))
             # Skip setup_complete events
             if response.setup_complete:
                 continue
