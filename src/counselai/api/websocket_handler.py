@@ -266,6 +266,7 @@ async def gemini_to_browser(
                         text_data = part.text
 
             if audio_data:
+                logger.debug('Got audio from Gemini: %d bytes', len(audio_data))
                 sc["modelTurn"] = {
                     "parts": [
                         {
@@ -277,6 +278,8 @@ async def gemini_to_browser(
                     ]
                 }
 
+            if not audio_data and not text_data and has_model_turn:
+                logger.debug('Model turn with no audio/text data')
             if text_data:
                 if "modelTurn" not in sc:
                     sc["modelTurn"] = {"parts": []}
