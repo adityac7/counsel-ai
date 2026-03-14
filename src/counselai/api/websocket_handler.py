@@ -157,6 +157,7 @@ def _describe_close_code(code: int | None) -> str:
 async def browser_to_gemini(ws: WebSocket, session, state: ConnectionStateMachine) -> None:
     """Forward audio/video chunks from the browser WebSocket to Gemini."""
     try:
+        chunk_count = 0
         while not state.is_terminal:
             raw = await ws.receive_text()
             if not raw or not raw.strip():
