@@ -7,162 +7,52 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root {
-  --bg-primary: #FAFBFC;
-  --bg-card: #FFFFFF;
-  --bg-subtle: #F4F5F7;
-  --bg-hover: #F0F1F4;
-  --brand: #0F7B6C;
-  --brand-light: #E8F5F0;
-  --brand-hover: #0D6B5E;
-  --brand-text: #0A5C50;
-  --success: #1A7F37;
-  --success-bg: #DAFBE1;
-  --warning: #9A6700;
-  --warning-bg: #FFF8C5;
-  --danger: #CF222E;
-  --danger-bg: #FFEBE9;
-  --info: #0969DA;
-  --info-bg: #DDF4FF;
-  --text-primary: #1F2328;
-  --text-secondary: #656D76;
-  --text-tertiary: #8B949E;
-  --border: #D0D7DE;
-  --border-subtle: #E8ECEF;
-  --border-hover: #B0B8C1;
-  --shadow-sm: 0 1px 2px rgba(31,35,40,0.04);
-  --shadow-md: 0 3px 6px rgba(31,35,40,0.04), 0 2px 4px rgba(31,35,40,0.08);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  color: var(--text-primary);
-  background: var(--bg-primary);
-  min-height: 100vh;
-  font-size: 15px;
-  line-height: 1.6;
-}
-a { color: inherit; text-decoration: none; }
-
-/* Layout */
-.layout { display: flex; min-height: 100vh; }
-.sidebar {
-  width: 240px; background: var(--bg-card);
-  border-right: 1px solid var(--border-subtle);
-  padding: 24px 0; position: fixed; top: 0; left: 0; bottom: 0;
-  display: flex; flex-direction: column;
-}
-.sidebar-brand { font-size: 18px; font-weight: 700; color: var(--brand-text); padding: 0 20px 24px; letter-spacing: -0.02em; }
-.nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 20px; font-size: 14px; font-weight: 500;
-  color: var(--text-secondary); transition: all 0.15s;
-  border-left: 3px solid transparent;
-}
-.nav-item:hover { color: var(--text-primary); background: var(--bg-subtle); }
-.nav-item.active { color: var(--brand-text); background: var(--brand-light); border-left-color: var(--brand); font-weight: 600; }
-.content { margin-left: 240px; flex: 1; padding: 32px 40px 64px; max-width: 960px; }
-
-/* Breadcrumb */
-.breadcrumb {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 24px; font-size: 13px; color: var(--text-tertiary);
-}
-.breadcrumb a { color: var(--brand-text); font-weight: 500; }
-.breadcrumb a:hover { text-decoration: underline; }
-
-/* Header */
-.page-header { margin-bottom: 32px; }
-.page-header h1 { font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
-.page-header .subtitle { color: var(--text-secondary); font-size: 14px; margin-top: 4px; }
-.grade-badge {
-  display: inline-block; margin-top: 8px; padding: 2px 12px;
-  border-radius: 20px; font-size: 13px; font-weight: 500;
-  background: var(--brand-light); color: var(--brand-text);
-}
-
-/* Stats */
-.stats-row {
-  display: grid; grid-template-columns: repeat(4, 1fr);
-  gap: 16px; margin-bottom: 28px;
-}
-.stat-card {
-  background: var(--bg-card); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg); padding: 20px 24px;
-  box-shadow: var(--shadow-sm); text-align: left;
-}
-.stat-card:hover { border-color: var(--border); box-shadow: var(--shadow-md); }
-.stat-card .val { font-size: 28px; font-weight: 700; color: var(--text-primary); line-height: 1.1; }
-.stat-card .label { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
-
-/* Cards */
-.card {
-  background: var(--bg-card); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg); padding: 24px;
-  box-shadow: var(--shadow-sm); margin-bottom: 20px;
-}
-.card:hover { border-color: var(--border); box-shadow: var(--shadow-md); }
-h2 { font-size: 16px; margin-bottom: 14px; font-weight: 600; color: var(--text-primary); }
-h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight: 600; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-
-/* Tags */
-.tags { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
-.tag {
-  padding: 4px 12px; border-radius: 20px; font-size: 13px; font-weight: 500;
-}
-.tag-strength { background: var(--success-bg); color: var(--success); }
-.tag-interest { background: var(--info-bg); color: var(--info); }
-.tag-growth { background: var(--warning-bg); color: var(--warning); }
-.tag-step { background: var(--brand-light); color: var(--brand-text); }
-
-/* Summary */
-.summary-text { font-size: 15px; line-height: 1.6; color: var(--text-primary); }
-.encouragement {
-  margin-top: 12px; padding: 12px 16px;
-  border-radius: var(--radius-md); background: var(--success-bg);
-  border: 1px solid #B8E4C8; font-size: 14px; color: var(--success);
-}
-
-/* Growth timeline */
-.timeline { position: relative; padding-left: 24px; }
-.timeline::before {
-  content: ''; position: absolute; left: 8px; top: 0; bottom: 0;
-  width: 2px; background: linear-gradient(180deg, var(--brand), var(--info), rgba(9,105,218,0.2));
-}
-.timeline-item {
-  position: relative; margin-bottom: 20px; padding: 16px;
-  border-radius: var(--radius-md); background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
-}
-.timeline-item::before {
-  content: ''; position: absolute; left: -20px; top: 20px;
-  width: 10px; height: 10px; border-radius: 50%;
-  background: var(--brand); border: 2px solid var(--bg-primary);
-}
-.timeline-date { font-size: 13px; color: var(--text-tertiary); margin-bottom: 4px; }
-.timeline-case { font-size: 14px; font-weight: 600; color: var(--brand-text); margin-bottom: 6px; }
-.timeline-summary { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
-
-.chart-wrap { position: relative; height: 220px; margin-top: 10px; }
-
-/* Empty state */
-.empty-state { text-align: center; padding: 48px 20px; }
-.empty-state .icon { font-size: 48px; margin-bottom: 12px; }
-.empty-state .title { font-size: 18px; font-weight: 600; margin-bottom: 6px; color: var(--text-primary); }
-.empty-state .desc { color: var(--text-tertiary); font-size: 14px; max-width: 400px; margin: 0 auto; }
-
-.muted { color: var(--text-tertiary); }
-
-@media(max-width: 900px) {
-  .sidebar { display: none; }
-  .content { margin-left: 0; padding: 20px; }
-  .stats-row { grid-template-columns: 1fr 1fr; }
-  .grid-2 { grid-template-columns: 1fr; }
-}
+:root{--bg-primary:#FAFBFC;--bg-card:#FFFFFF;--bg-subtle:#F4F5F7;--brand:#0F7B6C;--brand-light:#E8F5F0;--brand-text:#0A5C50;--success:#1A7F37;--success-bg:#DAFBE1;--warning:#9A6700;--warning-bg:#FFF8C5;--danger:#CF222E;--danger-bg:#FFEBE9;--info:#0969DA;--info-bg:#DDF4FF;--text-primary:#1F2328;--text-secondary:#656D76;--text-tertiary:#8B949E;--border:#D0D7DE;--border-subtle:#E8ECEF;--shadow-sm:0 1px 2px rgba(31,35,40,0.04);--shadow-md:0 3px 6px rgba(31,35,40,0.04),0 2px 4px rgba(31,35,40,0.08);--radius-sm:6px;--radius-md:10px;--radius-lg:14px}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'DM Sans',system-ui,-apple-system,sans-serif;color:var(--text-primary);background:var(--bg-primary);min-height:100vh;font-size:15px;line-height:1.6}
+a{color:inherit;text-decoration:none}
+.layout{display:flex;min-height:100vh}
+.sidebar{width:240px;background:var(--bg-card);border-right:1px solid var(--border-subtle);padding:24px 0;position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column}
+.sidebar-brand{font-size:18px;font-weight:700;color:var(--brand-text);padding:0 20px 24px;letter-spacing:-0.02em}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 20px;font-size:14px;font-weight:500;color:var(--text-secondary);transition:all .15s;border-left:3px solid transparent}
+.nav-item:hover{color:var(--text-primary);background:var(--bg-subtle)}
+.nav-item.active{color:var(--brand-text);background:var(--brand-light);border-left-color:var(--brand);font-weight:600}
+.content{margin-left:240px;flex:1;padding:32px 40px 64px;max-width:960px}
+.breadcrumb{display:flex;align-items:center;gap:8px;margin-bottom:16px;font-size:13px;color:var(--text-tertiary)}
+.breadcrumb a{color:var(--brand);font-weight:500}
+.page-header{text-align:center;margin-bottom:32px}
+.page-header h1{font-size:24px;font-weight:700;color:var(--text-primary);letter-spacing:-0.02em;margin-bottom:4px}
+.page-header .subtitle{color:var(--text-secondary);font-size:14px}
+.grade-badge{display:inline-block;margin-top:8px;padding:4px 14px;border-radius:20px;font-size:13px;font-weight:600;background:var(--brand-light);border:1px solid #B8E4DC;color:var(--brand-text)}
+.card{background:var(--bg-card);border:1px solid var(--border-subtle);border-radius:var(--radius-lg);padding:24px;box-shadow:var(--shadow-sm);margin-bottom:24px}
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:16px;margin-bottom:32px}
+.stat-card{text-align:left;padding:20px 24px}
+.stat-card .val{font-size:28px;font-weight:700;color:var(--text-primary);line-height:1.1}
+.stat-card .label{font-size:13px;color:var(--text-secondary);margin-top:4px}
+.tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.tag{padding:5px 12px;border-radius:20px;font-size:13px;font-weight:500}
+.tag-strength{background:var(--success-bg);color:var(--success)}
+.tag-interest{background:var(--info-bg);color:var(--info)}
+.tag-growth{background:var(--warning-bg);color:var(--warning)}
+.tag-step{background:var(--brand-light);color:var(--brand-text)}
+h2{font-size:16px;margin-bottom:12px;font-weight:600;color:var(--text-primary)}
+h3{font-size:14px;margin-bottom:8px;color:var(--brand-text)}
+.summary-text{font-size:15px;line-height:1.6;color:var(--text-primary)}
+.encouragement{margin-top:12px;padding:12px 16px;border-radius:var(--radius-md);background:var(--success-bg);border:1px solid #B8E4C8;font-size:14px;color:var(--success)}
+.timeline{position:relative;padding-left:24px}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--brand),var(--info),rgba(9,105,218,.2))}
+.timeline-item{position:relative;margin-bottom:20px;padding:16px;border-radius:var(--radius-md);background:var(--bg-subtle);border:1px solid var(--border-subtle)}
+.timeline-item::before{content:'';position:absolute;left:-20px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--brand);border:2px solid var(--bg-primary)}
+.timeline-date{font-size:12px;color:var(--text-tertiary);margin-bottom:4px}
+.timeline-case{font-size:14px;font-weight:600;color:var(--brand-text);margin-bottom:6px}
+.timeline-summary{font-size:14px;line-height:1.5;color:var(--text-primary)}
+.chart-wrap{position:relative;height:220px;margin-top:10px}
+.empty-state{text-align:center;padding:48px 20px}
+.empty-state .emoji{font-size:48px;margin-bottom:12px}
+.empty-state .title{font-size:16px;font-weight:600;margin-bottom:6px;color:var(--text-secondary)}
+.empty-state .desc{color:var(--text-tertiary);font-size:14px;max-width:400px;margin:0 auto}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:24px}
+@media(max-width:900px){.sidebar{display:none}.content{margin-left:0;padding:20px}.grid-2{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
@@ -174,146 +64,76 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
     <a href="/dashboard" class="nav-item">🏫 Schools</a>
     <a href="/" class="nav-item">🎤 New Session</a>
   </nav>
-
   <main class="content">
-    <div class="breadcrumb">
-      <a href="/dashboard">Dashboard</a>
-      <span>›</span>
-      <a href="/api/v1/dashboard/counsellor">Students</a>
-      <span>›</span>
-      <span>{{ data.student.full_name }}</span>
-    </div>
-
+    <div class="breadcrumb"><a href="/dashboard">Dashboard</a> <span>›</span> <a href="/api/v1/dashboard/counsellor">Students</a> <span>›</span> <span>{{ data.student.full_name }}</span></div>
     <div class="page-header">
       <h1>{{ data.student.full_name }}</h1>
-      <div class="subtitle">Personal growth insights</div>
+      <div class="subtitle">Your personal growth insights</div>
       <div class="grade-badge">Class {{ data.student.grade }}{% if data.student.section %} — {{ data.student.section }}{% endif %}</div>
     </div>
-
     {% if data.stats.total_sessions == 0 %}
-    <div class="card">
-      <div class="empty-state">
-        <div class="icon">🌱</div>
-        <div class="title">Your journey starts here</div>
-        <div class="desc">Once you complete your first counselling session, you'll see your strengths, interests, and growth areas here.</div>
-      </div>
+    <div class="card empty-state">
+      <div class="emoji">🌱</div>
+      <div class="title">Your journey starts here</div>
+      <div class="desc">Once you complete your first counselling session, you'll see your strengths, interests, and growth areas here.</div>
     </div>
     {% else %}
-
-    <!-- Stats -->
     <div class="stats-row">
-      <div class="stat-card"><div class="val">{{ data.stats.total_sessions }}</div><div class="label">Sessions</div></div>
-      <div class="stat-card"><div class="val">{{ data.stats.topics_explored | length }}</div><div class="label">Topics explored</div></div>
-      <div class="stat-card"><div class="val">{{ data.all_strengths | length }}</div><div class="label">Strengths found</div></div>
-      <div class="stat-card"><div class="val">{{ data.all_interests | length }}</div><div class="label">Interests</div></div>
+      <div class="card stat-card"><div class="val">{{ data.stats.total_sessions }}</div><div class="label">Sessions</div></div>
+      <div class="card stat-card"><div class="val">{{ data.stats.topics_explored | length }}</div><div class="label">Topics explored</div></div>
+      <div class="card stat-card"><div class="val">{{ data.all_strengths | length }}</div><div class="label">Strengths found</div></div>
+      <div class="card stat-card"><div class="val">{{ data.all_interests | length }}</div><div class="label">Interests</div></div>
     </div>
-
-    <!-- Latest Summary -->
     {% if data.latest.summary %}
     <div class="card">
       <h2>📝 Latest insights</h2>
       <div class="summary-text">{{ data.latest.summary }}</div>
-      {% if data.latest.encouragement %}
-      <div class="encouragement">💪 {{ data.latest.encouragement }}</div>
-      {% endif %}
+      {% if data.latest.encouragement %}<div class="encouragement">💪 {{ data.latest.encouragement }}</div>{% endif %}
     </div>
     {% endif %}
-
-    <!-- Strengths & Interests -->
     <div class="grid-2">
       {% if data.latest.strengths or data.all_strengths %}
-      <div class="card">
-        <h2>💎 Your strengths</h2>
-        <div class="tags">
-          {% for s in (data.latest.strengths if data.latest.strengths else data.all_strengths) %}
-          <span class="tag tag-strength">{{ s }}</span>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
+      <div class="card"><h2>💎 Your strengths</h2>
+        <div class="tags">{% for s in (data.latest.strengths if data.latest.strengths else data.all_strengths) %}<span class="tag tag-strength">{{ s }}</span>{% endfor %}</div>
+      </div>{% endif %}
       {% if data.latest.interests or data.all_interests %}
-      <div class="card">
-        <h2>🎯 Your interests</h2>
-        <div class="tags">
-          {% for i in (data.latest.interests if data.latest.interests else data.all_interests) %}
-          <span class="tag tag-interest">{{ i }}</span>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
+      <div class="card"><h2>🎯 Your interests</h2>
+        <div class="tags">{% for i in (data.latest.interests if data.latest.interests else data.all_interests) %}<span class="tag tag-interest">{{ i }}</span>{% endfor %}</div>
+      </div>{% endif %}
     </div>
-
-    <!-- Growth Areas & Next Steps -->
     <div class="grid-2">
       {% if data.latest.growth_areas %}
-      <div class="card">
-        <h2>🌱 Growth areas</h2>
-        <div class="tags">
-          {% for g in data.latest.growth_areas %}
-          <span class="tag tag-growth">{{ g }}</span>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
-
+      <div class="card"><h2>🌱 Growth areas</h2>
+        <div class="tags">{% for g in data.latest.growth_areas %}<span class="tag tag-growth">{{ g }}</span>{% endfor %}</div>
+      </div>{% endif %}
       {% if data.latest.suggested_next_steps %}
-      <div class="card">
-        <h2>🚀 Next steps</h2>
-        <div class="tags">
-          {% for step in data.latest.suggested_next_steps %}
-          <span class="tag tag-step">{{ step }}</span>
-          {% endfor %}
-        </div>
-      </div>
-      {% endif %}
+      <div class="card"><h2>🚀 Next steps</h2>
+        <div class="tags">{% for step in data.latest.suggested_next_steps %}<span class="tag tag-step">{{ step }}</span>{% endfor %}</div>
+      </div>{% endif %}
     </div>
-
-    <!-- Growth Journey Timeline -->
     {% if data.growth_snapshots | length > 1 %}
-    <div class="card">
-      <h2>📈 Your growth journey</h2>
+    <div class="card"><h2>📈 Your growth journey</h2>
       <div class="chart-wrap"><canvas id="growthChart"></canvas></div>
     </div>
-
-    <div class="card">
-      <h2>🗓 Session timeline</h2>
+    <div class="card"><h2>🗓 Session timeline</h2>
       <div class="timeline">
         {% for snap in data.growth_snapshots %}
         <div class="timeline-item">
           <div class="timeline-date">{{ snap.date[:10] if snap.date else 'Date unavailable' }}</div>
           <div class="timeline-case">{{ snap.case_study_id | replace("-", " ") | replace("_", " ") | title }}</div>
           {% if snap.summary %}<div class="timeline-summary">{{ snap.summary }}</div>{% endif %}
-          {% if snap.strengths %}
-          <div class="tags" style="margin-top:8px">
-            {% for s in snap.strengths[:4] %}<span class="tag tag-strength">{{ s }}</span>{% endfor %}
-          </div>
-          {% endif %}
-        </div>
-        {% endfor %}
+          {% if snap.strengths %}<div class="tags" style="margin-top:8px">{% for s in snap.strengths[:4] %}<span class="tag tag-strength">{{ s }}</span>{% endfor %}</div>{% endif %}
+        </div>{% endfor %}
       </div>
     </div>
     {% endif %}
-
     {% endif %}
   </main>
 </div>
-
 {% if data.growth_snapshots is defined and data.growth_snapshots | length > 1 %}
 <script>
-const snapshots = [
-  {% for snap in data.growth_snapshots %}
-  {date:'{{ snap.date[:10] if snap.date else "?" }}',strengths:{{ snap.strengths|length if snap.strengths else 0 }},interests:{{ snap.interests|length if snap.interests else 0 }}},
-  {% endfor %}
-];
-if(snapshots.length>1){
-  new Chart(document.getElementById('growthChart'),{type:'line',data:{
-    labels:snapshots.map(s=>s.date),
-    datasets:[
-      {label:'Strengths',data:snapshots.map(s=>s.strengths),borderColor:'#1A7F37',backgroundColor:'rgba(26,127,55,.1)',tension:.4,fill:true},
-      {label:'Interests',data:snapshots.map(s=>s.interests),borderColor:'#0969DA',backgroundColor:'rgba(9,105,218,.08)',tension:.4,fill:true}
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#656D76',font:{family:'DM Sans'}}}},scales:{x:{ticks:{color:'#8B949E'},grid:{color:'rgba(0,0,0,.04)'}},y:{beginAtZero:true,ticks:{color:'#8B949E',stepSize:1},grid:{color:'rgba(0,0,0,.04)'}}}}});
-}
+const snapshots=[{% for snap in data.growth_snapshots %}{date:'{{ snap.date[:10] if snap.date else "?" }}',strengths:{{ snap.strengths|length if snap.strengths else 0 }},interests:{{ snap.interests|length if snap.interests else 0 }}},{% endfor %}];
+if(snapshots.length>1){new Chart(document.getElementById('growthChart'),{type:'line',data:{labels:snapshots.map(s=>s.date),datasets:[{label:'Strengths',data:snapshots.map(s=>s.strengths),borderColor:'#1A7F37',backgroundColor:'rgba(26,127,55,.1)',tension:.4,fill:true},{label:'Interests',data:snapshots.map(s=>s.interests),borderColor:'#0969DA',backgroundColor:'rgba(9,105,218,.08)',tension:.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#656D76',font:{family:'DM Sans'}}}},scales:{x:{ticks:{color:'#8B949E'},grid:{color:'rgba(0,0,0,.04)'}},y:{beginAtZero:true,ticks:{color:'#8B949E',stepSize:1},grid:{color:'rgba(0,0,0,.04)'}}}}})}
 </script>
 {% endif %}
 </body>
