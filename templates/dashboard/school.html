@@ -7,58 +7,59 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
+:root{--bg:#fafaf7;--surface:#ffffff;--surface-2:#f5f5f0;--border:#e5e5e0;--teal:#2d9d8f;--teal-light:#e6f5f3;--teal-dark:#237e73;--rose:#e05555;--amber:#d4930d;--green:#2d8f5e;--indigo:#4f63d2;--text:#1a1a2e;--muted:#6b7280;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
-.app{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:24px 20px 60px}
-.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px}
+.app{max-width:1300px;margin:0 auto;padding:24px 20px 60px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:var(--shadow)}
 .header{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px;flex-wrap:wrap}
-.header h1{font-size:1.5rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.header h1{font-size:1.5rem;font-weight:700;color:var(--teal)}
 .header .meta{color:var(--muted);font-size:.85rem}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);transition:all .2s}
-.btn:hover{border-color:var(--violet)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);transition:all .2s;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
 
-.privacy{background:rgba(139,92,246,.06);border:1px solid rgba(139,92,246,.15);border-radius:12px;padding:12px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted)}
+.privacy{background:var(--teal-light);border:1px solid #b8e4dc;border-radius:12px;padding:12px 16px;margin-bottom:24px;display:flex;align-items:center;gap:10px;font-size:.85rem;color:var(--muted)}
 
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:14px;margin-bottom:24px}
-.stat{background:var(--surface);backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center}
-.stat .value{font-size:1.8rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:18px;text-align:center;box-shadow:var(--shadow)}
+.stat .value{font-size:1.8rem;font-weight:700;color:var(--teal)}
 .stat .label{font-size:.78rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
 
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px;margin-bottom:18px}
 @media(max-width:900px){.grid-2{grid-template-columns:1fr}}
 
-h2{font-size:1.05rem;margin-bottom:14px;font-weight:600}
-h3{font-size:.9rem;margin-bottom:10px;color:var(--violet)}
+h2{font-size:1.05rem;margin-bottom:14px;font-weight:600;color:var(--text)}
+h3{font-size:.9rem;margin-bottom:10px;color:var(--teal)}
 
 /* Bars */
 .bar-row{display:flex;align-items:center;gap:10px;margin-bottom:8px}
 .bar-label{min-width:130px;font-size:.82rem;color:var(--muted);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .bar-track{flex:1;height:24px;background:var(--surface-2);border-radius:6px;overflow:hidden;border:1px solid var(--border)}
 .bar-fill{height:100%;border-radius:6px;display:flex;align-items:center;padding:0 8px;font-size:.72rem;font-weight:600;color:#fff;min-width:fit-content;transition:width .4s}
-.bar-fill.purple{background:linear-gradient(90deg,#5b21b6,var(--purple))}
-.bar-fill.indigo{background:linear-gradient(90deg,#4338ca,var(--indigo))}
-.bar-fill.rose{background:linear-gradient(90deg,#be123c,var(--rose))}
-.bar-fill.green{background:linear-gradient(90deg,#059669,var(--green))}
+.bar-fill.purple{background:linear-gradient(90deg,#237e73,var(--teal))}
+.bar-fill.indigo{background:linear-gradient(90deg,#3d5099,var(--indigo))}
+.bar-fill.rose{background:linear-gradient(90deg,#b84444,var(--rose))}
+.bar-fill.green{background:linear-gradient(90deg,#1f7048,var(--green))}
 
 .chip{display:inline-block;padding:3px 8px;border-radius:20px;font-size:.75rem;font-weight:500;margin-right:6px}
-.chip.high{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.25)}
-.chip.medium{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
-.chip.low{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25)}
+.chip.high{background:#fde8e8;color:var(--rose);border:1px solid #f5c6c6}
+.chip.medium{background:#fef3cd;color:var(--amber);border:1px solid #f5e0a0}
+.chip.low{background:#e6f5ec;color:var(--green);border:1px solid #b8e4c8}
 
-.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);background:var(--surface-2)}
+.table-wrap{overflow-x:auto;border-radius:12px;border:1px solid var(--border);background:var(--surface)}
 table{width:100%;border-collapse:collapse;min-width:400px}
 th,td{text-align:left;padding:10px 14px;border-bottom:1px solid var(--border)}
-th{color:var(--muted);font-weight:500;font-size:.8rem;text-transform:uppercase;letter-spacing:.3px;background:rgba(255,255,255,.02)}
-td{font-size:.88rem}
+th{color:var(--muted);font-weight:500;font-size:.8rem;text-transform:uppercase;letter-spacing:.3px;background:var(--surface-2)}
+td{font-size:.88rem;color:var(--text)}
+tbody tr:nth-child(even){background:var(--surface-2)}
+tbody tr:hover{background:var(--teal-light)}
 
 .chart-wrap{position:relative;height:200px;margin-top:8px}
 
 .status{display:inline-block;padding:3px 8px;border-radius:6px;font-size:.75rem}
-.status.completed{background:rgba(52,211,153,.12);color:var(--green)}
-.status.processing{background:rgba(99,102,241,.12);color:var(--indigo)}
-.status.failed{background:rgba(251,113,133,.12);color:var(--rose)}
+.status.completed{background:#e6f5ec;color:var(--green)}
+.status.processing{background:var(--teal-light);color:var(--teal-dark)}
+.status.failed{background:#fde8e8;color:var(--rose)}
 .empty{text-align:center;padding:24px;color:var(--muted);font-size:.88rem}
 </style>
 </head>
@@ -82,7 +83,7 @@ td{font-size:.88rem}
   </div>
 
   <div class="grid-2">
-    <div class="glass"><h2>Grade Distribution</h2>
+    <div class="card"><h2>Grade Distribution</h2>
       {% if school.grade_distribution %}
         {% set max_sessions = namespace(val=1) %}
         {% for g in school.grade_distribution %}{% if g.session_count > max_sessions.val %}{% set max_sessions.val = g.session_count %}{% endif %}{% endfor %}
@@ -93,7 +94,7 @@ td{font-size:.88rem}
       {% else %}<div class="empty">No grade data available</div>{% endif %}
     </div>
 
-    <div class="glass"><h2>Red Flag Overview</h2>
+    <div class="card"><h2>Red Flag Overview</h2>
       {% if school.red_flag_summary.total_flags > 0 %}
         <div style="margin-bottom:14px">{% for sev, cnt in school.red_flag_summary.by_severity.items() %}<span class="chip {{ sev }}">{{ sev|upper }}: {{ cnt }}</span>{% endfor %}</div>
         <h3>Most Common Flags</h3>
@@ -108,7 +109,7 @@ td{font-size:.88rem}
   </div>
 
   <div class="grid-2">
-    <div class="glass"><h2>Top Discussion Topics</h2>
+    <div class="card"><h2>Top Discussion Topics</h2>
       {% if school.topic_clusters %}
         {% set max_topic = namespace(val=1) %}
         {% for t in school.topic_clusters %}{% if t.occurrences > max_topic.val %}{% set max_topic.val = t.occurrences %}{% endif %}{% endfor %}
@@ -119,7 +120,7 @@ td{font-size:.88rem}
       {% else %}<div class="empty">No topic data yet</div>{% endif %}
     </div>
 
-    <div class="glass"><h2>Construct Analysis</h2>
+    <div class="card"><h2>Construct Analysis</h2>
       {% if school.construct_distribution %}
         <div class="table-wrap"><table><thead><tr><th>Construct</th><th>Total</th><th>Supported</th><th>Mixed</th><th>Weak</th><th>Avg</th></tr></thead><tbody>
           {% for c in school.construct_distribution %}<tr>
@@ -135,7 +136,7 @@ td{font-size:.88rem}
   </div>
 
   <!-- Session Trend -->
-  <div class="glass">
+  <div class="card">
     <h2>Session Trend Over Time</h2>
     {% if school.session_trend %}
     <div class="chart-wrap"><canvas id="trendChart"></canvas></div>
@@ -143,7 +144,7 @@ td{font-size:.88rem}
   </div>
 
   <div class="grid-2">
-    <div class="glass"><h2>Section Breakdown</h2>
+    <div class="card"><h2>Section Breakdown</h2>
       {% if school.section_distribution %}
         <div class="table-wrap"><table><thead><tr><th>Class</th><th>Section</th><th>Students</th><th>Sessions</th></tr></thead><tbody>
           {% for s in school.section_distribution %}<tr><td>{{ s.grade }}</td><td>{{ s.section }}</td><td>{{ s.student_count }}</td><td>{{ s.session_count }}</td></tr>{% endfor %}
@@ -151,7 +152,7 @@ td{font-size:.88rem}
       {% else %}<div class="empty">No section data</div>{% endif %}
     </div>
 
-    <div class="glass"><h2>Processing Pipeline</h2>
+    <div class="card"><h2>Processing Pipeline</h2>
       {% if school.batch_summary and school.batch_summary.by_status %}
         {% for status, cnt in school.batch_summary.by_status.items() %}
         <div class="bar-row"><div class="bar-label"><span class="status {{ status }}">{{ status }}</span></div>
@@ -162,7 +163,7 @@ td{font-size:.88rem}
   </div>
 
   {% if school.class_insights %}
-  <div class="glass"><h2>Class Insights — Grade {{ school.class_insights.grade }}</h2>
+  <div class="card"><h2>Class Insights — Grade {{ school.class_insights.grade }}</h2>
     <div class="stats" style="margin-bottom:16px">
       <div class="stat"><div class="value">{{ school.class_insights.student_count }}</div><div class="label">Students</div></div>
       <div class="stat"><div class="value">{{ school.class_insights.session_count }}</div><div class="label">Sessions</div></div>
@@ -187,9 +188,9 @@ const labels=[{% for t in school.session_trend %}'{{ t.period[:10] if t.period e
 const sessions=[{% for t in school.session_trend %}{{ t.session_count }},{% endfor %}];
 const students=[{% for t in school.session_trend %}{{ t.unique_students }},{% endfor %}];
 new Chart(document.getElementById('trendChart'),{type:'line',data:{labels,datasets:[
-  {label:'Sessions',data:sessions,borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.4,fill:true},
-  {label:'Unique Students',data:students,borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.4,fill:true}
-]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af'}}},scales:{x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.04)'}},y:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.04)'}}}}});
+  {label:'Sessions',data:sessions,borderColor:'#2d9d8f',backgroundColor:'rgba(45,157,143,.1)',tension:.4,fill:true},
+  {label:'Unique Students',data:students,borderColor:'#4f63d2',backgroundColor:'rgba(79,99,210,.08)',tension:.4,fill:true}
+]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6b7280'}}},scales:{x:{ticks:{color:'#6b7280'},grid:{color:'rgba(0,0,0,.06)'}},y:{ticks:{color:'#6b7280'},grid:{color:'rgba(0,0,0,.06)'}}}}});
 </script>
 {% endif %}
 </body>

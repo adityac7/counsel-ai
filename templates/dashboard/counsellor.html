@@ -7,23 +7,22 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
+:root{--bg:#fafaf7;--surface:#ffffff;--surface-2:#f5f5f0;--border:#e5e5e0;--teal:#2d9d8f;--teal-light:#e6f5f3;--teal-dark:#237e73;--rose:#e05555;--amber:#d4930d;--green:#2d8f5e;--text:#1a1a2e;--muted:#6b7280;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
-.app{position:relative;z-index:1;max-width:1400px;margin:0 auto;padding:24px 20px 48px}
-.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px}
+.app{max-width:1400px;margin:0 auto;padding:24px 20px 48px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;box-shadow:var(--shadow)}
 .topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.topbar h1{font-size:1.5rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.topbar h1{font-size:1.5rem;font-weight:700;color:var(--teal)}
 .topbar .sub{color:var(--muted);font-size:.85rem;margin-top:2px}
 .nav{display:flex;gap:8px;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s}
-.btn:hover{border-color:var(--violet);background:rgba(139,92,246,.12)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
 
 /* Filters */
 .filters{display:flex;gap:10px;margin-bottom:20px;flex-wrap:wrap;align-items:center}
-.filters select,.filters input{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:.85rem}
-.filters select:focus,.filters input:focus{outline:none;border-color:var(--violet)}
+.filters select,.filters input{padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-family:inherit;font-size:.85rem}
+.filters select:focus,.filters input:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(45,157,143,.12)}
 
 /* Layout */
 .main-grid{display:grid;grid-template-columns:320px 1fr;gap:20px}
@@ -31,35 +30,35 @@ body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellips
 
 /* Student list */
 .student-list{max-height:70vh;overflow-y:auto;padding-right:6px}
-.student-card{padding:14px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:10px;cursor:pointer;transition:all .2s}
-.student-card:hover,.student-card.active{border-color:var(--violet);background:rgba(139,92,246,.08)}
-.student-card .name{font-weight:600;font-size:.95rem;margin-bottom:2px}
+.student-card{padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);margin-bottom:10px;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
+.student-card:hover,.student-card.active{border-color:var(--teal);background:var(--teal-light)}
+.student-card .name{font-weight:600;font-size:.95rem;margin-bottom:2px;color:var(--text)}
 .student-card .meta{font-size:.78rem;color:var(--muted)}
 .student-card .badges{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
 .badge{font-size:.7rem;padding:2px 8px;border-radius:12px;font-weight:500}
-.badge-risk{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.2)}
-.badge-ok{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)}
-.badge-sessions{background:rgba(99,102,241,.12);color:var(--indigo);border:1px solid rgba(99,102,241,.25)}
+.badge-risk{background:#fde8e8;color:var(--rose);border:1px solid #f5c6c6}
+.badge-ok{background:#e6f5ec;color:var(--green);border:1px solid #b8e4c8}
+.badge-sessions{background:var(--teal-light);color:var(--teal-dark);border:1px solid #b8e4dc}
 
 /* Right panel */
 .panel-empty{display:flex;align-items:center;justify-content:center;min-height:300px;color:var(--muted);font-size:.95rem}
 .session-list .s-row{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border);margin-bottom:8px;cursor:pointer;transition:all .2s}
-.s-row:hover{border-color:var(--violet)}
-.s-row .s-date{font-size:.85rem;font-weight:500}
+.s-row:hover{border-color:var(--teal)}
+.s-row .s-date{font-size:.85rem;font-weight:500;color:var(--text)}
 .s-row .s-meta{font-size:.78rem;color:var(--muted)}
 .chip{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.72rem;font-weight:500}
-.chip-ok{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25)}
-.chip-warn{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
-.chip-danger{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.25)}
+.chip-ok{background:#e6f5ec;color:var(--green);border:1px solid #b8e4c8}
+.chip-warn{background:#fef3cd;color:var(--amber);border:1px solid #f5e0a0}
+.chip-danger{background:#fde8e8;color:var(--rose);border:1px solid #f5c6c6}
 
 /* Notes */
 .notes-area{width:100%;min-height:80px;padding:10px;border-radius:10px;border:1px solid var(--border);background:var(--surface-2);color:var(--text);font-family:inherit;font-size:.85rem;resize:vertical}
-.notes-area:focus{outline:none;border-color:var(--violet)}
+.notes-area:focus{outline:none;border-color:var(--teal);box-shadow:0 0 0 3px rgba(45,157,143,.12)}
 
 /* Chart */
 .chart-wrap{position:relative;height:200px;margin-top:12px}
-h2{font-size:1.1rem;margin-bottom:14px}
-h3{font-size:.95rem;margin-bottom:10px;color:var(--violet)}
+h2{font-size:1.1rem;margin-bottom:14px;color:var(--text)}
+h3{font-size:.95rem;margin-bottom:10px;color:var(--teal)}
 </style>
 </head>
 <body>
@@ -83,14 +82,14 @@ h3{font-size:.95rem;margin-bottom:10px;color:var(--violet)}
   </div>
 
   <div class="main-grid">
-    <div class="glass">
+    <div class="card">
       <h2>Students</h2>
       <div class="student-list" id="student-list">
         <div class="panel-empty">Loading…</div>
       </div>
     </div>
     <div>
-      <div class="glass" id="right-panel">
+      <div class="card" id="right-panel">
         <div class="panel-empty">Select a student to view details</div>
       </div>
     </div>
@@ -149,7 +148,7 @@ async function selectStudent(id){
       <div style="margin-top:20px"><h3>Session Trend</h3><div class="chart-wrap"><canvas id="chart-${id}"></canvas></div></div>`;
     if(sessions.length>1){
       const ctx=document.getElementById(`chart-${id}`).getContext('2d');
-      new Chart(ctx,{type:'line',data:{labels:sessions.slice(-10).map(s=>fmtDate(s.created_at)),datasets:[{label:'Confidence',data:sessions.slice(-10).map(s=>s.confidence_score||0),borderColor:'#7c3aed',backgroundColor:'rgba(124,58,237,.1)',tension:.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af'}}},scales:{x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.05)'}},y:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.05)'}}}}});}
+      new Chart(ctx,{type:'line',data:{labels:sessions.slice(-10).map(s=>fmtDate(s.created_at)),datasets:[{label:'Confidence',data:sessions.slice(-10).map(s=>s.confidence_score||0),borderColor:'#2d9d8f',backgroundColor:'rgba(45,157,143,.1)',tension:.4,fill:true}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6b7280'}}},scales:{x:{ticks:{color:'#6b7280'},grid:{color:'rgba(0,0,0,.06)'}},y:{ticks:{color:'#6b7280'},grid:{color:'rgba(0,0,0,.06)'}}}}});}
   }catch(e){panelEl.innerHTML='<div class="panel-empty">Failed to load student details.</div>'}}
 
 async function saveNotes(id){

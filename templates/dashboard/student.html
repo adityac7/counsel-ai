@@ -7,49 +7,48 @@
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4/dist/chart.umd.min.js"></script>
 <style>
-:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
+:root{--bg:#fafaf7;--surface:#ffffff;--surface-2:#f5f5f0;--border:#e5e5e0;--teal:#2d9d8f;--teal-light:#e6f5f3;--teal-dark:#237e73;--rose:#e05555;--amber:#d4930d;--green:#2d8f5e;--indigo:#4f63d2;--text:#1a1a2e;--muted:#6b7280;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
-.app{position:relative;z-index:1;max-width:960px;margin:0 auto;padding:32px 20px 60px}
+.app{max-width:960px;margin:0 auto;padding:32px 20px 60px}
 
-.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px;margin-bottom:18px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:18px;box-shadow:var(--shadow)}
 
 /* Header */
 .header{text-align:center;margin-bottom:32px}
-.header h1{font-size:1.8rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:4px}
+.header h1{font-size:1.8rem;font-weight:700;color:var(--teal);margin-bottom:4px}
 .header .subtitle{color:var(--muted);font-size:.95rem}
-.grade-badge{display:inline-block;margin-top:8px;padding:4px 14px;border-radius:20px;font-size:.82rem;font-weight:600;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.3);color:var(--violet)}
+.grade-badge{display:inline-block;margin-top:8px;padding:4px 14px;border-radius:20px;font-size:.82rem;font-weight:600;background:var(--teal-light);border:1px solid #b8e4dc;color:var(--teal-dark)}
 
 /* Stats */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-bottom:24px}
 .stat-card{text-align:center;padding:18px 14px}
-.stat-card .val{font-size:1.6rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.stat-card .val{font-size:1.6rem;font-weight:700;color:var(--teal)}
 .stat-card .label{font-size:.75rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.4px}
 
 /* Tags */
 .tags{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
 .tag{padding:5px 12px;border-radius:20px;font-size:.8rem;font-weight:500}
-.tag-strength{background:rgba(52,211,153,.1);color:var(--green);border:1px solid rgba(52,211,153,.2)}
-.tag-interest{background:rgba(99,102,241,.1);color:var(--indigo);border:1px solid rgba(99,102,241,.2)}
-.tag-growth{background:rgba(251,191,36,.1);color:var(--amber);border:1px solid rgba(251,191,36,.2)}
-.tag-step{background:rgba(139,92,246,.1);color:var(--violet);border:1px solid rgba(139,92,246,.2)}
+.tag-strength{background:#e6f5ec;color:var(--green);border:1px solid #b8e4c8}
+.tag-interest{background:#eef0fb;color:var(--indigo);border:1px solid #c8cef0}
+.tag-growth{background:#fef3cd;color:var(--amber);border:1px solid #f5e0a0}
+.tag-step{background:var(--teal-light);color:var(--teal-dark);border:1px solid #b8e4dc}
 
-h2{font-size:1.1rem;margin-bottom:12px;font-weight:600}
-h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
+h2{font-size:1.1rem;margin-bottom:12px;font-weight:600;color:var(--text)}
+h3{font-size:.95rem;margin-bottom:8px;color:var(--teal)}
 .muted{color:var(--muted)}
 
 /* Summary card */
 .summary-text{font-size:.95rem;line-height:1.6;color:var(--text)}
-.encouragement{margin-top:12px;padding:12px 16px;border-radius:12px;background:rgba(52,211,153,.06);border:1px solid rgba(52,211,153,.15);font-size:.9rem;color:var(--green)}
+.encouragement{margin-top:12px;padding:12px 16px;border-radius:12px;background:#e6f5ec;border:1px solid #b8e4c8;font-size:.9rem;color:var(--green)}
 
 /* Growth timeline */
 .timeline{position:relative;padding-left:24px}
-.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--purple),var(--indigo),rgba(99,102,241,.2))}
+.timeline::before{content:'';position:absolute;left:8px;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--teal),var(--indigo),rgba(79,99,210,.2))}
 .timeline-item{position:relative;margin-bottom:20px;padding:16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
-.timeline-item::before{content:'';position:absolute;left:-20px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--violet);border:2px solid var(--bg)}
+.timeline-item::before{content:'';position:absolute;left:-20px;top:20px;width:10px;height:10px;border-radius:50%;background:var(--teal);border:2px solid var(--bg)}
 .timeline-date{font-size:.78rem;color:var(--muted);margin-bottom:4px}
-.timeline-case{font-size:.85rem;font-weight:600;color:var(--violet);margin-bottom:6px}
+.timeline-case{font-size:.85rem;font-weight:600;color:var(--teal);margin-bottom:6px}
 .timeline-summary{font-size:.88rem;line-height:1.5;color:var(--text)}
 
 /* Chart */
@@ -58,7 +57,7 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
 /* Empty */
 .empty-state{text-align:center;padding:48px 20px}
 .empty-state .emoji{font-size:3rem;margin-bottom:12px}
-.empty-state .title{font-size:1.2rem;font-weight:600;margin-bottom:6px}
+.empty-state .title{font-size:1.2rem;font-weight:600;margin-bottom:6px;color:var(--text)}
 .empty-state .desc{color:var(--muted);font-size:.9rem;max-width:400px;margin:0 auto}
 
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:18px}
@@ -74,7 +73,7 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
   </div>
 
   {% if data.stats.total_sessions == 0 %}
-  <div class="glass empty-state">
+  <div class="card empty-state">
     <div class="emoji">🌱</div>
     <div class="title">Your journey starts here</div>
     <div class="desc">Once you complete your first counselling session, you'll see your strengths, interests, and growth areas here.</div>
@@ -83,15 +82,15 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
 
   <!-- Stats -->
   <div class="stats-row">
-    <div class="glass stat-card"><div class="val">{{ data.stats.total_sessions }}</div><div class="label">Sessions</div></div>
-    <div class="glass stat-card"><div class="val">{{ data.stats.topics_explored | length }}</div><div class="label">Topics Explored</div></div>
-    <div class="glass stat-card"><div class="val">{{ data.all_strengths | length }}</div><div class="label">Strengths Found</div></div>
-    <div class="glass stat-card"><div class="val">{{ data.all_interests | length }}</div><div class="label">Interests</div></div>
+    <div class="card stat-card"><div class="val">{{ data.stats.total_sessions }}</div><div class="label">Sessions</div></div>
+    <div class="card stat-card"><div class="val">{{ data.stats.topics_explored | length }}</div><div class="label">Topics Explored</div></div>
+    <div class="card stat-card"><div class="val">{{ data.all_strengths | length }}</div><div class="label">Strengths Found</div></div>
+    <div class="card stat-card"><div class="val">{{ data.all_interests | length }}</div><div class="label">Interests</div></div>
   </div>
 
   <!-- Latest Summary -->
   {% if data.latest.summary %}
-  <div class="glass">
+  <div class="card">
     <h2>📝 Latest Insights</h2>
     <div class="summary-text">{{ data.latest.summary }}</div>
     {% if data.latest.encouragement %}
@@ -103,7 +102,7 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
   <!-- Strengths & Interests -->
   <div class="grid-2">
     {% if data.latest.strengths or data.all_strengths %}
-    <div class="glass">
+    <div class="card">
       <h2>💎 Your Strengths</h2>
       <div class="tags">
         {% for s in (data.latest.strengths if data.latest.strengths else data.all_strengths) %}
@@ -114,7 +113,7 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
     {% endif %}
 
     {% if data.latest.interests or data.all_interests %}
-    <div class="glass">
+    <div class="card">
       <h2>🎯 Your Interests</h2>
       <div class="tags">
         {% for i in (data.latest.interests if data.latest.interests else data.all_interests) %}
@@ -128,7 +127,7 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
   <!-- Growth Areas & Next Steps -->
   <div class="grid-2">
     {% if data.latest.growth_areas %}
-    <div class="glass">
+    <div class="card">
       <h2>🌱 Growth Areas</h2>
       <div class="tags">
         {% for g in data.latest.growth_areas %}
@@ -139,7 +138,7 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
     {% endif %}
 
     {% if data.latest.suggested_next_steps %}
-    <div class="glass">
+    <div class="card">
       <h2>🚀 Next Steps</h2>
       <div class="tags">
         {% for step in data.latest.suggested_next_steps %}
@@ -152,12 +151,12 @@ h3{font-size:.95rem;margin-bottom:8px;color:var(--violet)}
 
   <!-- Growth Journey Timeline -->
   {% if data.growth_snapshots | length > 1 %}
-  <div class="glass">
+  <div class="card">
     <h2>📈 Your Growth Journey</h2>
     <div class="chart-wrap"><canvas id="growthChart"></canvas></div>
   </div>
 
-  <div class="glass">
+  <div class="card">
     <h2>🗓 Session Timeline</h2>
     <div class="timeline">
       {% for snap in data.growth_snapshots %}
@@ -190,9 +189,9 @@ if(snapshots.length>1){
   new Chart(document.getElementById('growthChart'),{type:'line',data:{
     labels:snapshots.map(s=>s.date),
     datasets:[
-      {label:'Strengths',data:snapshots.map(s=>s.strengths),borderColor:'#34d399',backgroundColor:'rgba(52,211,153,.1)',tension:.4,fill:true},
-      {label:'Interests',data:snapshots.map(s=>s.interests),borderColor:'#6366f1',backgroundColor:'rgba(99,102,241,.08)',tension:.4,fill:true}
-    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af',font:{family:'Inter'}}}},scales:{x:{ticks:{color:'#9ca3af'},grid:{color:'rgba(255,255,255,.04)'}},y:{beginAtZero:true,ticks:{color:'#9ca3af',stepSize:1},grid:{color:'rgba(255,255,255,.04)'}}}}});
+      {label:'Strengths',data:snapshots.map(s=>s.strengths),borderColor:'#2d8f5e',backgroundColor:'rgba(45,143,94,.1)',tension:.4,fill:true},
+      {label:'Interests',data:snapshots.map(s=>s.interests),borderColor:'#4f63d2',backgroundColor:'rgba(79,99,210,.08)',tension:.4,fill:true}
+    ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#6b7280',font:{family:'Inter'}}}},scales:{x:{ticks:{color:'#6b7280'},grid:{color:'rgba(0,0,0,.06)'}},y:{beginAtZero:true,ticks:{color:'#6b7280',stepSize:1},grid:{color:'rgba(0,0,0,.06)'}}}}});
 }
 </script>
 {% endif %}
