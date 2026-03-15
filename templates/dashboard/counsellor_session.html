@@ -4,196 +4,329 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Session Review — CounselAI</title>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#fafaf7;--surface:#ffffff;--surface-2:#f5f5f0;--border:#e5e5e0;--teal:#2d9d8f;--teal-light:#e6f5f3;--teal-dark:#237e73;--rose:#e05555;--amber:#d4930d;--green:#2d8f5e;--indigo:#4f63d2;--text:#1a1a2e;--muted:#6b7280;--shadow:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04)}
-*{box-sizing:border-box;margin:0;padding:0}
-body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
-.app{max-width:1400px;margin:0 auto;padding:24px 20px 48px}
-.card{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:20px;margin-bottom:16px;box-shadow:var(--shadow)}
-.breadcrumb{display:flex;align-items:center;gap:8px;margin-bottom:20px;font-size:.9rem}
-.breadcrumb a{color:var(--teal);text-decoration:none;font-weight:500}
-.breadcrumb a:hover{text-decoration:underline}
-.breadcrumb .sep{color:var(--muted)}
-.session-header{display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:16px;margin-bottom:24px}
-.session-header h1{font-size:1.5rem;font-weight:700;color:var(--teal)}
-.session-meta{display:flex;flex-wrap:wrap;gap:14px;margin-top:8px}
-.meta-item{color:var(--muted);font-size:.88rem}
-.meta-item strong{color:var(--text)}
-.chip{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:500}
-.chip-status{background:#e6f5ec;border:1px solid #b8e4c8;color:var(--green)}
-.chip-status.processing{background:var(--teal-light);border-color:#b8e4dc;color:var(--teal-dark)}
-.tabs{display:flex;gap:0;border-bottom:2px solid var(--border);margin-bottom:20px}
-.tab{padding:10px 20px;cursor:pointer;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-2px;font-size:.9rem;transition:all .2s}
-.tab:hover{color:var(--text)}
-.tab.active{color:var(--teal);border-color:var(--teal);font-weight:600}
-.tab-content{display:none}.tab-content.active{display:block}
-h2{font-size:1.1rem;margin-bottom:12px;display:flex;align-items:center;gap:8px;color:var(--text)}
-h3{font-size:.95rem;margin-bottom:8px;color:var(--teal)}
-.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-@media(max-width:900px){.grid-2{grid-template-columns:1fr}}
+:root {
+  --bg-primary: #FAFBFC;
+  --bg-card: #FFFFFF;
+  --bg-subtle: #F4F5F7;
+  --bg-hover: #F0F1F4;
+  --brand: #0F7B6C;
+  --brand-light: #E8F5F0;
+  --brand-hover: #0D6B5E;
+  --brand-text: #0A5C50;
+  --success: #1A7F37;
+  --success-bg: #DAFBE1;
+  --warning: #9A6700;
+  --warning-bg: #FFF8C5;
+  --danger: #CF222E;
+  --danger-bg: #FFEBE9;
+  --info: #0969DA;
+  --info-bg: #DDF4FF;
+  --text-primary: #1F2328;
+  --text-secondary: #656D76;
+  --text-tertiary: #8B949E;
+  --border: #D0D7DE;
+  --border-subtle: #E8ECEF;
+  --border-hover: #B0B8C1;
+  --shadow-sm: 0 1px 2px rgba(31,35,40,0.04);
+  --shadow-md: 0 3px 6px rgba(31,35,40,0.04), 0 2px 4px rgba(31,35,40,0.08);
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-primary);
+  min-height: 100vh;
+  font-size: 15px;
+  line-height: 1.6;
+}
+a { color: inherit; text-decoration: none; }
+
+/* Layout */
+.layout { display: flex; min-height: 100vh; }
+.sidebar {
+  width: 240px; background: var(--bg-card);
+  border-right: 1px solid var(--border-subtle);
+  padding: 24px 0; position: fixed; top: 0; left: 0; bottom: 0;
+  display: flex; flex-direction: column;
+}
+.sidebar-brand { font-size: 18px; font-weight: 700; color: var(--brand-text); padding: 0 20px 24px; letter-spacing: -0.02em; }
+.nav-item {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 20px; font-size: 14px; font-weight: 500;
+  color: var(--text-secondary); transition: all 0.15s;
+  border-left: 3px solid transparent;
+}
+.nav-item:hover { color: var(--text-primary); background: var(--bg-subtle); }
+.nav-item.active { color: var(--brand-text); background: var(--brand-light); border-left-color: var(--brand); font-weight: 600; }
+.content { margin-left: 240px; flex: 1; padding: 32px 40px 64px; max-width: 1100px; }
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex; align-items: center; gap: 8px;
+  margin-bottom: 24px; font-size: 13px; color: var(--text-tertiary);
+}
+.breadcrumb a { color: var(--brand-text); font-weight: 500; }
+.breadcrumb a:hover { text-decoration: underline; }
+
+/* Session header */
+.session-header {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  flex-wrap: wrap; gap: 16px; margin-bottom: 28px;
+}
+.session-header h1 { font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
+.session-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
+.meta-item { color: var(--text-secondary); font-size: 14px; }
+.meta-item strong { color: var(--text-primary); }
+
+/* Chips */
+.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+.chip-success { background: var(--success-bg); color: var(--success); }
+.chip-warning { background: var(--warning-bg); color: var(--warning); }
+.chip-brand { background: var(--brand-light); color: var(--brand-text); }
+
+/* Tabs */
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.tab {
+  padding: 10px 20px; cursor: pointer; color: var(--text-tertiary);
+  border-bottom: 2px solid transparent; margin-bottom: -1px;
+  font-size: 14px; font-weight: 500; transition: all 0.15s;
+}
+.tab:hover { color: var(--text-primary); }
+.tab.active { color: var(--brand-text); border-color: var(--brand); font-weight: 600; }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+
+/* Cards */
+.card {
+  background: var(--bg-card); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg); padding: 24px;
+  box-shadow: var(--shadow-sm); margin-bottom: 20px;
+}
+h2 { font-size: 16px; margin-bottom: 14px; font-weight: 600; color: var(--text-primary); }
+h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight: 600; }
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
 /* Constructs */
-.construct{background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:12px}
-.construct-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px}
-.construct-label{font-weight:600;font-size:.95rem;color:var(--text)}
-.construct-score{display:flex;align-items:center;gap:8px}
-.score-bar{width:80px;height:6px;background:var(--surface-2);border-radius:3px;overflow:hidden;border:1px solid var(--border)}
-.score-fill{height:100%;border-radius:3px;transition:width .3s}
-.construct-status{font-size:.75rem;padding:2px 8px;border-radius:20px}
-.construct-status.supported{background:#e6f5ec;color:var(--green)}
-.construct-status.mixed{background:#fef3cd;color:var(--amber)}
-.construct-status.weak{background:#fde8e8;color:var(--rose)}
-.construct-body{color:var(--muted);font-size:.9rem;line-height:1.5}
-.evidence-tag{display:inline-block;padding:2px 8px;margin:2px 4px 2px 0;background:var(--teal-light);border:1px solid #b8e4dc;border-radius:6px;font-size:.75rem;color:var(--teal-dark)}
-.quote{border-left:3px solid var(--teal);padding:6px 12px;margin:6px 0;background:var(--teal-light);border-radius:0 8px 8px 0;font-style:italic;font-size:.88rem;color:var(--muted)}
+.construct {
+  background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;
+}
+.construct-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.construct-label { font-weight: 600; font-size: 14px; color: var(--text-primary); }
+.construct-score { display: flex; align-items: center; gap: 8px; }
+.score-bar { width: 80px; height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
+.score-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
+.construct-status { font-size: 12px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
+.construct-status.supported { background: var(--success-bg); color: var(--success); }
+.construct-status.mixed { background: var(--warning-bg); color: var(--warning); }
+.construct-status.weak { background: var(--danger-bg); color: var(--danger); }
+.construct-body { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.evidence-tag {
+  display: inline-block; padding: 2px 8px; margin: 2px 4px 2px 0;
+  background: var(--brand-light); border-radius: var(--radius-sm);
+  font-size: 12px; color: var(--brand-text);
+}
+.quote {
+  border-left: 3px solid var(--brand); padding: 6px 12px; margin: 6px 0;
+  background: var(--brand-light); border-radius: 0 8px 8px 0;
+  font-style: italic; font-size: 14px; color: var(--text-secondary);
+}
 
 /* Red flags */
-.red-flag{background:#fef7f7;border:1px solid #f5c6c6;border-radius:12px;padding:14px;margin-bottom:10px}
-.severity{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.75rem;font-weight:600;margin-right:8px}
-.severity.high{background:#fde8e8;color:var(--rose)}
-.severity.medium{background:#fef3cd;color:var(--amber)}
-.severity.low{background:#e6f5ec;color:var(--green)}
-.red-flag .reason{margin-top:6px;color:var(--muted);font-size:.88rem}
-.red-flag .action{margin-top:6px;color:var(--teal);font-size:.85rem;font-weight:500}
+.red-flag {
+  background: var(--danger-bg); border: 1px solid #F5C6C6;
+  border-radius: var(--radius-md); padding: 14px; margin-bottom: 10px;
+}
+.severity {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 12px; font-weight: 600; margin-right: 8px;
+}
+.severity.high { background: var(--danger-bg); color: var(--danger); }
+.severity.medium { background: var(--warning-bg); color: var(--warning); }
+.severity.low { background: var(--success-bg); color: var(--success); }
+.red-flag .reason { margin-top: 6px; color: var(--text-secondary); font-size: 14px; }
+.red-flag .action { margin-top: 6px; color: var(--brand-text); font-size: 13px; font-weight: 500; }
 
 /* Transcript */
-.transcript-container{max-height:500px;overflow-y:auto;padding-right:8px}
-.turn{padding:10px 14px;border-radius:10px;margin-bottom:8px}
-.turn.student{background:#eef9f7;border:1px solid #d0ece8}
-.turn.counsellor{background:var(--surface-2);border:1px solid var(--border)}
-.turn .speaker{font-size:.75rem;color:var(--muted);margin-bottom:3px;display:flex;justify-content:space-between}
-.turn .text{font-size:.9rem;line-height:1.5;color:var(--text)}
+.transcript-container { max-height: 500px; overflow-y: auto; padding-right: 8px; }
+.turn { padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 8px; }
+.turn.student { background: var(--bg-subtle); border: 1px solid var(--border-subtle); }
+.turn.counsellor { background: var(--brand-light); border: 1px solid #B8E4DC; }
+.turn .speaker {
+  font-size: 12px; color: var(--text-tertiary); margin-bottom: 3px;
+  display: flex; justify-content: space-between;
+}
+.turn .text { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
 
 /* Evidence */
-.evidence-node{background:var(--surface-2);border:1px solid var(--border);border-radius:10px;padding:12px;margin-bottom:10px}
-.modality-badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:600;margin-right:6px}
-.modality-badge.content{background:#eef9f7;color:var(--teal-dark)}
-.modality-badge.audio{background:#eef0fb;color:var(--indigo)}
-.modality-badge.video{background:#fef3cd;color:var(--amber)}
-.modality-badge.cross_modal{background:#fde8e8;color:var(--rose)}
-.confidence-bar{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted)}
-.window-card{background:var(--surface-2);border:1px solid #d0ece8;border-radius:10px;padding:12px;margin-bottom:8px}
-.window-header{display:flex;justify-content:space-between;align-items:center}
-.window-topic{font-weight:600;color:var(--teal)}
-.window-time{font-size:.8rem;color:var(--muted)}
+.evidence-node {
+  background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px; margin-bottom: 10px;
+}
+.modality-badge {
+  display: inline-block; padding: 2px 8px; border-radius: 20px;
+  font-size: 11px; font-weight: 600; margin-right: 6px;
+}
+.modality-badge.content { background: var(--brand-light); color: var(--brand-text); }
+.modality-badge.audio { background: var(--info-bg); color: var(--info); }
+.modality-badge.video { background: var(--warning-bg); color: var(--warning); }
+.modality-badge.cross_modal { background: var(--danger-bg); color: var(--danger); }
+.confidence-bar { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-tertiary); }
 
-.note-item{padding:8px 12px;margin-bottom:6px;background:var(--teal-light);border-left:3px solid var(--teal);border-radius:0 8px 8px 0;font-size:.88rem;color:var(--text)}
-.followup-item{padding:8px 12px;margin-bottom:6px;background:#eef0fb;border-left:3px solid var(--indigo);border-radius:0 8px 8px 0;font-size:.88rem;color:var(--text)}
-.btn{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--border);background:var(--surface);color:var(--text);text-decoration:none;padding:8px 14px;border-radius:10px;font-size:.85rem;cursor:pointer;transition:all .2s;box-shadow:var(--shadow)}
-.btn:hover{border-color:var(--teal);color:var(--teal)}
-.muted{color:var(--muted)}.empty{color:var(--muted);font-style:italic;padding:12px 0}
+.window-card {
+  background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px;
+}
+.window-header { display: flex; justify-content: space-between; align-items: center; }
+.window-topic { font-weight: 600; color: var(--brand-text); font-size: 14px; }
+.window-time { font-size: 13px; color: var(--text-tertiary); }
+
+.note-item {
+  padding: 8px 12px; margin-bottom: 6px; background: var(--brand-light);
+  border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0;
+  font-size: 14px; color: var(--text-primary);
+}
+.followup-item {
+  padding: 8px 12px; margin-bottom: 6px; background: var(--info-bg);
+  border-left: 3px solid var(--info); border-radius: 0 8px 8px 0;
+  font-size: 14px; color: var(--text-primary);
+}
+.muted { color: var(--text-tertiary); }
+.empty { color: var(--text-tertiary); font-style: italic; padding: 12px 0; }
+
+@media(max-width: 900px) {
+  .sidebar { display: none; }
+  .content { margin-left: 0; padding: 20px; }
+  .grid-2 { grid-template-columns: 1fr; }
+}
 </style>
 </head>
 <body>
-<div class="app">
-  <div class="breadcrumb">
-    <a href="/api/v1/dashboard/counsellor">← Workbench</a>
-    <span class="sep">/</span>
-    <span>Session Review</span>
-  </div>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-brand">🌿 CounselAI</div>
+    <a href="/dashboard" class="nav-item">📊 Overview</a>
+    <a href="/api/v1/dashboard/counsellor" class="nav-item active">👤 Students</a>
+    <a href="/dashboard" class="nav-item">🏫 Schools</a>
+    <a href="/" class="nav-item">🎤 New Session</a>
+  </nav>
 
-  <div class="session-header">
-    <div>
-      <h1>{{ data.student.name or 'Unknown Student' }}</h1>
-      <div class="session-meta">
-        <span class="meta-item">Grade <strong>{{ data.student.grade or '—' }}</strong></span>
-        {% if data.student.section %}<span class="meta-item">Section <strong>{{ data.student.section }}</strong></span>{% endif %}
-        {% if data.student.age %}<span class="meta-item">Age <strong>{{ data.student.age }}</strong></span>{% endif %}
-        {% if data.student.school %}<span class="meta-item">School <strong>{{ data.student.school }}</strong></span>{% endif %}
-        <span class="meta-item">Case <strong>{{ data.session.case_study_id }}</strong></span>
-        <span class="chip chip-status {{ data.session.status }}">{{ data.session.status }}</span>
+  <main class="content">
+    <div class="breadcrumb">
+      <a href="/dashboard">Dashboard</a>
+      <span>›</span>
+      <a href="/api/v1/dashboard/counsellor">Workbench</a>
+      <span>›</span>
+      <span>Session review</span>
+    </div>
+
+    <div class="session-header">
+      <div>
+        <h1>{{ data.student.name or 'Unknown Student' }}</h1>
+        <div class="session-meta">
+          <span class="meta-item">Grade <strong>{{ data.student.grade or '—' }}</strong></span>
+          {% if data.student.section %}<span class="meta-item">Section <strong>{{ data.student.section }}</strong></span>{% endif %}
+          {% if data.student.age %}<span class="meta-item">Age <strong>{{ data.student.age }}</strong></span>{% endif %}
+          {% if data.student.school %}<span class="meta-item">School <strong>{{ data.student.school }}</strong></span>{% endif %}
+          <span class="meta-item">Case <strong>{{ data.session.case_study_id }}</strong></span>
+          <span class="chip chip-success">{{ data.session.status }}</span>
+        </div>
+      </div>
+      <div style="text-align:right">
+        <div class="meta-item">{{ data.session.started_at or '—' }}</div>
+        {% if data.session.duration_seconds %}
+        <div class="meta-item" style="margin-top:4px">Duration: <strong>{{ (data.session.duration_seconds // 60) }}m {{ data.session.duration_seconds % 60 }}s</strong></div>
+        {% endif %}
       </div>
     </div>
-    <div style="text-align:right">
-      <div class="meta-item">{{ data.session.started_at or '—' }}</div>
-      {% if data.session.duration_seconds %}
-      <div class="meta-item" style="margin-top:4px">Duration: <strong>{{ (data.session.duration_seconds // 60) }}m {{ data.session.duration_seconds % 60 }}s</strong></div>
-      {% endif %}
+
+    <div class="tabs">
+      <div class="tab active" data-tab="profile" onclick="switchTab('profile')">📋 Profile</div>
+      <div class="tab" data-tab="evidence" onclick="switchTab('evidence')">🔍 Evidence</div>
+      <div class="tab" data-tab="transcript" onclick="switchTab('transcript')">💬 Transcript</div>
+      <div class="tab" data-tab="signals" onclick="switchTab('signals')">📊 Signals</div>
     </div>
-  </div>
 
-  <div class="tabs">
-    <div class="tab active" data-tab="profile" onclick="switchTab('profile')">📋 Profile</div>
-    <div class="tab" data-tab="evidence" onclick="switchTab('evidence')">🔍 Evidence</div>
-    <div class="tab" data-tab="transcript" onclick="switchTab('transcript')">💬 Transcript</div>
-    <div class="tab" data-tab="signals" onclick="switchTab('signals')">📊 Signals</div>
-  </div>
+    <!-- Profile Tab -->
+    <div class="tab-content active" id="tab-profile">
+      {% if data.profile %}{% set cv = data.profile.counsellor_view %}
+      {% if cv.summary %}<div class="card"><h2>📝 Summary</h2><p>{{ cv.summary }}</p></div>{% endif %}
 
-  <!-- Profile Tab -->
-  <div class="tab-content active" id="tab-profile">
-    {% if data.profile %}{% set cv = data.profile.counsellor_view %}
-    {% if cv.summary %}<div class="card"><h2>📝 Summary</h2><p>{{ cv.summary }}</p></div>{% endif %}
+      {% set flags = data.profile.red_flags %}
+      {% if flags and flags|length > 0 %}
+      <div class="card"><h2>🚩 Red flags ({{ flags|length }})</h2>
+        {% for rf in flags %}<div class="red-flag">
+          <span class="severity {{ rf.severity or 'medium' }}">{{ (rf.severity or 'medium')|upper }}</span>
+          <strong>{{ rf.key or 'Unknown' }}</strong>
+          <div class="reason">{{ rf.reason or '' }}</div>
+          {% if rf.recommended_action %}<div class="action">→ {{ rf.recommended_action }}</div>{% endif %}
+          {% if rf.evidence_refs %}<div style="margin-top:6px">{% for ref in rf.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
+        </div>{% endfor %}
+      </div>{% endif %}
 
-    {% set flags = data.profile.red_flags %}
-    {% if flags and flags|length > 0 %}
-    <div class="card"><h2>🚩 Red Flags ({{ flags|length }})</h2>
-      {% for rf in flags %}<div class="red-flag">
-        <span class="severity {{ rf.severity or 'medium' }}">{{ (rf.severity or 'medium')|upper }}</span>
-        <strong>{{ rf.key or 'Unknown' }}</strong>
-        <div class="reason">{{ rf.reason or '' }}</div>
-        {% if rf.recommended_action %}<div class="action">→ {{ rf.recommended_action }}</div>{% endif %}
-        {% if rf.evidence_refs %}<div style="margin-top:6px">{% for ref in rf.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
+      {% if cv.constructs %}<div class="card"><h2>🧩 Constructs ({{ cv.constructs|length }})</h2>
+        {% for c in cv.constructs %}<div class="construct">
+          <div class="construct-header"><div><span class="construct-label">{{ c.label or c.key }}</span> <span class="construct-status {{ c.status or 'weak' }}">{{ c.status or 'weak' }}</span></div>
+            {% if c.score is not none %}<div class="construct-score"><div class="score-bar"><div class="score-fill" style="width:{{ (c.score * 100)|int }}%;background:{% if c.score >= 0.7 %}var(--success){% elif c.score >= 0.4 %}var(--warning){% else %}var(--danger){% endif %}"></div></div><span style="font-size:14px">{{ '%.0f'|format(c.score * 100) }}%</span></div>{% endif %}
+          </div>
+          <div class="construct-body">{{ c.evidence_summary or '' }}</div>
+          {% if c.supporting_quotes %}{% for q in c.supporting_quotes %}<div class="quote">"{{ q }}"</div>{% endfor %}{% endif %}
+          {% if c.evidence_refs %}<div style="margin-top:6px">{% for ref in c.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
+        </div>{% endfor %}
+      </div>{% endif %}
+
+      {% if cv.cross_modal_notes %}<div class="card"><h2>🔗 Cross-modal notes</h2>{% for note in cv.cross_modal_notes %}<div class="note-item">{{ note }}</div>{% endfor %}</div>{% endif %}
+      {% if cv.recommended_follow_ups %}<div class="card"><h2>📌 Follow-ups</h2>{% for fu in cv.recommended_follow_ups %}<div class="followup-item">{{ fu }}</div>{% endfor %}</div>{% endif %}
+      {% else %}<div class="card"><div class="empty">No profile generated yet.</div></div>{% endif %}
+    </div>
+
+    <!-- Evidence Tab -->
+    <div class="tab-content" id="tab-evidence"><div class="card" id="evidence-loading"><p class="muted">Loading evidence…</p></div></div>
+
+    <!-- Transcript Tab -->
+    <div class="tab-content" id="tab-transcript"><div class="card">
+      <h2>💬 Transcript ({{ data.turns|length }} turns)</h2>
+      {% if data.turns %}<div class="transcript-container">
+        {% for t in data.turns %}<div class="turn {{ t.speaker }}">
+          <div class="speaker"><span>{{ t.speaker|capitalize }} — Turn {{ t.turn_index }}</span>
+            <span style="font-size:11px;color:var(--text-tertiary)">{{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}{% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}</span>
+          </div><div class="text">{{ t.text }}</div>
+        </div>{% endfor %}
+      </div>{% else %}<div class="empty">No transcript turns recorded.</div>{% endif %}
+    </div></div>
+
+    <!-- Signals Tab -->
+    <div class="tab-content" id="tab-signals">
+      {% if data.signal_windows %}<div class="card"><h2>🪟 Topic windows ({{ data.signal_windows|length }})</h2>
+        {% for w in data.signal_windows %}<div class="window-card"><div class="window-header">
+          <span class="window-topic">{{ w.topic_key }}</span>
+          <span class="window-time">{{ '%d:%02d'|format(w.start_ms // 60000, (w.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(w.end_ms // 60000, (w.end_ms // 1000) % 60) }} · {{ '%.0f'|format(w.reliability_score * 100) }}%</span>
+        </div></div>{% endfor %}
+      </div>{% endif %}
+
+      {% if data.hypotheses %}<div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
+        {% for h in data.hypotheses %}<div class="construct"><div class="construct-header"><div><span class="construct-label">{{ h.label }}</span> <span class="construct-status {{ h.status }}">{{ h.status }}</span></div>
+          {% if h.score is not none %}<span style="font-size:14px">{{ '%.0f'|format(h.score * 100) }}%</span>{% endif %}
+        </div><div class="construct-body">{{ h.evidence_summary }}</div></div>{% endfor %}
+      </div>{% endif %}
+
+      {% for modality, obs_list in data.observations.items() %}<div class="card">
+        <h2><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> Observations ({{ obs_list|length }})</h2>
+        {% for obs in obs_list[:20] %}<div class="evidence-node">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="font-size:14px">{{ obs.signal_key }}</strong><span class="confidence-bar">{{ '%.0f'|format(obs.confidence * 100) }}%</span></div>
+          {% if obs.value %}<div class="muted" style="font-size:13px">{% for k, v in obs.value.items() %}<span style="margin-right:12px">{{ k }}: <strong>{{ v }}</strong></span>{% endfor %}</div>{% endif %}
+        </div>{% endfor %}
+        {% if obs_list|length > 20 %}<div class="muted" style="padding:8px">… and {{ obs_list|length - 20 }} more</div>{% endif %}
       </div>{% endfor %}
-    </div>{% endif %}
 
-    {% if cv.constructs %}<div class="card"><h2>🧩 Constructs ({{ cv.constructs|length }})</h2>
-      {% for c in cv.constructs %}<div class="construct">
-        <div class="construct-header"><div><span class="construct-label">{{ c.label or c.key }}</span> <span class="construct-status {{ c.status or 'weak' }}">{{ c.status or 'weak' }}</span></div>
-          {% if c.score is not none %}<div class="construct-score"><div class="score-bar"><div class="score-fill" style="width:{{ (c.score * 100)|int }}%;background:{% if c.score >= 0.7 %}var(--green){% elif c.score >= 0.4 %}var(--amber){% else %}var(--rose){% endif %}"></div></div><span style="font-size:.85rem">{{ '%.0f'|format(c.score * 100) }}%</span></div>{% endif %}
-        </div>
-        <div class="construct-body">{{ c.evidence_summary or '' }}</div>
-        {% if c.supporting_quotes %}{% for q in c.supporting_quotes %}<div class="quote">"{{ q }}"</div>{% endfor %}{% endif %}
-        {% if c.evidence_refs %}<div style="margin-top:6px">{% for ref in c.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
-      </div>{% endfor %}
-    </div>{% endif %}
-
-    {% if cv.cross_modal_notes %}<div class="card"><h2>🔗 Cross-Modal Notes</h2>{% for note in cv.cross_modal_notes %}<div class="note-item">{{ note }}</div>{% endfor %}</div>{% endif %}
-    {% if cv.recommended_follow_ups %}<div class="card"><h2>📌 Follow-ups</h2>{% for fu in cv.recommended_follow_ups %}<div class="followup-item">{{ fu }}</div>{% endfor %}</div>{% endif %}
-    {% else %}<div class="card"><div class="empty">No profile generated yet.</div></div>{% endif %}
-  </div>
-
-  <!-- Evidence Tab -->
-  <div class="tab-content" id="tab-evidence"><div class="card" id="evidence-loading"><p class="muted">Loading evidence…</p></div></div>
-
-  <!-- Transcript Tab -->
-  <div class="tab-content" id="tab-transcript"><div class="card">
-    <h2>💬 Transcript ({{ data.turns|length }} turns)</h2>
-    {% if data.turns %}<div class="transcript-container">
-      {% for t in data.turns %}<div class="turn {{ t.speaker }}">
-        <div class="speaker"><span>{{ t.speaker|capitalize }} — Turn {{ t.turn_index }}</span>
-          <span style="font-size:.72rem;color:var(--muted)">{{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}{% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}</span>
-        </div><div class="text">{{ t.text }}</div>
-      </div>{% endfor %}
-    </div>{% else %}<div class="empty">No transcript turns recorded.</div>{% endif %}
-  </div></div>
-
-  <!-- Signals Tab -->
-  <div class="tab-content" id="tab-signals">
-    {% if data.signal_windows %}<div class="card"><h2>🪟 Topic Windows ({{ data.signal_windows|length }})</h2>
-      {% for w in data.signal_windows %}<div class="window-card"><div class="window-header">
-        <span class="window-topic">{{ w.topic_key }}</span>
-        <span class="window-time">{{ '%d:%02d'|format(w.start_ms // 60000, (w.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(w.end_ms // 60000, (w.end_ms // 1000) % 60) }} · {{ '%.0f'|format(w.reliability_score * 100) }}%</span>
-      </div></div>{% endfor %}
-    </div>{% endif %}
-
-    {% if data.hypotheses %}<div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
-      {% for h in data.hypotheses %}<div class="construct"><div class="construct-header"><div><span class="construct-label">{{ h.label }}</span> <span class="construct-status {{ h.status }}">{{ h.status }}</span></div>
-        {% if h.score is not none %}<span style="font-size:.85rem">{{ '%.0f'|format(h.score * 100) }}%</span>{% endif %}
-      </div><div class="construct-body">{{ h.evidence_summary }}</div></div>{% endfor %}
-    </div>{% endif %}
-
-    {% for modality, obs_list in data.observations.items() %}<div class="card">
-      <h2><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> Observations ({{ obs_list|length }})</h2>
-      {% for obs in obs_list[:20] %}<div class="evidence-node">
-        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong>{{ obs.signal_key }}</strong><span class="confidence-bar">{{ '%.0f'|format(obs.confidence * 100) }}%</span></div>
-        {% if obs.value %}<div class="muted" style="font-size:.85rem">{% for k, v in obs.value.items() %}<span style="margin-right:12px">{{ k }}: <strong>{{ v }}</strong></span>{% endfor %}</div>{% endif %}
-      </div>{% endfor %}
-      {% if obs_list|length > 20 %}<div class="muted" style="padding:8px">… and {{ obs_list|length - 20 }} more</div>{% endif %}
-    </div>{% endfor %}
-
-    {% if not data.signal_windows and not data.hypotheses and not data.observations %}<div class="card"><div class="empty">No signal data available.</div></div>{% endif %}
-  </div>
+      {% if not data.signal_windows and not data.hypotheses and not data.observations %}<div class="card"><div class="empty">No signal data available.</div></div>{% endif %}
+    </div>
+  </main>
 </div>
 
 <script>
@@ -205,14 +338,14 @@ async function loadEvidence(){
   try{const res=await fetch(`/api/v1/dashboard/counsellor/sessions/${sid}/evidence`);const ev=await res.json();
     if(ev.error){el.innerHTML=`<div class="card"><div class="empty">${ev.error}</div></div>`;return}
     let h='';const mc=ev.modality_counts||{};
-    h+=`<div class="card"><h2>🔍 Evidence Overview</h2><div style="display:flex;gap:16px;flex-wrap:wrap"><div class="meta-item">Total: <strong>${ev.total_observations}</strong></div>${Object.entries(mc).map(([k,v])=>`<div class="meta-item"><span class="modality-badge ${k}">${k}</span> <strong>${v}</strong></div>`).join('')}</div></div>`;
-    if(ev.hypothesis_links?.length){h+=`<div class="card"><h2>🧪 Hypothesis Links</h2>`;ev.hypothesis_links.forEach(x=>{h+=`<div class="construct"><div class="construct-header"><div><span class="construct-label">${esc(x.label)}</span> <span class="construct-status ${x.status}">${x.status}</span></div><span style="font-size:.85rem">${x.score!=null?Math.round(x.score*100)+'%':'—'}</span></div><div class="construct-body">${esc(x.evidence_summary)}</div></div>`});h+=`</div>`}
+    h+=`<div class="card"><h2>🔍 Evidence overview</h2><div style="display:flex;gap:16px;flex-wrap:wrap"><div class="meta-item">Total: <strong>${ev.total_observations}</strong></div>${Object.entries(mc).map(([k,v])=>`<div class="meta-item"><span class="modality-badge ${k}">${k}</span> <strong>${v}</strong></div>`).join('')}</div></div>`;
+    if(ev.hypothesis_links?.length){h+=`<div class="card"><h2>🧪 Hypothesis links</h2>`;ev.hypothesis_links.forEach(x=>{h+=`<div class="construct"><div class="construct-header"><div><span class="construct-label">${esc(x.label)}</span> <span class="construct-status ${x.status}">${x.status}</span></div><span style="font-size:14px">${x.score!=null?Math.round(x.score*100)+'%':'—'}</span></div><div class="construct-body">${esc(x.evidence_summary)}</div></div>`});h+=`</div>`}
     const byMod={};(ev.evidence_nodes||[]).forEach(n=>{const m=n.modality||'unknown';(byMod[m]=byMod[m]||[]).push(n)});
     for(const[mod,nodes]of Object.entries(byMod)){h+=`<div class="card"><h2><span class="modality-badge ${mod}">${mod.toUpperCase()}</span> Evidence (${nodes.length})</h2>`;
-      nodes.slice(0,30).forEach(n=>{h+=`<div class="evidence-node"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong>${esc(n.signal_key)}</strong><span class="confidence-bar">${Math.round(n.confidence*100)}%</span></div>`;
-        if(n.window){const ws=Math.floor(n.window.start_ms/60000),wss=Math.floor((n.window.start_ms/1000)%60);h+=`<div class="muted" style="font-size:.82rem;margin-bottom:4px"><span class="evidence-tag">${esc(n.window.topic_key)}</span> ${ws}:${String(wss).padStart(2,'0')}</div>`}
+      nodes.slice(0,30).forEach(n=>{h+=`<div class="evidence-node"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong style="font-size:14px">${esc(n.signal_key)}</strong><span class="confidence-bar">${Math.round(n.confidence*100)}%</span></div>`;
+        if(n.window){const ws=Math.floor(n.window.start_ms/60000),wss=Math.floor((n.window.start_ms/1000)%60);h+=`<div class="muted" style="font-size:13px;margin-bottom:4px"><span class="evidence-tag">${esc(n.window.topic_key)}</span> ${ws}:${String(wss).padStart(2,'0')}</div>`}
         if(n.related_turns?.length)n.related_turns.forEach(t=>{h+=`<div class="quote">[Turn ${t.turn_index}] "${esc(t.text)}"</div>`});
-        const val=n.value||{},vk=Object.keys(val);if(vk.length){h+=`<div class="muted" style="font-size:.82rem;margin-top:4px">`;vk.forEach(k=>{h+=`<span style="margin-right:10px">${esc(k)}: <strong>${esc(String(val[k]))}</strong></span>`});h+=`</div>`}
+        const val=n.value||{},vk=Object.keys(val);if(vk.length){h+=`<div class="muted" style="font-size:13px;margin-top:4px">`;vk.forEach(k=>{h+=`<span style="margin-right:10px">${esc(k)}: <strong>${esc(String(val[k]))}</strong></span>`});h+=`</div>`}
         h+=`</div>`});
       if(nodes.length>30)h+=`<div class="muted" style="padding:8px">… and ${nodes.length-30} more</div>`;h+=`</div>`}
     if(!ev.evidence_nodes?.length)h+=`<div class="card"><div class="empty">No evidence data.</div></div>`;
