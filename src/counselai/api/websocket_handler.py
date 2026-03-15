@@ -11,11 +11,49 @@ import json
 import logging
 import struct
 import math
+from dataclasses import dataclass, field
 
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from google.genai import types as gt
 
 logger = logging.getLogger(__name__)
+
+
+@dataclass
+class TranscriptCollector:
+    """Accumulates transcription chunks into complete turns."""
+    turns: list = field(default_factory=list)
+    _current_student: str = ""
+    _current_counsellor: str = ""
+
+    def add_student(self, text: str) -> None:
+        # Flush counsellor if switching roles
+        if self._current_counsellor:
+            self.turns.append({"role": "counsellor", "text": self._current_counsellor.strip()})
+            self._current_counsellor = ""
+        self._current_student += (" " if self._current_student else "") + text
+
+    def add_counsellor(self, text: str) -> None:
+        # Flush student if switching roles
+        if self._current_student:
+            self.turns.append({"role": "student", "text": self._current_student.strip()})
+            self._current_student = ""
+        self._current_counsellor += (" " if self._current_counsellor else "") + text
+
+    def flush(self) -> None:
+        """Flush any remaining partial turn."""
+        if self._current_student:
+            self.turns.append({"role": "student", "text": self._current_student.strip()})
+            self._current_student = ""
+        if self._current_counsellor:
+            self.turns.append({"role": "counsellor", "text": self._current_counsellor.strip()})
+            self._current_counsellor = ""
+
+    def on_turn_complete(self) -> None:
+        """Called when Gemini signals turnComplete — flush counsellor turn."""
+        if self._current_counsellor:
+            self.turns.append({"role": "counsellor", "text": self._current_counsellor.strip()})
+            self._current_counsellor = ""
 
 
 async def browser_to_gemini(ws: WebSocket, session) -> None:
@@ -78,7 +116,7 @@ async def browser_to_gemini(ws: WebSocket, session) -> None:
         logger.error("browser→gemini error: %s", exc)
 
 
-async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | None = None) -> None:
+async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | None = None, transcript: TranscriptCollector | None = None) -> None:
     """Forward Gemini responses to browser WebSocket.
 
     Key pattern from official docs: wrap session.receive() in while True.
@@ -149,17 +187,23 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                 # Turn complete
                 if srv.turn_complete:
                     sc["turnComplete"] = True
+                    if transcript:
+                        transcript.on_turn_complete()
 
                 # Transcriptions
                 if srv.input_transcription:
                     t = getattr(srv.input_transcription, "text", "")
                     if t and t.strip():
                         sc["inputTranscription"] = {"text": t.strip()}
+                        if transcript:
+                            transcript.add_student(t.strip())
 
                 if srv.output_transcription:
                     t = getattr(srv.output_transcription, "text", "")
                     if t and t.strip():
                         sc["outputTranscription"] = {"text": t.strip()}
+                        if transcript:
+                            transcript.add_counsellor(t.strip())
 
                 # Send to browser if we have content
                 if sc:
