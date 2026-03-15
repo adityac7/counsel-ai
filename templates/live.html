@@ -584,6 +584,7 @@ let pc, dataChannel, mediaStream, recorder, recordedChunks = []; let timerStart,
 let transcriptEntries = []; let sessionMeta = null;
 let eventCount = 0; let geminiModelTurnCount = 0;
 let lastStudentTranscript = ''; let waitingForStudentTranscript = false;
+let currentStudentEntry = null; let studentTranscriptTimer = null;
 let lastUserItemId = null;
 const eventTypeCounts = {};
 let sessionMode = 'openai'; let geminiWs = null;
@@ -653,15 +654,28 @@ function logRealtimeEvent(msg){
 }
 function addStudentTranscript(text, source){
   const raw = typeof text === 'string' ? text : String(text ?? ''); const clean = raw.trim();
-  console.log('[CounselAI] Student transcript candidate:', {
-    source: source || 'unknown', raw, clean,
-    waitingForStudentTranscript, lastUserItemId
-  });
-  if (!clean) { console.log('[CounselAI] Student transcript candidate was empty.'); return false; }
-  if (clean === lastStudentTranscript) {
-    uiLog('WARN', 'Duplicate student transcript observed; keeping capture active.');
+  if (!clean) return false;
+  if (clean === lastStudentTranscript) return false;
+  lastStudentTranscript = clean;
+
+  // Accumulate chunks into one entry, finalize after 1.5s of silence
+  if (!currentStudentEntry) {
+    currentStudentEntry = addEntry('student', clean);
+  } else {
+    // Add space between chunks
+    const existing = currentStudentEntry.body.textContent;
+    if (existing && !existing.endsWith(' ') && !clean.startsWith(' ')) {
+      currentStudentEntry.body.textContent += ' ';
+    }
+    currentStudentEntry.body.textContent += clean;
+    currentStudentEntry.data.text = currentStudentEntry.body.textContent;
+    transcriptEl.scrollTop = transcriptEl.scrollHeight;
   }
-  lastStudentTranscript = clean; addEntry('student', clean);
+
+  // Reset finalization timer — new entry after 1.5s gap
+  if (studentTranscriptTimer) clearTimeout(studentTranscriptTimer);
+  studentTranscriptTimer = setTimeout(() => { currentStudentEntry = null; }, 1500);
+
   waitingForStudentTranscript = false; return true;
 }
 function collectTranscriptCandidates(value, path = 'msg', out = []){
@@ -1057,6 +1071,7 @@ function handleGeminiMessage(msg) {
   if (serverContent.turnComplete) {
     orb.classList.remove('speaking');
     if (currentAiEntry) currentAiEntry = null;
+    currentStudentEntry = null; // New student entry for next turn
     setStatus('Listening...');
   }
   let studentText = '';
@@ -1085,7 +1100,13 @@ function handleGeminiMessage(msg) {
     const txt = serverContent.outputTranscription.text.trim();
     if (txt) {
       if (!currentAiEntry) currentAiEntry = addEntry('ai', '');
-      currentAiEntry.body.textContent += txt; currentAiEntry.data.text = currentAiEntry.body.textContent;
+      // Add space between chunks to prevent word concatenation
+      const existing = currentAiEntry.body.textContent;
+      if (existing && !existing.endsWith(' ') && !txt.startsWith(' ')) {
+        currentAiEntry.body.textContent += ' ';
+      }
+      currentAiEntry.body.textContent += txt;
+      currentAiEntry.data.text = currentAiEntry.body.textContent;
       transcriptEl.scrollTop = transcriptEl.scrollHeight;
     }
   }
