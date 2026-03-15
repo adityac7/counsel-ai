@@ -31,6 +31,11 @@ from counselai.storage.models import (
 # ---------------------------------------------------------------------------
 
 
+
+def _enum_val(v):
+    """Safely get .value from enum or return string as-is."""
+    return v.value if hasattr(v, 'value') else v
+
 class SchoolAnalyticsService:
     """Aggregate analytics queries scoped to a single school."""
 
@@ -373,7 +378,7 @@ class SchoolAnalyticsService:
             .all()
         )
         return {
-            "by_status": {str(r.status.value): r.cnt for r in status_counts},
+            "by_status": {str(_enum_val(r.status)): r.cnt for r in status_counts},
         }
 
     # -- Full analytics payload ---------------------------------------------

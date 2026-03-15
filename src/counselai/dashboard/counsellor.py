@@ -31,6 +31,11 @@ from counselai.storage.models import (
 # Data shapes returned by the service layer
 # ---------------------------------------------------------------------------
 
+
+def _enum_val(v):
+    """Safely get .value from enum or return string as-is."""
+    return v.value if hasattr(v, 'value') else v
+
 class QueueFilters:
     """Parsed filter parameters for the counsellor queue."""
 
@@ -181,7 +186,7 @@ def get_counsellor_queue(
                 if s.student and s.student.school
                 else None
             ),
-            "status": s.status.value,
+            "status": _enum_val(s.status),
             "case_study_id": s.case_study_id,
             "started_at": s.started_at.isoformat() if s.started_at else None,
             "ended_at": s.ended_at.isoformat() if s.ended_at else None,
@@ -272,7 +277,7 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
             "construct_key": h.construct_key,
             "label": h.label,
             "score": h.score,
-            "status": h.status.value,
+            "status": _enum_val(h.status),
             "evidence_summary": h.evidence_summary,
             "evidence_refs": h.evidence_refs_json or {},
         }
@@ -310,7 +315,7 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
     return {
         "session": {
             "id": str(session.id),
-            "status": session.status.value,
+            "status": _enum_val(session.status),
             "case_study_id": session.case_study_id,
             "provider": session.provider,
             "started_at": session.started_at.isoformat() if session.started_at else None,
@@ -401,7 +406,7 @@ def get_session_evidence(
             "hypothesis_id": str(h.id),
             "construct_key": h.construct_key,
             "label": h.label,
-            "status": h.status.value,
+            "status": _enum_val(h.status),
             "score": h.score,
             "evidence_summary": h.evidence_summary,
             "evidence_refs": h.evidence_refs_json or {},
