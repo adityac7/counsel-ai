@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>{% block title %}Dashboard{% endblock %} — CounselAI</title>
+<link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/dashboard.css">
+{% block head %}{% endblock %}
+</head>
+<body>
+<div class="layout">
+  <nav class="sidebar">
+    <div class="sidebar-brand">🌿 CounselAI</div>
+    <a href="/dashboard" class="nav-item {% if active_nav == 'overview' %}active{% endif %}">📊 Overview</a>
+    <a href="/api/v1/dashboard/counsellor" class="nav-item {% if active_nav == 'students' %}active{% endif %}">👤 Students</a>
+    <a href="/dashboard" class="nav-item {% if active_nav == 'schools' %}active{% endif %}">🏫 Schools</a>
+    <a href="/" class="nav-item {% if active_nav == 'session' %}active{% endif %}">🎤 New Session</a>
+  </nav>
+  <main class="content">
+    {% block breadcrumb %}{% endblock %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+{% block scripts %}{% endblock %}
+</body>
+</html>
