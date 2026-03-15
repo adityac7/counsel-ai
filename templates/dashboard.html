@@ -3,77 +3,131 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Admin Dashboard — CounselAI</title>
+<title>Dashboard — CounselAI</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
-:root{--bg:#0f0a1e;--surface:rgba(255,255,255,.06);--surface-2:rgba(255,255,255,.03);--border:rgba(255,255,255,.08);--purple:#7c3aed;--indigo:#6366f1;--violet:#8b5cf6;--teal:#2dd4bf;--rose:#fb7185;--amber:#fbbf24;--green:#34d399;--text:#f1f0f9;--muted:#9ca3af;--glass:saturate(180%) blur(20px);--grad:linear-gradient(135deg,#7c3aed,#6366f1)}
+:root{
+  --bg:#fafaf7;--surface:#ffffff;--surface-2:#f5f5f0;
+  --border:#e8e5df;--border-light:#f0ede8;
+  --teal:#2d9d8f;--teal-light:#e6f5f3;--teal-dark:#247f73;
+  --amber:#d4940a;--amber-light:#fef7e6;
+  --red:#c44536;--red-light:#fceae8;
+  --green:#3a8f6a;--green-light:#e8f5ee;
+  --text:#1a1a2e;--text-secondary:#5a5a6e;--text-muted:#8a8a9a;
+}
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Inter',system-ui,sans-serif;color:var(--text);background:var(--bg);min-height:100vh}
-body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse 80% 50% at 20% 0%,rgba(124,58,237,.15),transparent),radial-gradient(ellipse 60% 40% at 80% 100%,rgba(99,102,241,.1),transparent);pointer-events:none;z-index:0}
-.app{position:relative;z-index:1;max-width:1300px;margin:0 auto;padding:24px 20px 48px}
-.glass{background:var(--surface);backdrop-filter:var(--glass);-webkit-backdrop-filter:var(--glass);border:1px solid var(--border);border-radius:16px;padding:20px}
-.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:24px;flex-wrap:wrap}
-.topbar h1{font-size:1.5rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.topbar .sub{color:var(--muted);font-size:.85rem;margin-top:2px}
+.app{max-width:1300px;margin:0 auto;padding:24px 20px 48px}
+
+/* Top bar */
+.topbar{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:28px;flex-wrap:wrap}
+.topbar h1{font-size:1.4rem;font-weight:700;color:var(--text)}
+.topbar .sub{color:var(--text-muted);font-size:.84rem;margin-top:2px}
 .nav{display:flex;gap:8px;flex-wrap:wrap}
-.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:10px;font-size:.85rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .2s}
-.btn:hover{border-color:var(--violet);background:rgba(139,92,246,.12)}
-.btn-primary{background:rgba(124,58,237,.2);border-color:rgba(124,58,237,.4)}
-.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:24px}
-.stat-card{text-align:center;padding:20px 16px}
-.stat-card .val{font-size:2rem;font-weight:700;background:var(--grad);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
-.stat-card .label{font-size:.78rem;color:var(--muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
-.chip{display:inline-block;padding:3px 10px;border-radius:20px;font-size:.75rem;font-weight:500}
-.chip-ok{background:rgba(52,211,153,.12);color:var(--green);border:1px solid rgba(52,211,153,.25)}
-.chip-warn{background:rgba(251,191,36,.12);color:var(--amber);border:1px solid rgba(251,191,36,.25)}
-.chip-danger{background:rgba(251,113,133,.12);color:var(--rose);border:1px solid rgba(251,113,133,.25)}
-.table-wrap{overflow-x:auto;border-radius:14px;border:1px solid var(--border);background:var(--surface-2)}
-table{width:100%;border-collapse:collapse;min-width:800px}
-th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border)}
-th{color:var(--muted);font-weight:500;font-size:.8rem;text-transform:uppercase;letter-spacing:.4px;background:rgba(255,255,255,.02)}
-tr.row{cursor:pointer;transition:background .2s}
-tr.row:hover{background:rgba(139,92,246,.06)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:8px;font-size:.84rem;font-weight:500;text-decoration:none;color:var(--text);background:var(--surface);border:1px solid var(--border);cursor:pointer;transition:all .15s}
+.btn:hover{border-color:var(--teal);color:var(--teal)}
+.btn-primary{background:var(--teal);color:#fff;border-color:var(--teal)}
+.btn-primary:hover{background:var(--teal-dark);color:#fff}
+
+/* Stats row */
+.stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-bottom:28px}
+.stat-card{background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:22px 20px;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+.stat-card .icon{width:40px;height:40px;border-radius:10px;display:inline-flex;align-items:center;justify-content:center;font-size:1.2rem;margin-bottom:10px}
+.stat-card .icon.teal{background:var(--teal-light);color:var(--teal)}
+.stat-card .icon.amber{background:var(--amber-light);color:var(--amber)}
+.stat-card .icon.green{background:var(--green-light);color:var(--green)}
+.stat-card .icon.red{background:var(--red-light);color:var(--red)}
+.stat-card .val{font-size:1.9rem;font-weight:700;color:var(--text);line-height:1.1}
+.stat-card .label{font-size:.78rem;color:var(--text-muted);margin-top:6px;text-transform:uppercase;letter-spacing:.4px;font-weight:500}
+
+/* Cards */
+.card{background:var(--surface);border:1px solid var(--border-light);border-radius:12px;padding:22px;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:20px}
+.card h2{font-size:1.05rem;font-weight:600;color:var(--text);margin-bottom:16px}
+
+/* Chips */
+.chip{display:inline-block;padding:3px 10px;border-radius:6px;font-size:.75rem;font-weight:500}
+.chip-ok{background:var(--green-light);color:var(--green)}
+.chip-warn{background:var(--amber-light);color:var(--amber)}
+.chip-danger{background:var(--red-light);color:var(--red)}
+.chip-neutral{background:var(--surface-2);color:var(--text-secondary)}
+
+/* Table */
+.table-wrap{overflow-x:auto;border-radius:8px;border:1px solid var(--border-light)}
+table{width:100%;border-collapse:collapse;min-width:700px}
+th,td{text-align:left;padding:11px 14px;border-bottom:1px solid var(--border-light)}
+th{color:var(--text-muted);font-weight:500;font-size:.78rem;text-transform:uppercase;letter-spacing:.4px;background:var(--surface-2)}
+tr.row{cursor:pointer;transition:background .15s}
+tr.row:hover{background:var(--teal-light)}
+
+/* Detail panel */
 .detail{margin-top:20px;display:none}
 .detail.active{display:block}
 .grid-2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-.metrics-bar{margin-bottom:6px}
-.metrics-bar .bar-label{display:flex;justify-content:space-between;font-size:.85rem;margin-bottom:3px}
-.metrics-bar .track{height:6px;background:rgba(255,255,255,.06);border-radius:4px;overflow:hidden}
-.metrics-bar .fill{height:100%;border-radius:4px;background:var(--grad);transition:width .4s}
-.transcript{max-height:340px;overflow-y:auto;margin-top:8px;padding:12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
-.entry{padding:8px 12px;border-radius:10px;margin-bottom:6px}
-.entry.student{background:rgba(45,212,191,.06);border:1px solid rgba(45,212,191,.15)}
-.entry.counsellor{background:rgba(124,58,237,.08);border:1px solid rgba(124,58,237,.2)}
-.entry .role{font-size:.72rem;color:var(--muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px}
-.muted{color:var(--muted)}.empty{padding:20px;color:var(--muted)}
-ul{margin:0;padding-left:18px}
-.card-inner{padding:16px;margin-bottom:12px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border)}
+.card-inner{padding:16px;margin-bottom:12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-light)}
+.card-inner strong{color:var(--text);font-size:.9rem}
+
+/* Metric bars */
+.metrics-bar{margin-bottom:8px}
+.metrics-bar .bar-label{display:flex;justify-content:space-between;font-size:.84rem;margin-bottom:4px;color:var(--text-secondary)}
+.metrics-bar .bar-label strong{color:var(--text)}
+.metrics-bar .track{height:6px;background:var(--surface-2);border-radius:4px;overflow:hidden;border:1px solid var(--border-light)}
+.metrics-bar .fill{height:100%;border-radius:4px;background:var(--teal);transition:width .4s}
+
+/* Transcript */
+.transcript{max-height:340px;overflow-y:auto;margin-top:8px;padding:12px;border-radius:10px;background:var(--surface-2);border:1px solid var(--border-light)}
+.entry{padding:8px 12px;border-radius:8px;margin-bottom:6px}
+.entry.student{background:var(--teal-light);border:1px solid #c8e8e3}
+.entry.counsellor{background:var(--amber-light);border:1px solid #f0e0b8}
+.entry .role{font-size:.72rem;color:var(--text-muted);margin-bottom:2px;text-transform:uppercase;letter-spacing:.3px;font-weight:500}
+
+.muted{color:var(--text-muted)}.empty{padding:20px;color:var(--text-muted)}
+ul{margin:0;padding-left:18px;color:var(--text-secondary)}
+
 @media(max-width:768px){.grid-2{grid-template-columns:1fr}.stats-row{grid-template-columns:1fr 1fr}}
 </style>
 </head>
 <body>
 <div class="app">
   <div class="topbar">
-    <div><h1>🔮 CounselAI Admin</h1><div class="sub">Session analytics &amp; student insights</div></div>
+    <div>
+      <h1>📋 CounselAI Dashboard</h1>
+      <div class="sub">Session analytics &amp; student insights</div>
+    </div>
     <div class="nav">
       <a class="btn" href="/">Live Session</a>
-      <a class="btn" href="/api/v1/dashboard/counsellor">Counsellor</a>
+      <a class="btn btn-primary" href="/api/v1/dashboard/counsellor">Counsellor Workbench</a>
     </div>
   </div>
 
   <div class="stats-row" id="stats-row">
-    <div class="glass stat-card"><div class="val" id="st-total">—</div><div class="label">Total Sessions</div></div>
-    <div class="glass stat-card"><div class="val" id="st-students">—</div><div class="label">Students</div></div>
-    <div class="glass stat-card"><div class="val" id="st-flags">—</div><div class="label">Risk Alerts</div></div>
-    <div class="glass stat-card"><div class="val" id="st-avg">—</div><div class="label">Avg Duration</div></div>
+    <div class="stat-card">
+      <div class="icon teal">📊</div>
+      <div class="val" id="st-total">—</div>
+      <div class="label">Total Sessions</div>
+    </div>
+    <div class="stat-card">
+      <div class="icon green">👥</div>
+      <div class="val" id="st-students">—</div>
+      <div class="label">Students</div>
+    </div>
+    <div class="stat-card">
+      <div class="icon amber">🏫</div>
+      <div class="val" id="st-schools">—</div>
+      <div class="label">Active Schools</div>
+    </div>
+    <div class="stat-card">
+      <div class="icon red">⏱</div>
+      <div class="val" id="st-avg">—</div>
+      <div class="label">Avg Duration</div>
+    </div>
   </div>
 
-  <div class="glass" style="margin-bottom:20px">
-    <h2 style="font-size:1.1rem;margin-bottom:14px">Recent Sessions</h2>
+  <div class="card">
+    <h2>Recent Sessions</h2>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>Student</th><th>Class</th><th>Date</th><th>Duration</th><th>Emotion</th><th>Confidence</th><th>Source</th></tr></thead>
+        <thead><tr><th>Student</th><th>Grade</th><th>School</th><th>Date</th><th>Duration</th><th>Status</th><th>Flags</th></tr></thead>
         <tbody id="sessions-body"><tr><td colspan="7" class="empty">Loading sessions…</td></tr></tbody>
       </table>
     </div>
@@ -86,9 +140,20 @@ ul{margin:0;padding-left:18px}
 const sessionsBody=document.getElementById('sessions-body'),detailEl=document.getElementById('session-detail');
 function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function fmtDate(v){if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
-function fmtDur(s){if(s==null||isNaN(+s))return'—';s=Math.max(0,+s);return`${String(Math.floor(s/60)).padStart(2,'0')}:${String(Math.floor(s%60)).padStart(2,'0')}`}
-function conf(v){return v==null||isNaN(+v)?'—':`${(+v).toFixed(1)}%`}
+function fmtDur(s){if(s==null||isNaN(+s))return'—';s=Math.max(0,+s);const m=Math.floor(s/60),sec=Math.floor(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`}
 
+function severityChip(count,severity){
+  if(!count||count===0)return'<span class="chip chip-ok">None</span>';
+  const cls=severity==='high'?'chip-danger':severity==='medium'?'chip-warn':'chip-neutral';
+  return`<span class="chip ${cls}">${count} flag${count>1?'s':''}</span>`}
+
+function statusChip(s){
+  if(s==='completed')return'<span class="chip chip-ok">Done</span>';
+  if(s==='processing')return'<span class="chip chip-warn">Processing</span>';
+  if(s==='failed')return'<span class="chip chip-danger">Failed</span>';
+  return`<span class="chip chip-neutral">${esc(s||'—')}</span>`}
+
+/* -- Transcript & profile rendering (kept from original) -- */
 function renderTranscript(entries){
   if(!Array.isArray(entries)||!entries.length)return'<div class="muted">No transcript available.</div>';
   return entries.map(e=>{const r=(e.role||'student').toLowerCase();return`<div class="entry ${r==='counsellor'?'counsellor':'student'}"><div class="role">${r==='counsellor'?'Counsellor':'Student'}</div><div>${esc(e.text)||'(empty)'}</div></div>`}).join('')}
@@ -110,45 +175,70 @@ function profileSections(p){
   const emo=[p?.emotional_profile?.empathy_level?`Empathy: ${p.emotional_profile.empathy_level}`:'',p?.emotional_profile?.emotional_regulation?`Regulation: ${p.emotional_profile.emotional_regulation}`:'',p?.emotional_profile?.stress_response?`Stress response: ${p.emotional_profile.stress_response}`:'',anx.length?`Anxiety markers: ${anx.join(', ')}`:''].filter(Boolean);
   const beh=[p?.behavioral_insights?.confidence_level?`Confidence: ${p.behavioral_insights.confidence_level}`:'',p?.behavioral_insights?.social_dynamics?`Social: ${p.behavioral_insights.social_dynamics}`:'',p?.behavioral_insights?.leadership_potential?`Leadership: ${p.behavioral_insights.leadership_potential}`:''].filter(Boolean);
   const flags=Array.isArray(p?.red_flags)?p.red_flags:[];
-  const flagsHtml=flags.length?flags.map(f=>`<div style="padding:6px 10px;background:rgba(251,113,133,.08);border-radius:8px;margin-bottom:4px">⚠ ${esc(f)}</div>`).join(''):'No red flags.';
+  const flagsHtml=flags.length?flags.map(f=>`<div style="padding:6px 10px;background:var(--red-light);border-radius:8px;margin-bottom:4px;color:var(--red)">⚠ ${esc(typeof f==='string'?f:f.description||JSON.stringify(f))}</div>`).join(''):'<div class="muted">No red flags.</div>';
   return{personality:renderRows(pers),cognitive:renderRows(cog),emotional:renderRows(emo),behavioral:renderRows(beh),redFlags:flagsHtml,summary:esc(p?.summary||'No summary available.')}}
 
-function faceAnalysis(f){if(!f?.summary)return'No face data captured.';const s=f.summary;const items=[s.dominant_emotion?`Dominant emotion: ${s.dominant_emotion}`:'',s.eye_contact_score!=null?`Eye contact: ${(s.eye_contact_score*100).toFixed(0)}%`:'',s.smile_count!=null?`Smiles: ${s.smile_count}`:''].filter(Boolean);return items.map(i=>`<div style="margin-bottom:4px">${esc(i)}</div>`).join('')||'No face data.'}
-function voiceAnalysis(v){if(!v?.speech_rate)return'No voice data captured.';const items=[v.speech_rate.words_per_minute?`Speech: ${v.speech_rate.words_per_minute.toFixed(0)} WPM`:'',v.pitch?.mean_hz?`Pitch: ${v.pitch.mean_hz.toFixed(0)} Hz`:'',v.overall_confidence_score!=null?`Confidence: ${(v.overall_confidence_score*100).toFixed(0)}%`:''].filter(Boolean);return items.map(i=>`<div style="margin-bottom:4px">${esc(i)}</div>`).join('')||'No voice data.'}
-
+/* -- Session detail (uses counsellor review endpoint) -- */
 async function openSession(id){
-  const res=await fetch(`/api/sessions/${id}`);const data=await res.json();
-  if(!res.ok){detailEl.classList.add('active');detailEl.innerHTML=`<div class="glass"><div class="muted">Failed to load: ${data.error||'Unknown'}</div></div>`;return}
-  const p=data.profile||{},sec=profileSections(p),stu=data.student_info||{};
   detailEl.classList.add('active');
-  detailEl.innerHTML=`<div class="glass"><h2 style="font-size:1.15rem;margin-bottom:16px">Session #${data.id}</h2>
-    <div class="grid-2"><div class="card-inner"><div class="muted">${esc(stu.name||'—')} · ${esc(stu.class||'—')} · ${fmtDur(data.duration_seconds)}</div></div>
-    <div class="card-inner"><strong>Scores</strong><div style="margin-top:8px">${metricBars(p)}</div></div></div>
-    <div class="card-inner"><strong>Personality</strong><div class="muted" style="margin-top:6px">${sec.personality}</div></div>
-    <div class="card-inner"><strong>Cognitive</strong><div class="muted" style="margin-top:6px">${sec.cognitive}</div></div>
-    <div class="card-inner"><strong>Emotional</strong><div class="muted" style="margin-top:6px">${sec.emotional}</div></div>
-    <div class="card-inner"><strong>Behavioral</strong><div class="muted" style="margin-top:6px">${sec.behavioral}</div></div>
-    <div class="card-inner"><strong>Recommendations</strong><div style="margin-top:6px">${renderRecs(p)}</div></div>
-    <div class="card-inner"><strong style="color:var(--rose)">Red Flags</strong><div style="margin-top:6px">${sec.redFlags}</div></div>
-    <div class="card-inner"><strong>Summary</strong><div class="muted" style="margin-top:6px">${sec.summary}</div></div>
-    <div class="grid-2"><div class="card-inner"><strong>🎭 Face Analysis</strong><div class="muted" style="margin-top:6px">${faceAnalysis(data.face_analysis||{})}</div></div>
-    <div class="card-inner"><strong>🎤 Voice Analysis</strong><div class="muted" style="margin-top:6px">${voiceAnalysis(data.voice_analysis||{})}</div></div></div>
-    <div class="card-inner"><strong>Transcript</strong><div class="transcript">${renderTranscript(data.transcript)}</div></div>
-  </div>`}
+  detailEl.innerHTML='<div class="card"><div class="muted">Loading session details…</div></div>';
+  try{
+    const res=await fetch(`/api/v1/dashboard/counsellor/sessions/${id}/review`);
+    if(!res.ok){const err=await res.json().catch(()=>({}));detailEl.innerHTML=`<div class="card"><div class="muted">Failed to load: ${esc(err.detail||res.statusText)}</div></div>`;return}
+    const data=await res.json();
+    const p=data.profile||{},sec=profileSections(p);
+    const studentName=data.student?.full_name||data.student_name||'—';
+    const studentGrade=data.student?.grade||data.student_grade||'—';
+    const dur=fmtDur(data.duration_seconds);
+    detailEl.innerHTML=`<div class="card"><h2>Session Detail</h2>
+      <div class="grid-2"><div class="card-inner"><strong>Student</strong><div class="muted" style="margin-top:6px">${esc(studentName)} · Grade ${esc(studentGrade)} · ${dur}</div></div>
+      <div class="card-inner"><strong>Scores</strong><div style="margin-top:8px">${metricBars(p)}</div></div></div>
+      <div class="card-inner"><strong>Personality</strong><div class="muted" style="margin-top:6px">${sec.personality}</div></div>
+      <div class="card-inner"><strong>Cognitive</strong><div class="muted" style="margin-top:6px">${sec.cognitive}</div></div>
+      <div class="card-inner"><strong>Emotional</strong><div class="muted" style="margin-top:6px">${sec.emotional}</div></div>
+      <div class="card-inner"><strong>Behavioral</strong><div class="muted" style="margin-top:6px">${sec.behavioral}</div></div>
+      <div class="card-inner"><strong>Recommendations</strong><div style="margin-top:6px">${renderRecs(p)}</div></div>
+      <div class="card-inner"><strong style="color:var(--red)">Red Flags</strong><div style="margin-top:6px">${sec.redFlags}</div></div>
+      <div class="card-inner"><strong>Summary</strong><div class="muted" style="margin-top:6px">${sec.summary}</div></div>
+      <div class="card-inner"><strong>Transcript</strong><div class="transcript">${renderTranscript(data.transcript||[])}</div></div>
+    </div>`;
+  }catch(e){detailEl.innerHTML=`<div class="card"><div class="muted">Error loading session.</div></div>`}}
 
+/* -- Main data load using counsellor queue API -- */
 async function load(){
-  try{const res=await fetch('/api/sessions');const pl=await res.json();const ss=Array.isArray(pl.sessions)?pl.sessions:[];
-    document.getElementById('st-total').textContent=ss.length;
+  try{
+    const res=await fetch('/api/v1/dashboard/counsellor/queue?limit=50');
+    if(!res.ok)throw new Error(`API returned ${res.status}`);
+    const pl=await res.json();
+    const ss=Array.isArray(pl.items)?pl.items:[];
+    const total=pl.total||ss.length;
+
+    // Stats
+    document.getElementById('st-total').textContent=total;
     const students=new Set(ss.map(s=>s.student_name).filter(Boolean));
     document.getElementById('st-students').textContent=students.size;
-    const flagCount=ss.filter(s=>s.dominant_emotion&&['angry','fear','sad','disgust'].includes(s.dominant_emotion.toLowerCase())).length;
-    document.getElementById('st-flags').textContent=flagCount;
+    const schools=new Set(ss.map(s=>s.school_name).filter(Boolean));
+    document.getElementById('st-schools').textContent=schools.size||'—';
     const durations=ss.map(s=>+s.duration_seconds).filter(d=>!isNaN(d)&&d>0);
     document.getElementById('st-avg').textContent=durations.length?fmtDur(durations.reduce((a,b)=>a+b,0)/durations.length):'—';
-    if(!ss.length){sessionsBody.innerHTML='<tr><td colspan="7" class="empty">No sessions yet.</td></tr>';return}
-    sessionsBody.innerHTML=ss.map(s=>`<tr class="row" data-id="${s.id}"><td>${esc(s.student_name||'Student')}</td><td>${esc(s.student_class||'—')}</td><td>${fmtDate(s.session_end_time||s.created_at)}</td><td>${fmtDur(s.duration_seconds)}</td><td><span class="chip ${['angry','fear','sad'].includes((s.dominant_emotion||'').toLowerCase())?'chip-danger':'chip-ok'}">${esc(s.dominant_emotion||'unknown')}</span></td><td>${conf(s.confidence_score)}</td><td>${esc(s.source||'—')}</td></tr>`).join('');
+
+    if(!ss.length){sessionsBody.innerHTML='<tr><td colspan="7" class="empty">No sessions yet. Start a counselling session to see data here.</td></tr>';return}
+
+    sessionsBody.innerHTML=ss.map(s=>`<tr class="row" data-id="${esc(s.session_id)}">
+      <td><strong>${esc(s.student_name||'Student')}</strong></td>
+      <td>${esc(s.student_grade||'—')}</td>
+      <td>${esc(s.school_name||'—')}</td>
+      <td>${fmtDate(s.started_at)}</td>
+      <td>${fmtDur(s.duration_seconds)}</td>
+      <td>${statusChip(s.status)}</td>
+      <td>${severityChip(s.red_flag_count,s.max_severity)}</td>
+    </tr>`).join('');
+
     document.querySelectorAll('.row').forEach(r=>r.addEventListener('click',()=>openSession(r.dataset.id)));
-  }catch(e){sessionsBody.innerHTML='<tr><td colspan="7" class="empty">Failed to load sessions.</td></tr>'}}
+  }catch(e){
+    console.error('Dashboard load failed:',e);
+    sessionsBody.innerHTML='<tr><td colspan="7" class="empty">Failed to load sessions. Check API connection.</td></tr>'}}
+
 load();
 </script>
 </body>
