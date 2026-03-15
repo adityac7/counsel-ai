@@ -32,6 +32,10 @@ async def lifespan(application: FastAPI):
     setup_logging()
     init_db()
 
+    # Ensure all ORM tables exist (idempotent — won't drop existing data)
+    from counselai.storage.db import create_all_tables
+    await create_all_tables()
+
     from counselai.api.gemini_client import init_gemini_client
 
     try:
@@ -59,12 +63,16 @@ from counselai.api.routes.legacy import router as legacy_router  # noqa: E402
 from counselai.api.routes.dashboard import router as dashboard_router  # noqa: E402
 from counselai.api.routes.sessions import router as sessions_router  # noqa: E402
 from counselai.api.routes.live import router as live_router  # noqa: E402
+from counselai.api.routes.analytics import router as analytics_router  # noqa: E402
+from counselai.api.routes.analytics import feedback_router  # noqa: E402
 
 app.include_router(gemini_ws_router, prefix="/api", tags=["gemini"])
 app.include_router(legacy_router, prefix="/api", tags=["legacy"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
 app.include_router(sessions_router, prefix="/api/v1/sessions", tags=["sessions"])
 app.include_router(live_router, prefix="/api/v1/live", tags=["live"])
+app.include_router(analytics_router, tags=["analytics"])  # already has prefix="/api/analytics"
+app.include_router(feedback_router, tags=["feedback"])  # already has prefix="/api/sessions"
 
 # Static files (favicon etc.)
 _STATIC_DIR = _PROJECT_ROOT / "static"
