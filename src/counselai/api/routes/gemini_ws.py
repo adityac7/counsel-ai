@@ -7,6 +7,7 @@ No reconnection. No watchdog. No state machine.
 import asyncio
 import logging
 
+from fastapi import APIRouter
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from google.genai import types as gt
 
@@ -23,6 +24,7 @@ from counselai.api.websocket_handler import (
 )
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
 def generate_silent_audio(duration_ms: int = 100, sample_rate: int = 16000) -> bytes:
@@ -31,6 +33,7 @@ def generate_silent_audio(duration_ms: int = 100, sample_rate: int = 16000) -> b
     return b"\x00\x00" * n_samples
 
 
+@router.websocket("/gemini-ws")
 async def gemini_ws_proxy(ws: WebSocket) -> None:
     """Main WebSocket handler — connects browser to Gemini Live."""
     await ws.accept()
