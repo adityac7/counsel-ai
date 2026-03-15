@@ -78,14 +78,19 @@ async def browser_to_gemini(ws: WebSocket, session) -> None:
         logger.error("browser→gemini error: %s", exc)
 
 
-async def gemini_to_browser(ws: WebSocket, session) -> None:
+async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | None = None) -> None:
     """Forward Gemini responses to browser WebSocket.
 
     Key pattern from official docs: wrap session.receive() in while True.
     Each receive() call yields one conversational turn. When the turn
     completes (turnComplete), we loop back for the next turn.
     The session stays alive across turns.
+
+    Also captures session_resumption_update handles for reconnection.
     """
+    if resumption_state is None:
+        resumption_state = {}
+
     try:
         while True:
             # Each receive() gives us one turn
@@ -93,6 +98,24 @@ async def gemini_to_browser(ws: WebSocket, session) -> None:
                 # Skip setup events
                 if response.setup_complete:
                     continue
+
+                # Capture resumption handle for reconnection
+                if response.session_resumption_update:
+                    update = response.session_resumption_update
+                    if getattr(update, "resumable", False) and getattr(update, "new_handle", None):
+                        resumption_state["handle"] = update.new_handle
+                        logger.debug("Resumption handle updated")
+
+                # Handle GoAway — Gemini tells us to reconnect
+                if response.go_away:
+                    logger.info("Received GoAway from Gemini — connection will be recycled")
+                    try:
+                        await ws.send_json({"type": "go_away"})
+                    except Exception:
+                        pass
+                    # Signal to the caller that we need to reconnect
+                    resumption_state["go_away"] = True
+                    return  # Exit so caller can reconnect
 
                 srv = response.server_content
                 if not srv:

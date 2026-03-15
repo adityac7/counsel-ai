@@ -47,8 +47,13 @@ def get_gemini_client() -> genai.Client:
     return _client
 
 
-def build_live_config() -> gt.LiveConnectConfig:
-    """Build the LiveConnectConfig for audio-output sessions."""
+def build_live_config(resumption_handle: str | None = None) -> gt.LiveConnectConfig:
+    """Build the LiveConnectConfig for audio-output sessions.
+
+    Includes:
+    - context_window_compression: extends audio+video from 2min to unlimited
+    - session_resumption: survives 10min connection limit with auto-reconnect
+    """
     return gt.LiveConnectConfig(
         response_modalities=["AUDIO"],
         speech_config=gt.SpeechConfig(
@@ -56,6 +61,12 @@ def build_live_config() -> gt.LiveConnectConfig:
                 prebuilt_voice_config=gt.PrebuiltVoiceConfig(voice_name="Zephyr")
             )
         ),
-        inputAudioTranscription=gt.AudioTranscriptionConfig(),
-        outputAudioTranscription=gt.AudioTranscriptionConfig(),
+        input_audio_transcription=gt.AudioTranscriptionConfig(),
+        output_audio_transcription=gt.AudioTranscriptionConfig(),
+        context_window_compression=gt.ContextWindowCompressionConfig(
+            sliding_window=gt.SlidingWindow(),
+        ),
+        session_resumption=gt.SessionResumptionConfig(
+            handle=resumption_handle,
+        ),
     )
