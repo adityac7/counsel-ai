@@ -246,6 +246,9 @@ class SessionRecord(Base):
     student_mood_end: Mapped[str | None] = mapped_column(String(50))
     turn_count: Mapped[int | None] = mapped_column(Integer)
 
+    # Full post-session report (JSON blob from report_generator)
+    report: Mapped[str | None] = mapped_column(Text)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 

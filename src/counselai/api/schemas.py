@@ -238,6 +238,74 @@ class SchoolOverviewResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
+# Session report contracts
+# ---------------------------------------------------------------------------
+class ThemeItem(BaseModel):
+    theme: str
+    evidence: str = ""
+
+
+class EmotionalIndicators(BaseModel):
+    primary_emotion: str = ""
+    secondary_emotions: list[str] = Field(default_factory=list)
+    trajectory: str = ""
+    emotional_vocabulary_level: str = ""
+
+
+class RiskFlags(BaseModel):
+    level: str = "none"
+    flags: list[str] = Field(default_factory=list)
+    protective_factors: list[str] = Field(default_factory=list)
+    immediate_safety_concern: bool = False
+
+
+class CounsellorEffectiveness(BaseModel):
+    listen_phase: str = ""
+    probe_phase: str = ""
+    dig_deeper_phase: str = ""
+    pattern_followed: bool = False
+    strengths: list[str] = Field(default_factory=list)
+    areas_to_improve: list[str] = Field(default_factory=list)
+
+
+class RecommendedFollowups(BaseModel):
+    actions: list[str] = Field(default_factory=list)
+    topics_for_next_session: list[str] = Field(default_factory=list)
+    referral_needed: bool = False
+    referral_type: str = "none"
+    urgency: str = "routine"
+
+
+class CognitiveProfileSnapshot(BaseModel):
+    decision_making_style: str = ""
+    emotional_regulation: str = ""
+    social_awareness: str = ""
+    self_awareness: str = ""
+    coping_strategies: list[str] = Field(default_factory=list)
+
+
+class SessionReportResponse(BaseModel):
+    session_id: uuid.UUID
+    session_summary: str = ""
+    student_engagement_score: int = 0
+    student_engagement_rationale: str = ""
+    key_themes: list[ThemeItem] = Field(default_factory=list)
+    emotional_indicators: EmotionalIndicators = Field(
+        default_factory=EmotionalIndicators
+    )
+    risk_flags: RiskFlags = Field(default_factory=RiskFlags)
+    counsellor_effectiveness: CounsellorEffectiveness = Field(
+        default_factory=CounsellorEffectiveness
+    )
+    recommended_followups: RecommendedFollowups = Field(
+        default_factory=RecommendedFollowups
+    )
+    cognitive_profile_snapshot: CognitiveProfileSnapshot = Field(
+        default_factory=CognitiveProfileSnapshot
+    )
+
+
+# ---------------------------------------------------------------------------
 # Worker payload
 # ---------------------------------------------------------------------------
 class ProcessingStep(str, Enum):
