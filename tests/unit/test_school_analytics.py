@@ -26,11 +26,6 @@ from counselai.storage.models import (
     SignalWindow,
 )
 
-
-# ---------------------------------------------------------------------------
-# Fixtures
-# ---------------------------------------------------------------------------
-
 @pytest.fixture
 def db_engine():
     """In-memory SQLite engine with all tables created.
@@ -260,6 +255,39 @@ class TestSchoolAnalyticsService:
         career = next(c for c in result if c["construct_key"] == "career_identity_clarity")
         assert career["supported"] == 6  # all 6 sessions have this as supported
         assert career["total"] == 6
+
+    def test_profile_fallbacks_fill_constructs_and_topics(
+        self, db_session, school, students, sessions
+    ):
+        from counselai.dashboard.school import SchoolAnalyticsService
+
+        profile = Profile(
+            session_id=sessions[0].id,
+            profile_version="analyze-session-v1",
+            counsellor_view_json={
+                "constructs": [
+                    {
+                        "key": "critical_thinking",
+                        "label": "Critical Thinking",
+                        "status": "supported",
+                        "score": 0.78,
+                        "evidence_summary": "Student weighs options before answering.",
+                    }
+                ]
+            },
+            school_view_json={"themes": ["peer_pressure", "self_agency"]},
+            red_flags_json=[],
+        )
+        db_session.add(profile)
+        db_session.flush()
+
+        svc = SchoolAnalyticsService(db_session)
+        result = svc.full_analytics(school.id)
+
+        assert result["topic_clusters"][0]["topic_key"] == "peer_pressure"
+        assert result["topic_clusters"][0]["occurrences"] == 1
+        assert result["construct_distribution"][0]["construct_key"] == "critical_thinking"
+        assert result["construct_distribution"][0]["supported"] == 1
 
     def test_class_insights(self, db_session, school, students, sessions, profiles):
         from counselai.dashboard.school import SchoolAnalyticsService
