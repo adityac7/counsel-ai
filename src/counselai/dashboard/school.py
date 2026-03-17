@@ -1,41 +1,26 @@
 """School-facing analytics service layer.
-
-All queries return aggregate data only — no individual student names,
-narratives, or session-level details are exposed.  Privacy-first by design.
+Aggregate data only — no individual student details exposed.
 """
-
 from __future__ import annotations
 
 import uuid
-from collections import Counter, defaultdict
-from datetime import datetime, timezone
+from collections import Counter
 from typing import Any, Sequence
 
-from sqlalchemy import func, case, extract, and_
+from sqlalchemy import case, func
 from sqlalchemy.orm import Session
 
-from counselai.storage.models import (
-    Hypothesis,
-    HypothesisStatus,
-    Profile,
-    School,
-    SessionRecord,
-    SessionStatus,
-    SignalWindow,
-    Student,
+from counselai.dashboard.school_fallbacks import (
+    profile_construct_distribution,
+    profile_topic_clusters,
 )
-
-
-# ---------------------------------------------------------------------------
-# Data containers (plain dicts — schemas live in api/schemas.py)
-# ---------------------------------------------------------------------------
-
-
-
+from counselai.storage.models import (
+    Hypothesis, HypothesisStatus, Profile, School,
+    SessionRecord, SessionStatus, SignalWindow, Student,
+)
 def _enum_val(v):
     """Safely get .value from enum or return string as-is."""
     return v.value if hasattr(v, 'value') else v
-
 class SchoolAnalyticsService:
     """Aggregate analytics queries scoped to a single school."""
 
@@ -202,14 +187,16 @@ class SchoolAnalyticsService:
             .limit(20)
             .all()
         )
-        return [
-            {
-                "topic_key": r.topic_key,
-                "occurrences": r.occurrences,
-                "avg_reliability": round(float(r.avg_reliability), 3) if r.avg_reliability else None,
-            }
-            for r in rows
-        ]
+        if rows:
+            return [
+                {
+                    "topic_key": r.topic_key,
+                    "occurrences": r.occurrences,
+                    "avg_reliability": round(float(r.avg_reliability), 3) if r.avg_reliability else None,
+                }
+                for r in rows
+            ]
+        return profile_topic_clusters(self.db, school_id)
 
     # -- Hypothesis / construct distribution --------------------------------
 
@@ -245,18 +232,20 @@ class SchoolAnalyticsService:
             .limit(20)
             .all()
         )
-        return [
-            {
-                "construct_key": r.construct_key,
-                "label": r.label,
-                "total": r.total,
-                "supported": r.supported,
-                "mixed": r.mixed,
-                "weak": r.weak,
-                "avg_score": round(float(r.avg_score), 3) if r.avg_score else None,
-            }
-            for r in rows
-        ]
+        if rows:
+            return [
+                {
+                    "construct_key": r.construct_key,
+                    "label": r.label,
+                    "total": r.total,
+                    "supported": r.supported,
+                    "mixed": r.mixed,
+                    "weak": r.weak,
+                    "avg_score": round(float(r.avg_score), 3) if r.avg_score else None,
+                }
+                for r in rows
+            ]
+        return profile_construct_distribution(self.db, school_id)
 
     # -- Trend lines (sessions over time) -----------------------------------
 
@@ -267,11 +256,11 @@ class SchoolAnalyticsService:
         granularity: str = "month",
     ) -> list[dict[str, Any]]:
         """Session counts over time, bucketed by month or week."""
+        # SQLite-compatible date bucketing (no date_trunc)
         if granularity == "week":
-            bucket = func.date_trunc("week", SessionRecord.started_at)
+            bucket = func.strftime("%Y-%W", SessionRecord.started_at)
         else:
-            bucket = func.date_trunc("month", SessionRecord.started_at)
-
+            bucket = func.strftime("%Y-%m", SessionRecord.started_at)
         rows = (
             self.db.query(
                 bucket.label("period"),
