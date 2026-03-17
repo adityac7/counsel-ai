@@ -1,0 +1,29 @@
+{% extends "dashboard/base.html" %}
+{% block title %}Schools{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Schools</h1>
+  <div class="subtitle">Registered schools and their analytics</div>
+</div>
+
+{% if schools %}
+<div class="stats-row">
+  {% for school in schools %}
+  <a href="/api/v1/dashboard/schools/{{ school.id }}/dashboard" class="stat-card" style="text-decoration:none">
+    <div class="icon warning">🏫</div>
+    <div class="val">{{ school.name }}</div>
+    <div class="label">{{ school.student_count or 0 }} student{{ 's' if (school.student_count or 0) != 1 else '' }}</div>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="card">
+  <div class="empty-state">
+    <div class="icon">🏫</div>
+    <div class="title">No schools configured</div>
+    <div class="desc">Schools will appear here once students are registered with a school.</div>
+  </div>
+</div>
+{% endif %}
+{% endblock %}

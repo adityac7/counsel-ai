@@ -99,6 +99,39 @@ async def dashboard(request: Request):
     return response
 
 
+@app.get("/dashboard/schools", response_class=HTMLResponse)
+def schools_page(request: Request):
+    """Serve the schools list page."""
+    from counselai.storage.db import get_sync_session_factory
+    from counselai.storage.models import School, Student
+    from sqlalchemy import func, select as sa_select
+
+    factory = get_sync_session_factory()
+    db = factory()
+    try:
+        rows = db.execute(
+            sa_select(
+                School.id, School.name, School.board, School.city,
+                func.count(Student.id).label("student_count"),
+            )
+            .outerjoin(Student, Student.school_id == School.id)
+            .group_by(School.id)
+        ).all()
+
+        schools = [
+            {"id": str(r.id), "name": r.name, "board": r.board,
+             "city": r.city, "student_count": r.student_count}
+            for r in rows
+        ]
+    finally:
+        db.close()
+
+    return templates.TemplateResponse(
+        "dashboard/schools.html",
+        {"request": request, "schools": schools, "active_nav": "schools"},
+    )
+
+
 @app.get("/health")
 async def health():
     """Lightweight health check."""

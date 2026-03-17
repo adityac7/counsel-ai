@@ -49,7 +49,7 @@ def counsellor_workbench(request: Request, db: Session = Depends(get_sync_db)):
     grades = get_available_grades(db)
     return templates.TemplateResponse(
         "dashboard/counsellor.html",
-        {"request": request, "schools": schools, "grades": grades},
+        {"request": request, "schools": schools, "grades": grades, "active_nav": "students"},
     )
 
 
