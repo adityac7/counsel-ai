@@ -247,7 +247,7 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
         {
             "id": str(t.id),
             "turn_index": t.turn_index,
-            "speaker": t.speaker.value,
+            "speaker": _enum_val(t.speaker),
             "start_ms": t.start_ms,
             "end_ms": t.end_ms,
             "text": t.text,
@@ -300,7 +300,7 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
     # Signal observations grouped by modality
     observations_by_modality: dict[str, list[dict]] = {}
     for obs in session.signal_observations:
-        mod = obs.modality.value
+        mod = _enum_val(obs.modality)
         if mod not in observations_by_modality:
             observations_by_modality[mod] = []
         observations_by_modality[mod].append({
@@ -366,7 +366,7 @@ def get_session_evidence(
         node = {
             "id": str(obs.id),
             "type": "observation",
-            "modality": obs.modality.value,
+            "modality": _enum_val(obs.modality),
             "signal_key": obs.signal_key,
             "value": obs.value_json or {},
             "confidence": obs.confidence,
@@ -393,7 +393,7 @@ def get_session_evidence(
                     if t:
                         node["related_turns"].append({
                             "turn_index": t.turn_index,
-                            "speaker": t.speaker.value,
+                            "speaker": _enum_val(t.speaker),
                             "text": t.text,
                         })
 

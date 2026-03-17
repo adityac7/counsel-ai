@@ -86,7 +86,7 @@ async def _save_session_to_db(
             for i, turn in enumerate(turns):
                 t = Turn(
                     id=uuid.uuid4(),
-                    session_id=uuid.UUID(session_id),
+                    session_id=session_id,
                     turn_index=i,
                     speaker=turn["role"],
                     start_ms=0,
