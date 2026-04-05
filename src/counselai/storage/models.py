@@ -1,37 +1,19 @@
 """SQLAlchemy ORM models — SQLite-compatible, async-ready."""
-
 from __future__ import annotations
 
-import enum
-import json
-import uuid
+import enum, json, uuid
 from datetime import datetime, timezone
 from typing import Any
 
 from sqlalchemy import (
-    Boolean,
-    DateTime,
-    Float,
-    ForeignKey,
-    Index,
-    Integer,
-    String,
-    Text,
-    TypeDecorator,
+    Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, TypeDecorator,
 )
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-
 from counselai.storage.db import Base
-
-
-# ---------------------------------------------------------------------------
-# Custom types for SQLite compatibility
-# ---------------------------------------------------------------------------
 
 
 class JSONType(TypeDecorator[Any]):
     """Store Python dicts/lists as JSON text in SQLite."""
-
     impl = Text
     cache_ok = True
 
@@ -48,7 +30,6 @@ class JSONType(TypeDecorator[Any]):
 
 class UUIDType(TypeDecorator[uuid.UUID]):
     """Store UUIDs as 36-char strings in SQLite."""
-
     impl = String(36)
     cache_ok = True
 
@@ -65,23 +46,11 @@ class UUIDType(TypeDecorator[uuid.UUID]):
         return uuid.UUID(value)
 
 
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
-
-
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
-
 def _new_uuid() -> uuid.UUID:
     return uuid.uuid4()
-
-
-# ---------------------------------------------------------------------------
-# Enums
-# ---------------------------------------------------------------------------
-
 
 class SessionStatus(str, enum.Enum):
     draft = "draft"
@@ -111,35 +80,10 @@ class TranscriptSource(str, enum.Enum):
     manual = "manual"
 
 
-class ArtifactType(str, enum.Enum):
-    audio_raw = "audio_raw"
-    video_raw = "video_raw"
-    transcript_raw = "transcript_raw"
-    transcript_canonical = "transcript_canonical"
-    frame_bundle = "frame_bundle"
-    audio_features = "audio_features"
-    video_features = "video_features"
-    content_features = "content_features"
-    evidence_graph = "evidence_graph"
-    profile = "profile"
-
-
-class Modality(str, enum.Enum):
-    content = "content"
-    audio = "audio"
-    video = "video"
-    cross_modal = "cross_modal"
-
-
 class HypothesisStatus(str, enum.Enum):
     supported = "supported"
     mixed = "mixed"
     weak = "weak"
-
-
-# ---------------------------------------------------------------------------
-# Models
-# ---------------------------------------------------------------------------
 
 
 class School(Base):
@@ -171,49 +115,11 @@ class Student(Base):
 
     school: Mapped[School | None] = relationship(back_populates="students")
     sessions: Mapped[list["SessionRecord"]] = relationship(back_populates="student")
-    profile: Mapped["StudentProfile | None"] = relationship(
-        back_populates="student", uselist=False
-    )
 
     __table_args__ = (
         Index("ix_students_school_id", "school_id"),
         Index("ix_students_external_ref", "external_ref"),
     )
-
-
-class StudentProfile(Base):
-    """Extended demographic and academic info for a student."""
-
-    __tablename__ = "student_profiles"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
-    student_id: Mapped[uuid.UUID] = mapped_column(
-        UUIDType, ForeignKey("students.id"), nullable=False, unique=True
-    )
-
-    # Demographics
-    date_of_birth: Mapped[str | None] = mapped_column(String(10))  # YYYY-MM-DD
-    gender: Mapped[str | None] = mapped_column(String(20))
-    parent_contact: Mapped[str | None] = mapped_column(String(100))
-    parent_name: Mapped[str | None] = mapped_column(String(255))
-    address: Mapped[str | None] = mapped_column(Text)
-
-    # Academic info
-    academic_year: Mapped[str | None] = mapped_column(String(10))  # e.g. "2025-26"
-    stream: Mapped[str | None] = mapped_column(String(50))  # Science/Commerce/Arts
-    gpa: Mapped[float | None] = mapped_column(Float)
-    attendance_pct: Mapped[float | None] = mapped_column(Float)
-    extracurriculars: Mapped[dict | None] = mapped_column(JSONType)
-
-    # Counselling context
-    referral_reason: Mapped[str | None] = mapped_column(Text)
-    previous_counselling: Mapped[bool] = mapped_column(Boolean, default=False)
-    notes: Mapped[str | None] = mapped_column(Text)
-
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
-
-    student: Mapped[Student] = relationship(back_populates="profile")
 
 
 class SessionRecord(Base):
@@ -249,20 +155,15 @@ class SessionRecord(Base):
     # Full post-session report (JSON blob from report_generator)
     report: Mapped[str | None] = mapped_column(Text)
 
+    # Real-time observations captured via Gemini function calling during session
+    observations_json: Mapped[dict | None] = mapped_column(JSONType, default=list)
+    segments_json: Mapped[dict | None] = mapped_column(JSONType, default=list)
+
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow, onupdate=_utcnow)
 
     student: Mapped[Student] = relationship(back_populates="sessions")
     turns: Mapped[list["Turn"]] = relationship(
-        back_populates="session", cascade="all, delete-orphan"
-    )
-    artifacts: Mapped[list["Artifact"]] = relationship(
-        back_populates="session", cascade="all, delete-orphan"
-    )
-    signal_windows: Mapped[list["SignalWindow"]] = relationship(
-        back_populates="session", cascade="all, delete-orphan"
-    )
-    signal_observations: Mapped[list["SignalObservation"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
     hypotheses: Mapped[list["Hypothesis"]] = relationship(
@@ -285,7 +186,6 @@ class SessionRecord(Base):
 
 class SessionFeedback(Base):
     """Post-session feedback from student or counsellor."""
-
     __tablename__ = "session_feedback"
 
     id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
@@ -326,73 +226,6 @@ class Turn(Base):
 
     __table_args__ = (
         Index("ix_turns_session_id", "session_id"),
-    )
-
-
-class Artifact(Base):
-    __tablename__ = "artifacts"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        UUIDType, ForeignKey("sessions.id"), nullable=False
-    )
-    artifact_type: Mapped[str] = mapped_column(String(30), nullable=False)
-    storage_uri: Mapped[str] = mapped_column(Text, nullable=False)
-    sha256: Mapped[str] = mapped_column(String(64), nullable=False)
-    metadata_json: Mapped[dict | None] = mapped_column(JSONType, default=dict)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-
-    session: Mapped[SessionRecord] = relationship(back_populates="artifacts")
-
-    __table_args__ = (
-        Index("ix_artifacts_session_id", "session_id"),
-    )
-
-
-class SignalWindow(Base):
-    __tablename__ = "signal_windows"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        UUIDType, ForeignKey("sessions.id"), nullable=False
-    )
-    topic_key: Mapped[str] = mapped_column(String(100), nullable=False)
-    start_ms: Mapped[int] = mapped_column(Integer, nullable=False)
-    end_ms: Mapped[int] = mapped_column(Integer, nullable=False)
-    source_turn_ids: Mapped[dict | None] = mapped_column(JSONType, default=list)
-    reliability_score: Mapped[float] = mapped_column(Float, nullable=False)
-
-    session: Mapped[SessionRecord] = relationship(back_populates="signal_windows")
-    observations: Mapped[list["SignalObservation"]] = relationship(
-        back_populates="window"
-    )
-
-    __table_args__ = (
-        Index("ix_signal_windows_session_id", "session_id"),
-    )
-
-
-class SignalObservation(Base):
-    __tablename__ = "signal_observations"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        UUIDType, ForeignKey("sessions.id"), nullable=False
-    )
-    window_id: Mapped[uuid.UUID | None] = mapped_column(
-        UUIDType, ForeignKey("signal_windows.id")
-    )
-    modality: Mapped[str] = mapped_column(String(20), nullable=False)
-    signal_key: Mapped[str] = mapped_column(String(100), nullable=False)
-    value_json: Mapped[dict | None] = mapped_column(JSONType, default=dict)
-    confidence: Mapped[float] = mapped_column(Float, nullable=False)
-    evidence_ref_json: Mapped[dict | None] = mapped_column(JSONType, default=dict)
-
-    session: Mapped[SessionRecord] = relationship(back_populates="signal_observations")
-    window: Mapped[SignalWindow | None] = relationship(back_populates="observations")
-
-    __table_args__ = (
-        Index("ix_signal_observations_session_id", "session_id"),
     )
 
 

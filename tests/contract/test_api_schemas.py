@@ -13,110 +13,28 @@ from datetime import datetime, timezone
 import pytest
 
 from counselai.api.schemas import (
-    CohortStat,
+    BatchSummary,
+    ClassInsights,
+    ConstructAggregate,
     ConstructOut,
     CounsellorQueueResponse,
-    InboundMediaChunk,
-    JobPayload,
-    OutboundTranscriptTurn,
-    ProcessingStep,
+    GradeDistribution,
+    HypothesisStatus,
     ProfileResponse,
     RedFlagOut,
+    RedFlagSeverity,
+    RedFlagSummary,
     SchoolOverviewResponse,
-    SessionCompleteResponse,
-    SessionCreateRequest,
-    SessionCreateResponse,
-    SessionDetailResponse,
+    SectionDistribution,
     SessionQueueItem,
     SessionStatus,
     Speaker,
     StudentDashboardResponse,
     StudentSessionSummary,
+    TopicCluster,
+    TopicCount,
+    TrendPoint,
 )
-
-
-class TestSessionCreateContract:
-    def test_valid_request(self):
-        req = SessionCreateRequest(
-            student_id=uuid.uuid4(),
-            case_study_id="peer-pressure-01",
-            provider="gemini-live",
-        )
-        data = json.loads(req.model_dump_json())
-        assert "student_id" in data
-        assert data["case_study_id"] == "peer-pressure-01"
-
-    def test_default_provider(self):
-        req = SessionCreateRequest(
-            student_id=uuid.uuid4(),
-            case_study_id="test",
-        )
-        assert req.provider == "gemini-live"
-
-    def test_response_defaults(self):
-        resp = SessionCreateResponse(session_id=uuid.uuid4())
-        assert resp.status == SessionStatus.draft
-
-
-class TestSessionDetailContract:
-    def test_full_response(self):
-        resp = SessionDetailResponse(
-            session_id=uuid.uuid4(),
-            student_id=uuid.uuid4(),
-            case_study_id="peer-pressure-01",
-            provider="gemini-live",
-            status=SessionStatus.completed,
-            started_at=datetime.now(timezone.utc),
-            processing_version="v1",
-        )
-        data = json.loads(resp.model_dump_json())
-        assert data["status"] == "completed"
-        assert data["processing_version"] == "v1"
-
-    def test_optional_fields_null(self):
-        resp = SessionDetailResponse(
-            session_id=uuid.uuid4(),
-            student_id=uuid.uuid4(),
-            case_study_id="test",
-            provider="gemini-live",
-            status=SessionStatus.draft,
-            started_at=datetime.now(timezone.utc),
-            processing_version="v1",
-        )
-        data = json.loads(resp.model_dump_json())
-        assert data["ended_at"] is None
-        assert data["duration_seconds"] is None
-
-
-class TestSessionCompleteContract:
-    def test_response_shape(self):
-        resp = SessionCompleteResponse(
-            session_id=uuid.uuid4(),
-            job_id=uuid.uuid4(),
-        )
-        assert resp.status == SessionStatus.processing
-
-
-class TestWebSocketContracts:
-    def test_inbound_media_chunk(self):
-        chunk = InboundMediaChunk(
-            timestamp_ms=12345,
-            mime_type="audio/pcm",
-            data_b64="SGVsbG8=",
-        )
-        assert chunk.type == "media_chunk"
-
-    def test_outbound_transcript_turn(self):
-        turn = OutboundTranscriptTurn(
-            speaker=Speaker.student,
-            turn_index=4,
-            start_ms=11800,
-            end_ms=16220,
-            text="Mujhe lagta hai...",
-        )
-        data = json.loads(turn.model_dump_json())
-        assert data["type"] == "transcript_turn"
-        assert data["speaker"] == "student"
 
 
 class TestProfileResponseContract:
@@ -130,7 +48,7 @@ class TestProfileResponseContract:
                     label="Career identity clarity",
                     status="supported",
                     score=0.73,
-                    evidence_refs=["turn:7", "window:career_interest"],
+                    evidence_refs=["turn:7"],
                 ),
             ],
             red_flags=[
@@ -173,21 +91,6 @@ class TestDashboardContracts:
         assert data["total"] == 1
         assert data["items"][0]["red_flag_count"] == 2
 
-    def test_school_overview_response(self):
-        resp = SchoolOverviewResponse(
-            school_id=uuid.uuid4(),
-            name="Test School",
-            total_sessions=42,
-            total_students=15,
-            cohort_stats=[
-                CohortStat(label="Grade 10", count=8),
-                CohortStat(label="Grade 11", count=7),
-            ],
-        )
-        data = json.loads(resp.model_dump_json())
-        assert data["total_sessions"] == 42
-        assert len(data["cohort_stats"]) == 2
-
     def test_student_dashboard_response(self):
         sid = uuid.uuid4()
         resp = StudentDashboardResponse(
@@ -207,25 +110,93 @@ class TestDashboardContracts:
         assert len(data["sessions"]) == 1
 
 
-class TestJobPayloadContract:
-    def test_default_steps(self):
-        payload = JobPayload(session_id=uuid.uuid4())
-        assert len(payload.steps) == len(ProcessingStep)
-        assert ProcessingStep.content in payload.steps
-
-    def test_selective_steps(self):
-        payload = JobPayload(
-            session_id=uuid.uuid4(),
-            steps=[ProcessingStep.content, ProcessingStep.profile],
+class TestSchoolAnalyticsContracts:
+    def test_school_overview_response_minimal(self):
+        resp = SchoolOverviewResponse(
+            school_id=uuid.uuid4(),
+            name="Test School",
         )
-        assert len(payload.steps) == 2
+        assert resp.total_sessions == 0
+        assert resp.red_flag_summary.total_flags == 0
 
-    def test_serialization_roundtrip(self):
-        payload = JobPayload(
-            session_id=uuid.uuid4(),
-            processing_version="v2",
+    def test_school_overview_response_full(self):
+        resp = SchoolOverviewResponse(
+            school_id=uuid.uuid4(),
+            name="Test School",
+            board="CBSE",
+            city="Mumbai",
+            total_students=100,
+            total_sessions=250,
+            completed_sessions=200,
+            avg_duration_seconds=900.5,
+            grade_distribution=[
+                GradeDistribution(grade="9", student_count=30, session_count=75),
+                GradeDistribution(grade="10", student_count=40, session_count=100),
+            ],
+            red_flag_summary=RedFlagSummary(
+                total_flags=15,
+                by_severity={"high": 3, "medium": 7, "low": 5},
+                by_key={"high_external_pressure": 7, "substance_exposure": 3},
+            ),
+            topic_clusters=[
+                TopicCluster(topic_key="peer_pressure", occurrences=45, avg_reliability=0.82),
+            ],
+            construct_distribution=[
+                ConstructAggregate(
+                    construct_key="self_agency",
+                    label="Self Agency",
+                    total=50, supported=20, mixed=20, weak=10,
+                    avg_score=0.55,
+                ),
+            ],
+            session_trend=[
+                TrendPoint(period="2026-01-01T00:00:00", session_count=30, unique_students=20),
+            ],
+            batch_summary=BatchSummary(by_status={"completed": 200, "processing": 30, "failed": 20}),
         )
-        data = json.loads(payload.model_dump_json())
-        restored = JobPayload(**data)
-        assert restored.processing_version == "v2"
-        assert len(restored.steps) == len(ProcessingStep)
+        assert resp.total_students == 100
+        assert resp.grade_distribution[0].grade == "9"
+        assert resp.red_flag_summary.by_severity["high"] == 3
+
+    def test_class_insights_schema(self):
+        ci = ClassInsights(
+            grade="10",
+            student_count=40,
+            session_count=100,
+            completed_sessions=85,
+            red_flag_total=5,
+            top_topics=[TopicCount(topic_key="career_interest", count=25)],
+        )
+        assert ci.grade == "10"
+        assert ci.top_topics[0].count == 25
+
+    def test_section_distribution(self):
+        sd = SectionDistribution(
+            grade="9",
+            section="A",
+            student_count=15,
+            session_count=30,
+        )
+        assert sd.grade == "9"
+        assert sd.section == "A"
+
+
+class TestEnumContracts:
+    def test_session_status_values(self):
+        assert SessionStatus.draft == "draft"
+        assert SessionStatus.completed == "completed"
+        assert SessionStatus.failed == "failed"
+
+    def test_speaker_values(self):
+        assert Speaker.student == "student"
+        assert Speaker.counsellor == "counsellor"
+
+    def test_hypothesis_status_values(self):
+        assert HypothesisStatus.supported == "supported"
+        assert HypothesisStatus.mixed == "mixed"
+        assert HypothesisStatus.weak == "weak"
+
+    def test_red_flag_severity_values(self):
+        assert RedFlagSeverity.low == "low"
+        assert RedFlagSeverity.medium == "medium"
+        assert RedFlagSeverity.high == "high"

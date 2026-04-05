@@ -9,7 +9,7 @@ or counsellor ends it.
 import asyncio
 import json
 import logging
-import uuid
+import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
@@ -17,7 +17,7 @@ from starlette.websockets import WebSocket, WebSocketDisconnect
 from google.genai import types as gt
 
 from counselai.storage.db import get_session_factory
-from counselai.storage.models import SessionRecord, Student, Turn
+from counselai.storage.models import SessionStatus
 
 from counselai.api.constants import COUNSELLOR_INSTRUCTIONS
 from counselai.api.gemini_client import (
@@ -25,83 +25,25 @@ from counselai.api.gemini_client import (
     build_live_config,
     get_gemini_client,
 )
+from counselai.settings import settings
+from counselai.api.validators import validate_ws_params
 from counselai.api.websocket_handler import (
     TranscriptCollector,
     browser_to_gemini,
     gemini_to_browser,
     keepalive_ping,
+    session_timer,
+)
+from counselai.storage.repositories.live_sessions import (
+    LiveSessionHandle,
+    create_live_session,
+    finalize_live_session,
 )
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
 
 MAX_RECONNECTS = 20  # ~200 minutes max (10min per connection)
-
-
-async def _save_session_to_db(
-    student_name: str,
-    student_grade: str,
-    student_section: str,
-    school_name: str,
-    student_age: int,
-    scenario: str,
-    turns: list[dict],
-) -> str | None:
-    """Save session transcript to DB. Returns session ID or None on error."""
-    try:
-        async with get_session_factory()() as db:
-            # Find or create student
-            from sqlalchemy import select
-            stmt = select(Student).where(Student.full_name == student_name)
-            result = await db.execute(stmt)
-            student = result.scalar_one_or_none()
-
-            if not student:
-                student = Student(
-                    id=str(uuid.uuid4()),
-                    full_name=student_name,
-                    grade=student_grade,
-                    section=student_section or None,
-                    age=student_age,
-                )
-                db.add(student)
-
-            # Create session record
-            session_id = uuid.uuid4()
-            now = datetime.now(timezone.utc)
-            session_rec = SessionRecord(
-                id=session_id,
-                student_id=student.id if isinstance(student.id, uuid.UUID) else uuid.UUID(student.id),
-                case_study_id=scenario[:100] if scenario else "general",
-                provider="gemini-live",
-                status="completed",
-                started_at=now,
-                ended_at=now,
-                duration_seconds=0,  # Will be updated by frontend
-                turn_count=len(turns),
-            )
-            db.add(session_rec)
-
-            # Save individual turns
-            for i, turn in enumerate(turns):
-                t = Turn(
-                    id=uuid.uuid4(),
-                    session_id=uuid.UUID(session_id),
-                    turn_index=i,
-                    speaker=turn["role"],
-                    start_ms=0,
-                    end_ms=0,
-                    text=turn["text"],
-                    source="gemini-live",
-                )
-                db.add(t)
-
-            await db.commit()
-            logger.info("Saved session %s with %d turns", str(session_id), len(turns))
-            return str(session_id)
-    except Exception as exc:
-        logger.error("Failed to save session: %s", exc)
-        return None
 
 
 def generate_silent_audio(duration_ms: int = 100, sample_rate: int = 16000) -> bytes:
@@ -120,18 +62,80 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
     await ws.accept()
     logger.info("Browser connected")
 
-    scenario = ws.query_params.get("scenario", "General counselling session")
-    student_name = ws.query_params.get("name", "Student")
+    params = validate_ws_params(dict(ws.query_params))
+    scenario = params["scenario"]
+    student_name = params["name"]
+    language = params["lang"]
 
-    client = get_gemini_client()
+    try:
+        client = get_gemini_client()
+    except Exception as exc:
+        logger.error("Gemini client unavailable: %s", exc)
+        try:
+            await ws.send_json({
+                "type": "error",
+                "message": "Gemini API is not configured. Please set GEMINI_API_KEY.",
+                "reconnect_failed": True,
+            })
+            await ws.close(1011, "Provider unavailable")
+        except Exception:
+            pass
+        return
     resumption_state = {"handle": None, "go_away": False}
     transcript = TranscriptCollector()
     is_first_connection = True
     reconnect_count = 0
+    session_start = time.monotonic()
+    live_session: LiveSessionHandle | None = None
+    final_status = SessionStatus.completed
+
+    try:
+        async with get_session_factory()() as db:
+            live_session = await create_live_session(
+                db,
+                student_name=student_name,
+                student_grade=params["grade"],
+                student_section=params["section"],
+                school_name=params["school"],
+                student_age=params["age"],
+                scenario=scenario,
+                language=language,
+            )
+    except Exception as exc:
+        logger.error("Failed to create live session row: %s", exc, exc_info=True)
+        try:
+            await ws.send_json({
+                "type": "error",
+                "message": "Session could not be initialized. Please try again.",
+                "reconnect_failed": True,
+            })
+            await ws.close(1011, "Session persistence unavailable")
+        except Exception:
+            pass
+        return
+
+    try:
+        await ws.send_json({
+            "type": "session_started",
+            "session_id": live_session.session_id,
+            "started_at": live_session.started_at.isoformat(),
+        })
+    except Exception:
+        logger.warning("Failed to notify browser of session start", exc_info=True)
+
+    # Build system instruction once (sent in config, not as client_content)
+    system_instruction = COUNSELLOR_INSTRUCTIONS + (
+        f"\n\nStudent name: {student_name}\n"
+        f"Case study / scenario:\n{scenario}"
+    )
 
     while reconnect_count <= MAX_RECONNECTS:
         resumption_state["go_away"] = False
-        config = build_live_config(resumption_handle=resumption_state.get("handle"))
+        config = build_live_config(
+            resumption_handle=resumption_state.get("handle"),
+            language=language,
+            system_instruction=system_instruction if is_first_connection else "",
+        )
 
         try:
             async with client.aio.live.connect(
@@ -141,22 +145,13 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                     logger.info("Connected to Gemini Live: %s", GEMINI_LIVE_MODEL)
                     await ws.send_json({"type": "setup_complete"})
 
-                    # Send system instructions (only on first connection)
-                    prompt = COUNSELLOR_INSTRUCTIONS + (
-                        f"\n\nStudent name: {student_name}\n"
-                        f"Case study / scenario:\n{scenario}"
-                    )
-                    await session.send_client_content(
-                        turns=gt.Content(parts=[gt.Part(text=prompt)]),
-                        turn_complete=True,
-                    )
-                    logger.info("System prompt sent")
-
+                    # System prompt is now in LiveConnectConfig.system_instruction
                     # Send silent audio to trigger greeting
                     silent = generate_silent_audio()
                     await session.send_realtime_input(
                         audio=gt.Blob(data=silent, mime_type="audio/pcm")
                     )
+                    logger.info("System prompt in config, silent audio sent to trigger greeting")
 
                     await ws.send_json({"type": "connection_active"})
                     is_first_connection = False
@@ -164,15 +159,23 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                     logger.info("Reconnected to Gemini (attempt %d)", reconnect_count)
                     await ws.send_json({"type": "reconnected"})
 
-                # Run bidirectional pipeline
-                b2g = asyncio.create_task(browser_to_gemini(ws, session))
+                # Run bidirectional pipeline + session timer
+                b2g = asyncio.create_task(browser_to_gemini(ws, session, transcript))
                 g2b = asyncio.create_task(
                     gemini_to_browser(ws, session, resumption_state, transcript)
                 )
                 ping = asyncio.create_task(keepalive_ping(ws))
 
+                # Compute remaining time (accounts for reconnections)
+                elapsed = time.monotonic() - session_start
+                remaining = max(0, settings.max_session_duration_seconds - elapsed)
+                wrapup = min(settings.session_wrapup_seconds, remaining)
+                timer = asyncio.create_task(
+                    session_timer(ws, session, transcript, int(remaining), int(wrapup))
+                )
+
                 done, pending = await asyncio.wait(
-                    [b2g, g2b, ping],
+                    [b2g, g2b, ping, timer],
                     return_when=asyncio.FIRST_COMPLETED,
                 )
 
@@ -205,24 +208,43 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
 
         except Exception as exc:
             logger.error("Gemini session error: %s", exc)
+            final_status = SessionStatus.failed
+            transcript.flush()
             try:
-                await ws.send_json({"type": "error", "message": str(exc)})
+                await ws.send_json({
+                    "type": "error",
+                    "message": str(exc),
+                    "reconnect_failed": True,
+                    "turns_saved": len(transcript.turns),
+                })
             except Exception:
                 pass
             break
 
     # Save transcript to DB
     transcript.flush()
-    if transcript.turns:
-        await _save_session_to_db(
-            student_name=student_name,
-            student_grade=ws.query_params.get("grade", "9"),
-            student_section=ws.query_params.get("section", ""),
-            school_name=ws.query_params.get("school", ""),
-            student_age=int(ws.query_params.get("age", "15")),
-            scenario=scenario,
-            turns=transcript.turns,
-        )
+    saved_session_id = None
+    if live_session is not None:
+        try:
+            async with get_session_factory()() as db:
+                saved_session_id = await finalize_live_session(
+                    db,
+                    session_id=live_session.session_id,
+                    turns=transcript.turns,
+                    observations=transcript.observations,
+                    segments=transcript.segments,
+                    status=final_status,
+                    ended_at=datetime.now(timezone.utc),
+                )
+        except Exception as exc:
+            logger.error("Failed to finalize live session %s: %s", live_session.session_id, exc, exc_info=True)
+
+    # Best-effort compatibility event for older clients that still listen for it.
+    if saved_session_id:
+        try:
+            await ws.send_json({"type": "session_saved", "session_id": saved_session_id})
+        except Exception:
+            logger.info("Browser closed before session_saved could be delivered")
 
     # Close browser WebSocket
     try:

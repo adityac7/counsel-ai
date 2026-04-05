@@ -1,79 +1,11 @@
-<!doctype html>
-<html lang="en">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Session Review — CounselAI</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+{% extends "dashboard/base.html" %}
+{% set active_nav = "students" %}
+
+{% block title %}Session Review{% endblock %}
+
+{% block head %}
 <style>
-:root {
-  --bg-primary: #FAFBFC;
-  --bg-card: #FFFFFF;
-  --bg-subtle: #F4F5F7;
-  --bg-hover: #F0F1F4;
-  --brand: #0F7B6C;
-  --brand-light: #E8F5F0;
-  --brand-hover: #0D6B5E;
-  --brand-text: #0A5C50;
-  --success: #1A7F37;
-  --success-bg: #DAFBE1;
-  --warning: #9A6700;
-  --warning-bg: #FFF8C5;
-  --danger: #CF222E;
-  --danger-bg: #FFEBE9;
-  --info: #0969DA;
-  --info-bg: #DDF4FF;
-  --text-primary: #1F2328;
-  --text-secondary: #656D76;
-  --text-tertiary: #8B949E;
-  --border: #D0D7DE;
-  --border-subtle: #E8ECEF;
-  --border-hover: #B0B8C1;
-  --shadow-sm: 0 1px 2px rgba(31,35,40,0.04);
-  --shadow-md: 0 3px 6px rgba(31,35,40,0.04), 0 2px 4px rgba(31,35,40,0.08);
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-}
-* { box-sizing: border-box; margin: 0; padding: 0; }
-body {
-  font-family: 'DM Sans', system-ui, -apple-system, sans-serif;
-  color: var(--text-primary);
-  background: var(--bg-primary);
-  min-height: 100vh;
-  font-size: 15px;
-  line-height: 1.6;
-}
-a { color: inherit; text-decoration: none; }
-
-/* Layout */
-.layout { display: flex; min-height: 100vh; }
-.sidebar {
-  width: 240px; background: var(--bg-card);
-  border-right: 1px solid var(--border-subtle);
-  padding: 24px 0; position: fixed; top: 0; left: 0; bottom: 0;
-  display: flex; flex-direction: column;
-}
-.sidebar-brand { font-size: 18px; font-weight: 700; color: var(--brand-text); padding: 0 20px 24px; letter-spacing: -0.02em; }
-.nav-item {
-  display: flex; align-items: center; gap: 10px;
-  padding: 10px 20px; font-size: 14px; font-weight: 500;
-  color: var(--text-secondary); transition: all 0.15s;
-  border-left: 3px solid transparent;
-}
-.nav-item:hover { color: var(--text-primary); background: var(--bg-subtle); }
-.nav-item.active { color: var(--brand-text); background: var(--brand-light); border-left-color: var(--brand); font-weight: 600; }
-.content { margin-left: 240px; flex: 1; padding: 32px 40px 64px; max-width: 1100px; }
-
-/* Breadcrumb */
-.breadcrumb {
-  display: flex; align-items: center; gap: 8px;
-  margin-bottom: 24px; font-size: 13px; color: var(--text-tertiary);
-}
-.breadcrumb a { color: var(--brand-text); font-weight: 500; }
-.breadcrumb a:hover { text-decoration: underline; }
-
-/* Session header */
+/* Session review — page-specific styles (supplements dashboard.css) */
 .session-header {
   display: flex; justify-content: space-between; align-items: flex-start;
   flex-wrap: wrap; gap: 16px; margin-bottom: 28px;
@@ -82,14 +14,7 @@ a { color: inherit; text-decoration: none; }
 .session-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
 .meta-item { color: var(--text-secondary); font-size: 14px; }
 .meta-item strong { color: var(--text-primary); }
-
-/* Chips */
-.chip { display: inline-flex; align-items: center; gap: 4px; padding: 2px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
-.chip-success { background: var(--success-bg); color: var(--success); }
-.chip-warning { background: var(--warning-bg); color: var(--warning); }
 .chip-brand { background: var(--brand-light); color: var(--brand-text); }
-
-/* Tabs */
 .tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
 .tab {
   padding: 10px 20px; cursor: pointer; color: var(--text-tertiary);
@@ -100,18 +25,8 @@ a { color: inherit; text-decoration: none; }
 .tab.active { color: var(--brand-text); border-color: var(--brand); font-weight: 600; }
 .tab-content { display: none; }
 .tab-content.active { display: block; }
-
-/* Cards */
-.card {
-  background: var(--bg-card); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-lg); padding: 24px;
-  box-shadow: var(--shadow-sm); margin-bottom: 20px;
-}
 h2 { font-size: 16px; margin-bottom: 14px; font-weight: 600; color: var(--text-primary); }
 h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight: 600; }
-.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-
-/* Constructs */
 .construct {
   background: var(--bg-subtle); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;
@@ -136,8 +51,6 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
   background: var(--brand-light); border-radius: 0 8px 8px 0;
   font-style: italic; font-size: 14px; color: var(--text-secondary);
 }
-
-/* Red flags */
 .red-flag {
   background: var(--danger-bg); border: 1px solid #F5C6C6;
   border-radius: var(--radius-md); padding: 14px; margin-bottom: 10px;
@@ -151,8 +64,6 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
 .severity.low { background: var(--success-bg); color: var(--success); }
 .red-flag .reason { margin-top: 6px; color: var(--text-secondary); font-size: 14px; }
 .red-flag .action { margin-top: 6px; color: var(--brand-text); font-size: 13px; font-weight: 500; }
-
-/* Transcript */
 .transcript-container { max-height: 500px; overflow-y: auto; padding-right: 8px; }
 .turn { padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 8px; }
 .turn.student { background: var(--bg-subtle); border: 1px solid var(--border-subtle); }
@@ -162,8 +73,6 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
   display: flex; justify-content: space-between;
 }
 .turn .text { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
-
-/* Evidence */
 .evidence-node {
   background: var(--bg-subtle); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 12px; margin-bottom: 10px;
@@ -177,7 +86,6 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
 .modality-badge.video { background: var(--warning-bg); color: var(--warning); }
 .modality-badge.cross_modal { background: var(--danger-bg); color: var(--danger); }
 .confidence-bar { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-tertiary); }
-
 .window-card {
   background: var(--bg-subtle); border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px;
@@ -185,7 +93,6 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
 .window-header { display: flex; justify-content: space-between; align-items: center; }
 .window-topic { font-weight: 600; color: var(--brand-text); font-size: 14px; }
 .window-time { font-size: 13px; color: var(--text-tertiary); }
-
 .note-item {
   padding: 8px 12px; margin-bottom: 6px; background: var(--brand-light);
   border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0;
@@ -196,139 +103,128 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
   border-left: 3px solid var(--info); border-radius: 0 8px 8px 0;
   font-size: 14px; color: var(--text-primary);
 }
-.muted { color: var(--text-tertiary); }
 .empty { color: var(--text-tertiary); font-style: italic; padding: 12px 0; }
-
 @media(max-width: 900px) {
-  .sidebar { display: none; }
-  .content { margin-left: 0; padding: 20px; }
   .grid-2 { grid-template-columns: 1fr; }
 }
 </style>
-</head>
-<body>
-<div class="layout">
-  <nav class="sidebar">
-    <div class="sidebar-brand">🌿 CounselAI</div>
-    <a href="/dashboard" class="nav-item">📊 Overview</a>
-    <a href="/api/v1/dashboard/counsellor" class="nav-item active">👤 Students</a>
-    <a href="/dashboard" class="nav-item">🏫 Schools</a>
-    <a href="/" class="nav-item">🎤 New Session</a>
-  </nav>
+{% endblock %}
 
-  <main class="content">
-    <div class="breadcrumb">
-      <a href="/dashboard">Dashboard</a>
-      <span>›</span>
-      <a href="/api/v1/dashboard/counsellor">Workbench</a>
-      <span>›</span>
-      <span>Session review</span>
+{% block breadcrumb %}
+<div class="breadcrumb">
+  <a href="/dashboard">Dashboard</a>
+  <span>›</span>
+  <a href="/api/v1/dashboard/counsellor">Workbench</a>
+  <span>›</span>
+  <span>Session review</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="session-header">
+  <div>
+    <h1>{{ data.student.name or 'Unknown Student' }}</h1>
+    <div class="session-meta">
+      <span class="meta-item">Grade <strong>{{ data.student.grade or '—' }}</strong></span>
+      {% if data.student.section %}<span class="meta-item">Section <strong>{{ data.student.section }}</strong></span>{% endif %}
+      {% if data.student.age %}<span class="meta-item">Age <strong>{{ data.student.age }}</strong></span>{% endif %}
+      {% if data.student.school %}<span class="meta-item">School <strong>{{ data.student.school }}</strong></span>{% endif %}
+      <span class="meta-item">Case <strong>{{ data.session.case_study_id }}</strong></span>
+      <span class="chip chip-success">{{ data.session.status }}</span>
     </div>
-
-    <div class="session-header">
-      <div>
-        <h1>{{ data.student.name or 'Unknown Student' }}</h1>
-        <div class="session-meta">
-          <span class="meta-item">Grade <strong>{{ data.student.grade or '—' }}</strong></span>
-          {% if data.student.section %}<span class="meta-item">Section <strong>{{ data.student.section }}</strong></span>{% endif %}
-          {% if data.student.age %}<span class="meta-item">Age <strong>{{ data.student.age }}</strong></span>{% endif %}
-          {% if data.student.school %}<span class="meta-item">School <strong>{{ data.student.school }}</strong></span>{% endif %}
-          <span class="meta-item">Case <strong>{{ data.session.case_study_id }}</strong></span>
-          <span class="chip chip-success">{{ data.session.status }}</span>
-        </div>
-      </div>
-      <div style="text-align:right">
-        <div class="meta-item">{{ data.session.started_at or '—' }}</div>
-        {% if data.session.duration_seconds %}
-        <div class="meta-item" style="margin-top:4px">Duration: <strong>{{ (data.session.duration_seconds // 60) }}m {{ data.session.duration_seconds % 60 }}s</strong></div>
-        {% endif %}
-      </div>
-    </div>
-
-    <div class="tabs">
-      <div class="tab active" data-tab="profile" onclick="switchTab('profile')">📋 Profile</div>
-      <div class="tab" data-tab="evidence" onclick="switchTab('evidence')">🔍 Evidence</div>
-      <div class="tab" data-tab="transcript" onclick="switchTab('transcript')">💬 Transcript</div>
-      <div class="tab" data-tab="signals" onclick="switchTab('signals')">📊 Signals</div>
-    </div>
-
-    <!-- Profile Tab -->
-    <div class="tab-content active" id="tab-profile">
-      {% if data.profile %}{% set cv = data.profile.counsellor_view %}
-      {% if cv.summary %}<div class="card"><h2>📝 Summary</h2><p>{{ cv.summary }}</p></div>{% endif %}
-
-      {% set flags = data.profile.red_flags %}
-      {% if flags and flags|length > 0 %}
-      <div class="card"><h2>🚩 Red flags ({{ flags|length }})</h2>
-        {% for rf in flags %}<div class="red-flag">
-          <span class="severity {{ rf.severity or 'medium' }}">{{ (rf.severity or 'medium')|upper }}</span>
-          <strong>{{ rf.key or 'Unknown' }}</strong>
-          <div class="reason">{{ rf.reason or '' }}</div>
-          {% if rf.recommended_action %}<div class="action">→ {{ rf.recommended_action }}</div>{% endif %}
-          {% if rf.evidence_refs %}<div style="margin-top:6px">{% for ref in rf.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
-        </div>{% endfor %}
-      </div>{% endif %}
-
-      {% if cv.constructs %}<div class="card"><h2>🧩 Constructs ({{ cv.constructs|length }})</h2>
-        {% for c in cv.constructs %}<div class="construct">
-          <div class="construct-header"><div><span class="construct-label">{{ c.label or c.key }}</span> <span class="construct-status {{ c.status or 'weak' }}">{{ c.status or 'weak' }}</span></div>
-            {% if c.score is not none %}<div class="construct-score"><div class="score-bar"><div class="score-fill" style="width:{{ (c.score * 100)|int }}%;background:{% if c.score >= 0.7 %}var(--success){% elif c.score >= 0.4 %}var(--warning){% else %}var(--danger){% endif %}"></div></div><span style="font-size:14px">{{ '%.0f'|format(c.score * 100) }}%</span></div>{% endif %}
-          </div>
-          <div class="construct-body">{{ c.evidence_summary or '' }}</div>
-          {% if c.supporting_quotes %}{% for q in c.supporting_quotes %}<div class="quote">"{{ q }}"</div>{% endfor %}{% endif %}
-          {% if c.evidence_refs %}<div style="margin-top:6px">{% for ref in c.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
-        </div>{% endfor %}
-      </div>{% endif %}
-
-      {% if cv.cross_modal_notes %}<div class="card"><h2>🔗 Cross-modal notes</h2>{% for note in cv.cross_modal_notes %}<div class="note-item">{{ note }}</div>{% endfor %}</div>{% endif %}
-      {% if cv.recommended_follow_ups %}<div class="card"><h2>📌 Follow-ups</h2>{% for fu in cv.recommended_follow_ups %}<div class="followup-item">{{ fu }}</div>{% endfor %}</div>{% endif %}
-      {% else %}<div class="card"><div class="empty">No profile generated yet.</div></div>{% endif %}
-    </div>
-
-    <!-- Evidence Tab -->
-    <div class="tab-content" id="tab-evidence"><div class="card" id="evidence-loading"><p class="muted">Loading evidence…</p></div></div>
-
-    <!-- Transcript Tab -->
-    <div class="tab-content" id="tab-transcript"><div class="card">
-      <h2>💬 Transcript ({{ data.turns|length }} turns)</h2>
-      {% if data.turns %}<div class="transcript-container">
-        {% for t in data.turns %}<div class="turn {{ t.speaker }}">
-          <div class="speaker"><span>{{ t.speaker|capitalize }} — Turn {{ t.turn_index }}</span>
-            <span style="font-size:11px;color:var(--text-tertiary)">{{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}{% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}</span>
-          </div><div class="text">{{ t.text }}</div>
-        </div>{% endfor %}
-      </div>{% else %}<div class="empty">No transcript turns recorded.</div>{% endif %}
-    </div></div>
-
-    <!-- Signals Tab -->
-    <div class="tab-content" id="tab-signals">
-      {% if data.signal_windows %}<div class="card"><h2>🪟 Topic windows ({{ data.signal_windows|length }})</h2>
-        {% for w in data.signal_windows %}<div class="window-card"><div class="window-header">
-          <span class="window-topic">{{ w.topic_key }}</span>
-          <span class="window-time">{{ '%d:%02d'|format(w.start_ms // 60000, (w.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(w.end_ms // 60000, (w.end_ms // 1000) % 60) }} · {{ '%.0f'|format(w.reliability_score * 100) }}%</span>
-        </div></div>{% endfor %}
-      </div>{% endif %}
-
-      {% if data.hypotheses %}<div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
-        {% for h in data.hypotheses %}<div class="construct"><div class="construct-header"><div><span class="construct-label">{{ h.label }}</span> <span class="construct-status {{ h.status }}">{{ h.status }}</span></div>
-          {% if h.score is not none %}<span style="font-size:14px">{{ '%.0f'|format(h.score * 100) }}%</span>{% endif %}
-        </div><div class="construct-body">{{ h.evidence_summary }}</div></div>{% endfor %}
-      </div>{% endif %}
-
-      {% for modality, obs_list in data.observations.items() %}<div class="card">
-        <h2><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> Observations ({{ obs_list|length }})</h2>
-        {% for obs in obs_list[:20] %}<div class="evidence-node">
-          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="font-size:14px">{{ obs.signal_key }}</strong><span class="confidence-bar">{{ '%.0f'|format(obs.confidence * 100) }}%</span></div>
-          {% if obs.value %}<div class="muted" style="font-size:13px">{% for k, v in obs.value.items() %}<span style="margin-right:12px">{{ k }}: <strong>{{ v }}</strong></span>{% endfor %}</div>{% endif %}
-        </div>{% endfor %}
-        {% if obs_list|length > 20 %}<div class="muted" style="padding:8px">… and {{ obs_list|length - 20 }} more</div>{% endif %}
-      </div>{% endfor %}
-
-      {% if not data.signal_windows and not data.hypotheses and not data.observations %}<div class="card"><div class="empty">No signal data available.</div></div>{% endif %}
-    </div>
-  </main>
+  </div>
+  <div style="text-align:right">
+    <div class="meta-item">{{ data.session.started_at or '—' }}</div>
+    {% if data.session.duration_seconds %}
+    <div class="meta-item" style="margin-top:4px">Duration: <strong>{{ (data.session.duration_seconds // 60) }}m {{ data.session.duration_seconds % 60 }}s</strong></div>
+    {% endif %}
+  </div>
 </div>
 
+<div class="tabs">
+  <div class="tab active" data-tab="profile" onclick="switchTab('profile')">📋 Profile</div>
+  <div class="tab" data-tab="evidence" onclick="switchTab('evidence')">🔍 Evidence</div>
+  <div class="tab" data-tab="transcript" onclick="switchTab('transcript')">💬 Transcript</div>
+  <div class="tab" data-tab="signals" onclick="switchTab('signals')">📊 Signals</div>
+</div>
+
+<!-- Profile Tab -->
+<div class="tab-content active" id="tab-profile">
+  {% if data.profile %}{% set cv = data.profile.counsellor_view %}
+  {% if cv.summary %}<div class="card"><h2>📝 Summary</h2><p>{{ cv.summary }}</p></div>{% endif %}
+
+  {% set flags = data.profile.red_flags %}
+  {% if flags and flags|length > 0 %}
+  <div class="card"><h2>🚩 Red flags ({{ flags|length }})</h2>
+    {% for rf in flags %}<div class="red-flag">
+      <span class="severity {{ rf.severity or 'medium' }}">{{ (rf.severity or 'medium')|upper }}</span>
+      <strong>{{ rf.key or 'Unknown' }}</strong>
+      <div class="reason">{{ rf.reason or '' }}</div>
+      {% if rf.recommended_action %}<div class="action">→ {{ rf.recommended_action }}</div>{% endif %}
+      {% if rf.evidence_refs %}<div style="margin-top:6px">{% for ref in rf.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
+    </div>{% endfor %}
+  </div>{% endif %}
+
+  {% if cv.constructs %}<div class="card"><h2>🧩 Constructs ({{ cv.constructs|length }})</h2>
+    {% for c in cv.constructs %}<div class="construct">
+      <div class="construct-header"><div><span class="construct-label">{{ c.label or c.key }}</span> <span class="construct-status {{ c.status or 'weak' }}">{{ c.status or 'weak' }}</span></div>
+        {% if c.score is not none %}<div class="construct-score"><div class="score-bar"><div class="score-fill" style="width:{{ (c.score * 100)|int }}%;background:{% if c.score >= 0.7 %}var(--success){% elif c.score >= 0.4 %}var(--warning){% else %}var(--danger){% endif %}"></div></div><span style="font-size:14px">{{ '%.0f'|format(c.score * 100) }}%</span></div>{% endif %}
+      </div>
+      <div class="construct-body">{{ c.evidence_summary or '' }}</div>
+      {% if c.supporting_quotes %}{% for q in c.supporting_quotes %}<div class="quote">"{{ q }}"</div>{% endfor %}{% endif %}
+      {% if c.evidence_refs %}<div style="margin-top:6px">{% for ref in c.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
+    </div>{% endfor %}
+  </div>{% endif %}
+
+  {% if cv.cross_modal_notes %}<div class="card"><h2>🔗 Cross-modal notes</h2>{% for note in cv.cross_modal_notes %}<div class="note-item">{{ note }}</div>{% endfor %}</div>{% endif %}
+  {% if cv.recommended_follow_ups %}<div class="card"><h2>📌 Follow-ups</h2>{% for fu in cv.recommended_follow_ups %}<div class="followup-item">{{ fu }}</div>{% endfor %}</div>{% endif %}
+  {% else %}<div class="card"><div class="empty">No profile generated yet.</div></div>{% endif %}
+</div>
+
+<!-- Evidence Tab -->
+<div class="tab-content" id="tab-evidence"><div class="card" id="evidence-loading"><p class="muted">Loading evidence…</p></div></div>
+
+<!-- Transcript Tab -->
+<div class="tab-content" id="tab-transcript"><div class="card">
+  <h2>💬 Transcript ({{ data.turns|length }} turns)</h2>
+  {% if data.turns %}<div class="transcript-container">
+    {% for t in data.turns %}<div class="turn {{ t.speaker }}">
+      <div class="speaker"><span>{{ t.speaker|capitalize }} — Turn {{ t.turn_index }}</span>
+        <span style="font-size:11px;color:var(--text-tertiary)">{{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}{% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}</span>
+      </div><div class="text">{{ t.text }}</div>
+    </div>{% endfor %}
+  </div>{% else %}<div class="empty">No transcript turns recorded.</div>{% endif %}
+</div></div>
+
+<!-- Signals Tab -->
+<div class="tab-content" id="tab-signals">
+  {% if data.signal_windows %}<div class="card"><h2>🪟 Topic windows ({{ data.signal_windows|length }})</h2>
+    {% for w in data.signal_windows %}<div class="window-card"><div class="window-header">
+      <span class="window-topic">{{ w.topic_key }}</span>
+      <span class="window-time">{{ '%d:%02d'|format(w.start_ms // 60000, (w.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(w.end_ms // 60000, (w.end_ms // 1000) % 60) }} · {{ '%.0f'|format(w.reliability_score * 100) }}%</span>
+    </div></div>{% endfor %}
+  </div>{% endif %}
+
+  {% if data.hypotheses %}<div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
+    {% for h in data.hypotheses %}<div class="construct"><div class="construct-header"><div><span class="construct-label">{{ h.label }}</span> <span class="construct-status {{ h.status }}">{{ h.status }}</span></div>
+      {% if h.score is not none %}<span style="font-size:14px">{{ '%.0f'|format(h.score * 100) }}%</span>{% endif %}
+    </div><div class="construct-body">{{ h.evidence_summary }}</div></div>{% endfor %}
+  </div>{% endif %}
+
+  {% for modality, obs_list in data.observations.items() %}<div class="card">
+    <h2><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> Observations ({{ obs_list|length }})</h2>
+    {% for obs in obs_list[:20] %}<div class="evidence-node">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="font-size:14px">{{ obs.signal_key }}</strong><span class="confidence-bar">{{ '%.0f'|format(obs.confidence * 100) }}%</span></div>
+      {% if obs.value %}<div class="muted" style="font-size:13px">{% for k, v in obs.value.items() %}<span style="margin-right:12px">{{ k }}: <strong>{{ v }}</strong></span>{% endfor %}</div>{% endif %}
+    </div>{% endfor %}
+    {% if obs_list|length > 20 %}<div class="muted" style="padding:8px">… and {{ obs_list|length - 20 }} more</div>{% endif %}
+  </div>{% endfor %}
+
+  {% if not data.signal_windows and not data.hypotheses and not data.observations %}<div class="card"><div class="empty">No signal data available.</div></div>{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
 <script>
 function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+n));if(n==='evidence'&&!window._evLoaded)loadEvidence()}
 function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
@@ -352,5 +248,4 @@ async function loadEvidence(){
     el.innerHTML=h;window._evLoaded=true;
   }catch(e){el.innerHTML=`<div class="card"><div class="empty">Failed to load evidence.</div></div>`}}
 </script>
-</body>
-</html>
+{% endblock %}

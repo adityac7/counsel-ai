@@ -1,4 +1,2 @@
 #!/bin/bash
-source venv/bin/activate
-pip install -r requirements.txt
-streamlit run app.py --server.port 8501 --server.address 0.0.0.0
+PYTHONPATH=src:. uvicorn counselai.api.app:app --host 0.0.0.0 --port 8501 --reload --reload-dir src --reload-dir templates --reload-dir static

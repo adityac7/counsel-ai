@@ -1,0 +1,228 @@
+{% extends "dashboard/base.html" %}
+{% set active_nav = "overview" %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block head %}
+<style>
+/* Overview-specific styles (supplements dashboard.css) */
+.detail { margin-top: 24px; display: none; }
+.detail.active { display: block; }
+.card-inner {
+  padding: 16px;
+  margin-bottom: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+}
+.card-inner strong { color: var(--text-primary); font-size: 14px; }
+.metrics-bar { margin-bottom: 8px; }
+.metrics-bar .bar-label {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  margin-bottom: 4px;
+  color: var(--text-secondary);
+}
+.metrics-bar .bar-label strong { color: var(--text-primary); }
+.metrics-bar .track {
+  height: 6px;
+  background: var(--bg-subtle);
+  border-radius: 4px;
+  overflow: hidden;
+  border: 1px solid var(--border-subtle);
+}
+.metrics-bar .fill {
+  height: 100%;
+  border-radius: 4px;
+  background: var(--brand);
+  transition: width 0.4s;
+}
+.transcript {
+  max-height: 340px;
+  overflow-y: auto;
+  margin-top: 8px;
+  padding: 12px;
+  border-radius: var(--radius-md);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border-subtle);
+}
+.entry { padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; }
+.entry.student { background: var(--bg-subtle); border: 1px solid var(--border-subtle); }
+.entry.counsellor { background: var(--brand-light); border: 1px solid #B8E4DC; }
+.entry .role {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  margin-bottom: 2px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  font-weight: 500;
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Dashboard</h1>
+  <div class="subtitle">Session analytics and student insights</div>
+</div>
+
+<div class="stats-row" id="stats-row">
+  <div class="stat-card">
+    <div class="icon brand">📊</div>
+    <div class="val" id="st-total">—</div>
+    <div class="label">Total sessions</div>
+  </div>
+  <div class="stat-card">
+    <div class="icon success">👥</div>
+    <div class="val" id="st-students">—</div>
+    <div class="label">Students</div>
+  </div>
+  <div class="stat-card">
+    <div class="icon warning">🏫</div>
+    <div class="val" id="st-schools">—</div>
+    <div class="label">Active schools</div>
+  </div>
+  <div class="stat-card">
+    <div class="icon danger">⏱</div>
+    <div class="val" id="st-avg">—</div>
+    <div class="label">Avg duration</div>
+  </div>
+</div>
+
+<div class="card">
+  <h2>Recent sessions</h2>
+  <div class="table-wrap">
+    <table>
+      <thead><tr><th>Student</th><th>Grade</th><th>School</th><th>Date</th><th>Duration</th><th>Status</th><th>Flags</th></tr></thead>
+      <tbody id="sessions-body"><tr><td colspan="7" style="padding:20px;color:var(--text-tertiary)">Loading sessions…</td></tr></tbody>
+    </table>
+  </div>
+</div>
+
+<div id="session-detail" class="detail"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+const sessionsBody=document.getElementById('sessions-body'),detailEl=document.getElementById('session-detail');
+function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
+function fmtDate(v){if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
+function fmtDur(s){if(s==null||isNaN(+s))return'—';s=Math.max(0,+s);const m=Math.floor(s/60),sec=Math.floor(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`}
+
+function severityChip(count,severity){
+  if(!count||count===0)return'<span class="chip chip-success">None</span>';
+  const cls=severity==='high'?'chip-danger':severity==='medium'?'chip-warning':'chip-neutral';
+  return`<span class="chip ${cls}">${count} flag${count>1?'s':''}</span>`}
+
+function statusChip(s){
+  if(s==='completed')return'<span class="chip chip-success">Done</span>';
+  if(s==='processing')return'<span class="chip chip-warning">Processing</span>';
+  if(s==='failed')return'<span class="chip chip-danger">Failed</span>';
+  return`<span class="chip chip-neutral">${esc(s||'—')}</span>`}
+
+function renderTranscript(entries){
+  if(!Array.isArray(entries)||!entries.length)return'<div class="muted">No transcript available.</div>';
+  return entries.map(e=>{const r=(e.role||'student').toLowerCase();return`<div class="entry ${r==='counsellor'?'counsellor':'student'}"><div class="role">${r==='counsellor'?'Counsellor':'Student'}</div><div>${esc(e.text)||'(empty)'}</div></div>`}).join('')}
+
+function metricBars(p){
+  const view=p?.counsellor_view;
+  const getScore=(key,fallback)=>{
+    const construct=view?.constructs?.find(c=>c.key===key);
+    if(construct?.score!=null){
+      return Math.round(construct.score*10*10)/10;
+    }
+    return fallback;
+  };
+  const m=[{l:'Critical Thinking',v:getScore('critical_thinking',p?.cognitive_profile?.critical_thinking)},{l:'Perspective Taking',v:getScore('perspective_taking',p?.cognitive_profile?.perspective_taking)},{l:'EQ Score',v:getScore('eq_score',p?.emotional_profile?.eq_score)},{l:'Confidence',v:getScore('confidence',p?.behavioral_insights?.confidence)}].filter(x=>x.v!=null);
+  if(!m.length)return'<div class="muted">No scores available.</div>';
+  return m.map(x=>{const pct=Math.min(100,(+x.v/10)*100);return`<div class="metrics-bar"><div class="bar-label"><span>${esc(x.l)}</span><strong>${esc(x.v)}/10</strong></div><div class="track"><div class="fill" style="width:${pct}%"></div></div></div>`}).join('')}
+
+function renderRecs(p){const l=Array.isArray(p?.counsellor_view?.recommended_follow_ups)?p.counsellor_view.recommended_follow_ups:Array.isArray(p?.recommendations)?p.recommendations:[];return l.length?`<ul>${l.map(i=>`<li>${esc(i)}</li>`).join('')}</ul>`:'<div class="muted">No recommendations.</div>'}
+
+function renderRows(items){return items.map(i=>`<div style="margin-bottom:6px">${esc(i)}</div>`).join('')||'—'}
+
+function profileSections(p){
+  p = p || {};
+  const view=p?.counsellor_view||{};
+  const persona=view.personality_snapshot||p?.personality_snapshot||{};
+  const traits=Array.isArray(persona?.traits)?persona.traits:[];
+  const pers=[traits.length?`Traits: ${traits.join(', ')}`:'',persona?.communication_style?`Communication: ${persona.communication_style}`:'',persona?.decision_making?`Decisions: ${persona.decision_making}`:''].filter(Boolean);
+  const cognitive=p?.cognitive_profile||view.cognitive_profile||{};
+  const cog=[cognitive?.moral_reasoning_stage?`Moral reasoning: ${cognitive.moral_reasoning_stage}`:'',cognitive?.problem_solving_style?`Problem solving: ${cognitive.problem_solving_style}`:''].filter(Boolean);
+  const emotional=p?.emotional_profile||view.emotional_profile||{};
+  const anx=Array.isArray(emotional?.anxiety_markers)?emotional.anxiety_markers:[];
+  const emo=[emotional?.empathy_level?`Empathy: ${emotional.empathy_level}`:'',emotional?.emotional_regulation?`Regulation: ${emotional.emotional_regulation}`:'',emotional?.stress_response?`Stress response: ${emotional.stress_response}`:'',anx.length?`Anxiety markers: ${anx.join(', ')}`:''].filter(Boolean);
+  const behavioral=p?.behavioral_insights||view.behavioral_insights||{};
+  const beh=[behavioral?.confidence_level?`Confidence: ${behavioral.confidence_level}`:'',behavioral?.social_dynamics?`Social: ${behavioral.social_dynamics}`:'',behavioral?.leadership_potential?`Leadership: ${behavioral.leadership_potential}`:''].filter(Boolean);
+  const flags=Array.isArray(view.red_flags)?view.red_flags:Array.isArray(p?.red_flags)?p.red_flags:[];
+  const reasonText=f=>typeof f==='string'?f:f.reason||f.description||JSON.stringify(f);
+  const flagsHtml=flags.length?flags.map(f=>`<div style="padding:6px 10px;background:var(--danger-bg);border-radius:8px;margin-bottom:4px;color:var(--danger)">⚠ ${esc(reasonText(f))}</div>`).join(''):'<div class="muted">No red flags.</div>';
+  const summaryText=view.summary||p?.summary||'No summary available.';
+  p.summary = summaryText;
+  return{personality:renderRows(pers),cognitive:renderRows(cog),emotional:renderRows(emo),behavioral:renderRows(beh),redFlags:flagsHtml,summary:esc(p?.summary||'No summary available.')}}
+
+async function openSession(id){
+  detailEl.classList.add('active');
+  detailEl.innerHTML='<div class="card"><div class="muted">Loading session details…</div></div>';
+  try{
+    const res=await fetch(`/api/v1/dashboard/counsellor/sessions/${id}/review`);
+    if(!res.ok){const err=await res.json().catch(()=>({}));detailEl.innerHTML=`<div class="card"><div class="muted">Failed to load: ${esc(err.detail||res.statusText)}</div></div>`;return}
+    const data=await res.json();
+    const p=data.profile||{},sec=profileSections(p);
+    const studentName=data.student?.name||data.student?.full_name||data.student_name||'—';
+    const studentGrade=data.student?.grade||data.student_grade||'—';
+    const dur=fmtDur(data.duration_seconds||data.session?.duration_seconds);
+    detailEl.innerHTML=`<div class="card"><h2>Session detail</h2>
+      <div class="grid-2"><div class="card-inner"><strong>Student</strong><div class="muted" style="margin-top:6px">${esc(studentName)} · Grade ${esc(studentGrade)} · ${dur}</div></div>
+      <div class="card-inner"><strong>Scores</strong><div style="margin-top:8px">${metricBars(p)}</div></div></div>
+      <div class="card-inner"><strong>Personality</strong><div class="muted" style="margin-top:6px">${sec.personality}</div></div>
+      <div class="card-inner"><strong>Cognitive</strong><div class="muted" style="margin-top:6px">${sec.cognitive}</div></div>
+      <div class="card-inner"><strong>Emotional</strong><div class="muted" style="margin-top:6px">${sec.emotional}</div></div>
+      <div class="card-inner"><strong>Behavioral</strong><div class="muted" style="margin-top:6px">${sec.behavioral}</div></div>
+      <div class="card-inner"><strong>Recommendations</strong><div style="margin-top:6px">${renderRecs(p)}</div></div>
+      <div class="card-inner"><strong style="color:var(--danger)">Red flags</strong><div style="margin-top:6px">${sec.redFlags}</div></div>
+      <div class="card-inner"><strong>Summary</strong><div class="muted" style="margin-top:6px">${sec.summary}</div></div>
+      <div class="card-inner"><strong>Transcript</strong><div class="transcript">${renderTranscript(data.transcript||[])}</div></div>
+    </div>`;
+  }catch(e){detailEl.innerHTML=`<div class="card"><div class="muted">Error loading session.</div></div>`}}
+
+async function load(){
+  try{
+    const res=await fetch('/api/v1/dashboard/counsellor/queue?limit=50');
+    if(!res.ok)throw new Error(`API returned ${res.status}`);
+    const pl=await res.json();
+    const ss=Array.isArray(pl.items)?pl.items:[];
+    const total=pl.total||ss.length;
+
+    document.getElementById('st-total').textContent=total;
+    const students=new Set(ss.map(s=>s.student_name).filter(Boolean));
+    document.getElementById('st-students').textContent=students.size;
+    const schools=new Set(ss.map(s=>s.school_name).filter(Boolean));
+    document.getElementById('st-schools').textContent=schools.size||'—';
+    const durations=ss.map(s=>+s.duration_seconds).filter(d=>!isNaN(d)&&d>0);
+    document.getElementById('st-avg').textContent=durations.length?fmtDur(durations.reduce((a,b)=>a+b,0)/durations.length):'—';
+
+    if(!ss.length){
+      sessionsBody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><div class="title">No sessions yet</div><div class="desc">Start a counselling session to see data here.</div></div></td></tr>`;
+      return;
+    }
+
+    sessionsBody.innerHTML=ss.map(s=>`<tr class="row" data-id="${esc(s.session_id)}">
+      <td><strong>${esc(s.student_name||'Student')}</strong></td>
+      <td>${esc(s.student_grade||'—')}</td>
+      <td>${esc(s.school_name||'—')}</td>
+      <td>${fmtDate(s.started_at)}</td>
+      <td>${fmtDur(s.duration_seconds)}</td>
+      <td>${statusChip(s.status)}</td>
+      <td>${severityChip(s.red_flag_count,s.max_severity)}</td>
+    </tr>`).join('');
+
+    document.querySelectorAll('.row').forEach(r=>r.addEventListener('click',()=>openSession(r.dataset.id)));
+  }catch(e){
+    console.error('Dashboard load failed:',e);
+    sessionsBody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="icon">⚠️</div><div class="title">Failed to load sessions</div><div class="desc">Check API connection and try again.</div></div></td></tr>`}}
+
+load();
+</script>
+{% endblock %}

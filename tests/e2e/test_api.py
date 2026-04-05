@@ -1,7 +1,4 @@
-"""E2E tests for CounselAI REST API endpoints.
-
-Uses httpx to hit the live server directly — no browser needed.
-"""
+"""Live-server API contract checks for the stable E2E lane."""
 
 from __future__ import annotations
 
@@ -19,85 +16,11 @@ def client() -> httpx.Client:
         yield c
 
 
-# ---------------------------------------------------------------------------
-# GET /api/sessions
-# ---------------------------------------------------------------------------
-class TestSessionsAPI:
-
-    def test_get_sessions_returns_json(self, client: httpx.Client):
-        resp = client.get("/api/sessions")
+class TestHealthAndEntryPoints:
+    def test_health_endpoint(self, client: httpx.Client):
+        resp = client.get("/health")
         assert resp.status_code == 200
-        data = resp.json()
-        assert "sessions" in data
-        assert isinstance(data["sessions"], list)
-
-    def test_get_sessions_content_type(self, client: httpx.Client):
-        resp = client.get("/api/sessions")
-        assert "application/json" in resp.headers.get("content-type", "")
-
-
-# ---------------------------------------------------------------------------
-# GET /api/case-studies
-# ---------------------------------------------------------------------------
-class TestCaseStudiesAPI:
-
-    def test_get_case_studies_returns_json(self, client: httpx.Client):
-        resp = client.get("/api/case-studies")
-        assert resp.status_code == 200
-        data = resp.json()
-        assert "case_studies" in data
-
-    def test_case_studies_is_list(self, client: httpx.Client):
-        resp = client.get("/api/case-studies")
-        data = resp.json()
-        assert isinstance(data["case_studies"], list)
-
-
-# ---------------------------------------------------------------------------
-# GET /api/sessions/{id} — nonexistent session
-# ---------------------------------------------------------------------------
-class TestSessionDetailAPI:
-
-    def test_invalid_session_id_returns_400(self, client: httpx.Client):
-        """Non-UUID session ID returns 400 Bad Request."""
-        resp = client.get("/api/sessions/999999")
-        assert resp.status_code == 400
-
-    def test_invalid_session_id_has_detail(self, client: httpx.Client):
-        resp = client.get("/api/sessions/999999")
-        data = resp.json()
-        assert "detail" in data or "error" in data
-
-    def test_nonexistent_uuid_session_returns_404(self, client: httpx.Client):
-        """Valid UUID that doesn't exist returns 404."""
-        resp = client.get("/api/sessions/00000000-0000-0000-0000-000000000000")
-        assert resp.status_code == 404
-
-
-# ---------------------------------------------------------------------------
-# Dashboard JSON APIs
-# ---------------------------------------------------------------------------
-class TestDashboardAPIs:
-
-    def test_counsellor_queue_endpoint(self, client: httpx.Client):
-        resp = client.get("/api/v1/dashboard/counsellor/queue")
-        assert resp.status_code in (200, 500)
-
-    def test_counsellor_filters_endpoint(self, client: httpx.Client):
-        resp = client.get("/api/v1/dashboard/counsellor/filters")
-        assert resp.status_code in (200, 500)
-
-    def test_counsellor_html_page(self, client: httpx.Client):
-        resp = client.get("/api/v1/dashboard/counsellor")
-        assert resp.status_code in (200, 500)
-        if resp.status_code == 200:
-            assert "text/html" in resp.headers.get("content-type", "")
-
-
-# ---------------------------------------------------------------------------
-# HTML page endpoints
-# ---------------------------------------------------------------------------
-class TestHTMLPages:
+        assert resp.json()["status"] == "ok"
 
     def test_index_returns_html(self, client: httpx.Client):
         resp = client.get("/")
@@ -111,17 +34,37 @@ class TestHTMLPages:
         assert "text/html" in resp.headers.get("content-type", "")
 
 
-# ---------------------------------------------------------------------------
-# POST endpoints — contract checks
-# ---------------------------------------------------------------------------
-class TestPostEndpoints:
+class TestCaseStudiesAPI:
+    def test_case_studies_returns_json(self, client: httpx.Client):
+        resp = client.get("/api/case-studies")
+        assert resp.status_code == 200
+        assert isinstance(resp.json()["case_studies"], list)
 
-    def test_analyze_session_without_data_returns_422(self, client: httpx.Client):
-        """POST /api/analyze-session without required fields → 422."""
+
+class TestDashboardAPIs:
+    def test_counsellor_queue_returns_200(self, client: httpx.Client, seeded_dashboard_data):
+        resp = client.get("/api/v1/dashboard/counsellor/queue?limit=200")
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["total"] >= 5
+        session_ids = {item["session_id"] for item in payload["items"]}
+        assert seeded_dashboard_data["sessions"]["review"] in session_ids
+        assert seeded_dashboard_data["sessions"]["legacy"] in session_ids
+
+    def test_seeded_review_route_returns_200(self, client: httpx.Client, seeded_dashboard_data):
+        review_session_id = seeded_dashboard_data["sessions"]["review"]
+        resp = client.get(f"/api/v1/dashboard/counsellor/sessions/{review_session_id}/review")
+        assert resp.status_code == 200
+        payload = resp.json()
+        assert payload["session"]["id"] == review_session_id
+        assert payload["profile"] is not None
+
+
+class TestPostContracts:
+    def test_analyze_session_without_data_returns_400(self, client: httpx.Client):
         resp = client.post("/api/analyze-session")
-        assert resp.status_code == 422
+        assert resp.status_code == 400
 
-    def test_rtc_connect_without_body_returns_error(self, client: httpx.Client):
-        """POST /api/rtc-connect without SDP body → error."""
+    def test_removed_rtc_route_is_not_available(self, client: httpx.Client):
         resp = client.post("/api/rtc-connect", content=b"")
-        assert resp.status_code >= 400
+        assert resp.status_code in (404, 405, 422)

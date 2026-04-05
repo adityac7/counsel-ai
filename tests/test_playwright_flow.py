@@ -1,46 +1,64 @@
-"""Additional Playwright flow coverage for start + summary screens."""
-import pytest
+"""Minimal Playwright sanity checks for the live session UI."""
 
-BASE = "http://localhost:8501"
+from __future__ import annotations
+
+import os
+
+import pytest
+from playwright.sync_api import Browser, Page, expect, sync_playwright
+
+SERVER_URL = os.getenv("COUNSELAI_TEST_URL", "http://localhost:8501")
+
+
+@pytest.fixture(scope="session")
+def server_url() -> str:
+    return SERVER_URL
 
 
 @pytest.fixture(scope="module")
-def page():
-    from playwright.sync_api import sync_playwright
-
-    with sync_playwright() as p:
-        browser = p.chromium.launch(
+def browser() -> Browser:
+    with sync_playwright() as pw:
+        browser = pw.chromium.launch(
             headless=True,
             chromium_sandbox=False,
             args=["--no-sandbox", "--disable-setuid-sandbox"],
         )
-        pg = browser.new_context(permissions=[], ignore_https_errors=True).new_page()
-        yield pg
+        yield browser
         browser.close()
 
 
-def test_start_session_no_mic_error(page):
-    page.goto(BASE)
-    page.wait_for_timeout(1000)
-    page.fill("#student-name", "Test Student")
-    page.fill("#student-class", "10")
-    page.select_option("#case-study", index=1)
-    page.click("#start-session")
-    page.wait_for_timeout(2000)
-    assert page.locator("#toast").is_visible()
-    assert "Error" in page.locator("#toast").inner_text()
+@pytest.fixture
+def page(browser: Browser) -> Page:
+    context = browser.new_context(ignore_https_errors=True)
+    page = context.new_page()
+    yield page
+    context.close()
 
 
-def test_summary_screen_with_injected_data(page):
-    page.goto(BASE)
-    page.evaluate(
-        "()=>{"
-        "document.getElementById('student-name').value='Injected';"
-        "document.getElementById('student-class').value='11';"
-        "transcriptEntries=[{role:'student',text:'Hello'},{role:'counsellor',text:'Hi'}];"
-        "showSummary();"
-        "}"
-    )
-    assert page.locator("#screen-summary").is_visible()
-    assert page.locator("#summary-meta").inner_text().startswith("Session:")
-    assert page.locator("#summary-transcript").inner_text().count("Student") == 1
+class TestLiveEntryForm:
+    def test_start_button_requires_consent(self, page: Page, server_url: str) -> None:
+        page.goto(server_url)
+        start_btn = page.locator("#start-btn")
+        assert start_btn.is_enabled() is False
+        page.fill("#student-name", "Sanity Student")
+        page.check("#consent-cb")
+        expect(start_btn).to_be_enabled()
+        page.uncheck("#consent-cb")
+        expect(start_btn).to_be_disabled()
+
+
+class TestSummaryScreen:
+    def test_summary_sections_render(self, page: Page, server_url: str) -> None:
+        page.goto(server_url)
+        page.evaluate(
+            "() => {"
+            "document.getElementById('student-name').value = 'Injected';"
+            "window.transcriptEntries = [{ role: 'student', text: 'Hello' }, { role: 'counsellor', text: 'Hi' }];"
+            "showScreen('summary');"
+            "}"
+        )
+        expect(page.locator("#summary")).to_be_visible()
+        expect(page.locator("#profile-metrics")).to_be_attached()
+        expect(page.locator("#personality-section")).to_be_attached()
+        expect(page.locator("#recommendations")).to_be_attached()
+        expect(page.locator("#summary-transcript")).to_be_attached()

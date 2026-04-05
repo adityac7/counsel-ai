@@ -1,0 +1,12 @@
+.git
+.env
+__pycache__
+*.pyc
+*.egg-info
+.claude
+counselai.db*
+artifacts/
+test-reports/
+tests/
+*.md
+.serena/

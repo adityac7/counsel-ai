@@ -23,7 +23,6 @@ from counselai.storage.models import (
     Profile,
     Hypothesis,
     HypothesisStatus,
-    SignalWindow,
 )
 
 @pytest.fixture

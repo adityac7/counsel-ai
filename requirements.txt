@@ -21,18 +21,6 @@ pydantic>=2.5.0
 pydantic-settings>=2.1.0
 python-dotenv>=1.0.0
 
-# Numerical / media analysis
-numpy>=1.24.0
-opencv-python-headless>=4.8.0
-librosa>=0.10.0
-parselmouth>=0.4.3
-
-# LLM providers
-openai>=1.0.0
-
-# Worker queue (optional — for async processing pipeline)
-# dramatiq[redis]>=1.16.0
-
 # ---------- Dev / Test ----------
 # pytest>=8.0.0
 # pytest-asyncio>=0.23.0

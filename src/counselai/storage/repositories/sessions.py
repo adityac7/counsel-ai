@@ -11,8 +11,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from counselai.storage.models import (
-    Artifact,
-    ArtifactType,
     SessionFeedback,
     SessionRecord,
     SessionStatus,
@@ -61,7 +59,6 @@ class SessionRepository:
             .where(SessionRecord.id == session_id)
             .options(
                 joinedload(SessionRecord.turns),
-                joinedload(SessionRecord.artifacts),
                 joinedload(SessionRecord.profiles),
                 joinedload(SessionRecord.feedback),
             )
@@ -223,38 +220,6 @@ class SessionRepository:
             .where(Turn.session_id == session_id)
             .order_by(Turn.turn_index)
         )
-        result = await self.db.execute(stmt)
-        return result.scalars().all()
-
-    # -- Artifacts ----------------------------------------------------------
-
-    async def add_artifact(
-        self,
-        session_id: uuid.UUID,
-        *,
-        artifact_type: ArtifactType,
-        storage_uri: str,
-        sha256: str,
-        metadata_json: dict | None = None,
-    ) -> Artifact:
-        artifact = Artifact(
-            session_id=session_id,
-            artifact_type=artifact_type.value,
-            storage_uri=storage_uri,
-            sha256=sha256,
-            metadata_json=metadata_json or {},
-        )
-        self.db.add(artifact)
-        await self.db.flush()
-        return artifact
-
-    async def get_artifacts(
-        self, session_id: uuid.UUID, artifact_type: ArtifactType | None = None
-    ) -> Sequence[Artifact]:
-        stmt = select(Artifact).where(Artifact.session_id == session_id)
-        if artifact_type is not None:
-            stmt = stmt.where(Artifact.artifact_type == artifact_type.value)
-        stmt = stmt.order_by(Artifact.created_at)
         result = await self.db.execute(stmt)
         return result.scalars().all()
 

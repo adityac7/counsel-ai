@@ -1,8 +1,6 @@
-"""CounselAI prompt modules.
+"""CounselAI prompt constants.
 
-Import the main counsellor prompt and post-session analysis prompt
-from their respective modules.
+All prompt content has been consolidated into counselai.api.constants:
+- COUNSELLOR_INSTRUCTIONS — live session system prompt
+- POST_SESSION_ANALYSIS_PROMPT — post-session analysis schema
 """
-
-from counselai.prompts.system_prompt import build_counsellor_prompt  # noqa: F401
-from counselai.prompts.post_session import POST_SESSION_ANALYSIS_PROMPT  # noqa: F401

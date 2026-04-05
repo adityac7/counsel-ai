@@ -15,11 +15,13 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from counselai.dashboard.counsellor import (
+from counselai.dashboard.counsellor_queue import (
     QueueFilters,
     get_available_grades,
     get_available_schools,
     get_counsellor_queue,
+)
+from counselai.dashboard.counsellor_review import (
     get_session_evidence,
     get_session_review,
 )
@@ -61,7 +63,13 @@ def db_engine():
                 started_at TEXT, ended_at TEXT,
                 duration_seconds INTEGER,
                 artifact_manifest_path TEXT,
-                primary_language TEXT, processing_version TEXT
+                primary_language TEXT, processing_version TEXT,
+                session_summary TEXT, risk_level TEXT,
+                follow_up_needed INTEGER DEFAULT 0,
+                topics_discussed TEXT,
+                student_mood_start TEXT, student_mood_end TEXT,
+                turn_count INTEGER, report TEXT,
+                created_at TEXT, updated_at TEXT
             )
         """))
         conn.execute(text("""
@@ -92,30 +100,8 @@ def db_engine():
                 evidence_refs_json TEXT DEFAULT '{}'
             )
         """))
-        conn.execute(text("""
-            CREATE TABLE signal_windows (
-                id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
-                topic_key TEXT NOT NULL, start_ms INTEGER NOT NULL,
-                end_ms INTEGER NOT NULL, source_turn_ids TEXT DEFAULT '[]',
-                reliability_score REAL NOT NULL
-            )
-        """))
-        conn.execute(text("""
-            CREATE TABLE signal_observations (
-                id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
-                window_id TEXT, modality TEXT NOT NULL,
-                signal_key TEXT NOT NULL, value_json TEXT DEFAULT '{}',
-                confidence REAL NOT NULL, evidence_ref_json TEXT DEFAULT '{}'
-            )
-        """))
-        conn.execute(text("""
-            CREATE TABLE artifacts (
-                id TEXT PRIMARY KEY, session_id TEXT NOT NULL,
-                artifact_type TEXT NOT NULL, storage_uri TEXT NOT NULL,
-                sha256 TEXT NOT NULL, metadata_json TEXT DEFAULT '{}',
-                created_at TEXT
-            )
-        """))
+        # signal_windows, signal_observations, artifacts tables removed —
+        # these models no longer exist in the ORM
         conn.commit()
 
     return engine
@@ -217,34 +203,12 @@ def seed_full_session(db: Session, *, red_flags=None, status="completed"):
         "er": json.dumps({"refs": ["turn:0", "turn:2"]}),
     })
 
-    # Signal window
-    window_id = _uid()
-    db.execute(text(
-        "INSERT INTO signal_windows (id, session_id, topic_key, start_ms, end_ms, "
-        "source_turn_ids, reliability_score) VALUES (:id, :sid, :tk, :st, :en, :sti, :rs)"
-    ), {
-        "id": window_id, "sid": session_id, "tk": "peer_pressure",
-        "st": 8500, "en": 28000, "sti": json.dumps(turn_ids), "rs": 0.85,
-    })
-
-    # Signal observation
-    db.execute(text(
-        "INSERT INTO signal_observations (id, session_id, window_id, modality, signal_key, "
-        "value_json, confidence, evidence_ref_json) VALUES (:id, :sid, :wid, :mod, :sk, :vj, :c, :er)"
-    ), {
-        "id": _uid(), "sid": session_id, "wid": window_id,
-        "mod": "content", "sk": "hedging_markers",
-        "vj": json.dumps({"count": 2, "examples": ["I think maybe"]}),
-        "c": 0.8, "er": json.dumps({"turn_indices": [2]}),
-    })
-
     db.commit()
     return {
         "school_id": school_id,
         "student_id": student_id,
         "session_id": session_id,
         "turn_ids": turn_ids,
-        "window_id": window_id,
     }
 
 

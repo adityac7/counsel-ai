@@ -1,35 +1,44 @@
+"""Tests for the unified session analyzer.
+
+Mocks the Gemini client's generate_content method and verifies the result
+matches the expected ANALYSIS_SCHEMA keys.
+"""
+
 import json
-from types import SimpleNamespace
+from unittest.mock import MagicMock, patch
 
-import profile_generator
-
-
-def _fake_openai_factory(payload):
-    class _FakeCompletions:
-        def create(self, *args, **kwargs):
-            return SimpleNamespace(
-                choices=[
-                    SimpleNamespace(message=SimpleNamespace(content=json.dumps(payload)))
-                ]
-            )
-
-    class _FakeChat:
-        def __init__(self):
-            self.completions = _FakeCompletions()
-
-    class _FakeClient:
-        def __init__(self, *args, **kwargs):
-            self.chat = _FakeChat()
-
-    return _FakeClient
+from counselai.analysis.unified_analyzer import analyze_session, ANALYSIS_SCHEMA
 
 
-def test_generate_profile_new_fields(monkeypatch):
-    mock_profile = {
-        "summary": "The student shows a considerate moral stance and prefers private resolution. "
-        "They balance empathy with a clear stance against cheating. "
-        "Responses are concise and grounded in fairness. "
-        "Overall, the profile suggests steady judgment with modest emotional awareness.",
+def _fake_analysis_result():
+    """Return a mock analysis result matching ANALYSIS_SCHEMA."""
+    return {
+        "session_summary": "The student shows a considerate moral stance and prefers private resolution.",
+        "engagement_score": 7,
+        "key_themes": [
+            {"theme": "peer_pressure", "evidence": "Friend was cheating", "severity": "medium"},
+        ],
+        "emotional_analysis": {
+            "primary_emotion": "concern",
+            "secondary_emotions": ["empathy"],
+            "trajectory": "steady",
+            "emotional_vocabulary": "developing",
+        },
+        "risk_assessment": {
+            "level": "low",
+            "flags": [],
+            "protective_factors": ["strong moral compass"],
+            "immediate_safety_concern": False,
+        },
+        "constructs": [
+            {
+                "key": "critical_thinking",
+                "label": "Critical Thinking",
+                "score": 0.7,
+                "status": "supported",
+                "evidence_summary": "Provides a reasoned, stepwise approach to conflict.",
+            },
+        ],
         "personality_snapshot": {
             "traits": ["considerate", "principled"],
             "communication_style": "concise and thoughtful",
@@ -46,7 +55,6 @@ def test_generate_profile_new_fields(monkeypatch):
             "empathy_level": "moderate",
             "stress_response": "calm",
             "anxiety_markers": [],
-            "emotional_vocabulary": "basic",
         },
         "behavioral_insights": {
             "confidence": 6,
@@ -55,49 +63,128 @@ def test_generate_profile_new_fields(monkeypatch):
             "academic_pressure": "low",
             "resilience": "steady",
         },
-        "conversation_analysis": {
-            "evolution_across_rounds": "consistent with initial stance",
-            "consistency": "high",
-        },
         "key_moments": [
             {
                 "quote": "I would talk to him privately first",
                 "insight": "Shows preference for discretion and relationship preservation.",
             },
-            {
-                "quote": "I dont want to embarrass him but cheating is wrong",
-                "insight": "Balances empathy with a clear moral boundary.",
-            },
         ],
-        "reasoning": {
-            "critical_thinking": "Provides a reasoned, stepwise approach to conflict.",
-            "perspective_taking": "Considers the friend's feelings and public impact.",
-            "eq_score": "Recognizes emotional consequences while holding standards.",
-            "confidence": "Speaks with clarity but without assertive dominance.",
+        "student_view": {
+            "strengths": ["Moral clarity", "Empathy"],
+            "interests": [],
+            "growth_areas": ["Assertiveness"],
+            "encouragement": "Your thoughtfulness shows real maturity.",
+            "next_steps": ["Encourage elaboration on alternatives."],
+        },
+        "school_view": {
+            "themes": ["peer_dynamics"],
+            "academic_pressure_level": "none",
+        },
+        "follow_up": {
+            "actions": ["Discuss peer dynamics further"],
+            "referral_needed": False,
+            "urgency": "routine",
         },
         "red_flags": [],
         "recommendations": ["Encourage elaboration on alternatives and consequences."],
+        "face_data": {
+            "dominant_emotion": "concern",
+            "engagement_indicators": "Maintains steady focus throughout the scenario.",
+        },
+        "voice_data": {
+            "speech_patterns": "Measured and deliberate",
+            "confidence_level": "Moderate",
+        },
+        "segment_analysis": [
+            {
+                "segment_name": "Opening response",
+                "content_summary": "Student prefers private intervention before escalation.",
+                "emotional_state": "calm",
+            },
+        ],
     }
 
-    monkeypatch.setenv("OPENAI_API_KEY", "test-key")
-    monkeypatch.setattr(profile_generator, "OpenAI", _fake_openai_factory(mock_profile))
 
-    transcript = [
-        {"role": "counsellor", "content": "What would you do if your friend was cheating?"},
-        {"role": "student", "content": "I would talk to him privately first"},
-        {"role": "counsellor", "content": "What makes you say that?"},
-        {"role": "student", "content": "I dont want to embarrass him but cheating is wrong"},
-    ]
-    session_data = {"transcript": transcript}
+def test_analyze_session_returns_expected_schema_keys(monkeypatch):
+    """analyze_session should return all top-level keys from ANALYSIS_SCHEMA."""
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
 
-    profile = profile_generator.generate_profile(session_data)
+    mock_result = _fake_analysis_result()
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(mock_result)
 
-    assert "summary" in profile
-    assert "key_moments" in profile
-    assert "reasoning" in profile
-    assert "personality_snapshot" in profile
-    assert "cognitive_profile" in profile
-    assert "emotional_profile" in profile
-    assert "behavioral_insights" in profile
-    assert "conversation_analysis" in profile
-    assert "recommendations" in profile
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("counselai.analysis.unified_analyzer.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+
+        transcript = [
+            {"role": "counsellor", "text": "What would you do if your friend was cheating?"},
+            {"role": "student", "text": "I would talk to him privately first"},
+            {"role": "counsellor", "text": "What makes you say that?"},
+            {"role": "student", "text": "I dont want to embarrass him but cheating is wrong"},
+        ]
+
+        result = analyze_session(
+            transcript,
+            student_name="Test Student",
+            student_grade="10",
+            case_study="ethics-01",
+            duration_seconds=300,
+        )
+
+    # Verify all required top-level keys from the schema are present
+    required_keys = ANALYSIS_SCHEMA["required"]
+    for key in required_keys:
+        assert key in result, f"Missing required key: {key}"
+
+    # Verify specific nested structures
+    assert "session_summary" in result
+    assert "risk_assessment" in result
+    assert "constructs" in result
+    assert "student_view" in result
+    assert "school_view" in result
+    assert "key_moments" in result
+    assert "personality_snapshot" in result
+    assert "cognitive_profile" in result
+    assert "emotional_profile" in result
+    assert "behavioral_insights" in result
+    assert "recommendations" in result
+    assert "red_flags" in result
+
+    # Verify nested schema shapes
+    assert "level" in result["risk_assessment"]
+    assert "flags" in result["risk_assessment"]
+    assert isinstance(result["constructs"], list)
+    assert isinstance(result["key_moments"], list)
+
+
+def test_analyze_session_calls_gemini_with_transcript(monkeypatch):
+    """Verify that analyze_session passes transcript content to Gemini."""
+    monkeypatch.setenv("GEMINI_API_KEY", "test-key")
+
+    mock_result = _fake_analysis_result()
+    mock_response = MagicMock()
+    mock_response.text = json.dumps(mock_result)
+
+    mock_client = MagicMock()
+    mock_client.models.generate_content.return_value = mock_response
+
+    with patch("counselai.analysis.unified_analyzer.genai") as mock_genai:
+        mock_genai.Client.return_value = mock_client
+
+        transcript = [
+            {"role": "student", "text": "I feel pressured by my friends."},
+        ]
+
+        analyze_session(transcript, student_name="Arjun", student_grade="11")
+
+    # Verify Gemini was called exactly once
+    mock_client.models.generate_content.assert_called_once()
+
+    # Verify the prompt includes transcript content
+    call_args = mock_client.models.generate_content.call_args
+    contents = call_args.kwargs.get("contents") or call_args[1].get("contents")
+    prompt_text = contents[0] if isinstance(contents, list) else str(contents)
+    assert "I feel pressured" in prompt_text

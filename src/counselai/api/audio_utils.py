@@ -17,7 +17,7 @@ from typing import NamedTuple
 from google.genai import types as gt
 
 from counselai.api.exceptions import TranscriptionError
-from counselai.api.gemini_client import get_gemini_client, GEMINI_TRANSCRIPTION_MODEL
+from counselai.api.gemini_client import get_gemini_client, GEMINI_ANALYSIS_MODEL
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +175,7 @@ async def transcribe_audio(audio_bytes: bytes, mime_type: str = "audio/wav") -> 
     try:
         client = get_gemini_client()
         response = client.models.generate_content(
-            model=GEMINI_TRANSCRIPTION_MODEL,
+            model=GEMINI_ANALYSIS_MODEL,
             contents=[
                 "Transcribe the human speech in this audio to text. Return ONLY the exact "
                 "spoken words in the original language (Hindi/Hinglish/English). If there is "

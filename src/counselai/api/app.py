@@ -9,11 +9,13 @@ from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
 from counselai.logging import setup_logging
+from counselai.settings import settings
 from counselai.storage.db import init_db
 
 logger = logging.getLogger(__name__)
@@ -55,24 +57,26 @@ async def lifespan(application: FastAPI):
 # ---------------------------------------------------------------------------
 app = FastAPI(title="CounselAI", version="0.2.0", lifespan=lifespan)
 
+# CORS — configurable via COUNSELAI_CORS_ORIGINS env var (comma-separated)
+_cors_origins = getattr(settings, "cors_origins", "")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins else ["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # ---------------------------------------------------------------------------
 # Mount routers
 # ---------------------------------------------------------------------------
 from counselai.api.routes.gemini_ws import router as gemini_ws_router  # noqa: E402
-from counselai.api.routes.legacy import router as legacy_router  # noqa: E402
+from counselai.api.routes.analysis import router as analysis_router  # noqa: E402
 from counselai.api.routes.dashboard import router as dashboard_router  # noqa: E402
-from counselai.api.routes.sessions import router as sessions_router  # noqa: E402
-from counselai.api.routes.live import router as live_router  # noqa: E402
-from counselai.api.routes.analytics import router as analytics_router  # noqa: E402
-from counselai.api.routes.analytics import feedback_router  # noqa: E402
 
 app.include_router(gemini_ws_router, prefix="/api", tags=["gemini"])
-app.include_router(legacy_router, prefix="/api", tags=["legacy"])
+app.include_router(analysis_router, prefix="/api", tags=["analysis"])
 app.include_router(dashboard_router, prefix="/api/v1/dashboard", tags=["dashboard"])
-app.include_router(sessions_router, prefix="/api/v1/sessions", tags=["sessions"])
-app.include_router(live_router, prefix="/api/v1/live", tags=["live"])
-app.include_router(analytics_router, tags=["analytics"])  # already has prefix="/api/analytics"
-app.include_router(feedback_router, tags=["feedback"])  # already has prefix="/api/sessions"
 
 # Static files (favicon etc.)
 _STATIC_DIR = _PROJECT_ROOT / "static"
@@ -94,7 +98,9 @@ async def index(request: Request):
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Serve the dashboard overview page."""
-    response = templates.TemplateResponse("dashboard.html", {"request": request})
+    response = templates.TemplateResponse(
+        "dashboard/overview.html", {"request": request}
+    )
     response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 

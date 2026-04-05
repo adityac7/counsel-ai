@@ -1,0 +1,17 @@
+version: "3.8"
+
+services:
+  counselai:
+    build: .
+    ports:
+      - "8501:8501"
+    environment:
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      - COUNSELAI_DATABASE_URL=sqlite+aiosqlite:///counselai.db
+    volumes:
+      - ./artifacts:/app/artifacts
+      - db-data:/app/counselai.db
+    restart: unless-stopped
+
+volumes:
+  db-data:

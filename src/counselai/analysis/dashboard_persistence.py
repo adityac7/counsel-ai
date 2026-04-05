@@ -110,7 +110,7 @@ def _upsert_hypotheses(
                 status=item["status"],
                 score=item["score"],
                 evidence_summary=item["evidence_summary"],
-                evidence_refs_json=item["evidence_refs"],
+                evidence_refs_json=item.get("evidence_refs", {}),
             )
             db.add(row)
             continue
@@ -119,7 +119,7 @@ def _upsert_hypotheses(
         row.status = item["status"]
         row.score = item["score"]
         row.evidence_summary = item["evidence_summary"]
-        row.evidence_refs_json = item["evidence_refs"]
+        row.evidence_refs_json = item.get("evidence_refs", {})
 
     for construct_key, row in existing_by_key.items():
         if construct_key not in seen_keys:

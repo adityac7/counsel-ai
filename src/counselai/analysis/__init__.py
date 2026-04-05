@@ -1,1 +1,1 @@
-"""Analysis module — topic windows, evidence graph, cross-modal correlation, and hypotheses."""
+"""Analysis module — report generation, profile generation, face/voice analysis, and dashboard persistence."""

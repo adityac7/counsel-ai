@@ -16,7 +16,7 @@ from counselai.dashboard.school_fallbacks import (
 )
 from counselai.storage.models import (
     Hypothesis, HypothesisStatus, Profile, School,
-    SessionRecord, SessionStatus, SignalWindow, Student,
+    SessionRecord, SessionStatus, Student,
 )
 def _enum_val(v):
     """Safely get .value from enum or return string as-is."""
@@ -172,30 +172,7 @@ class SchoolAnalyticsService:
     # -- Topic clusters -----------------------------------------------------
 
     def topic_clusters(self, school_id: uuid.UUID) -> list[dict[str, Any]]:
-        """Most frequent topic_keys from signal windows, with avg reliability."""
-        rows = (
-            self.db.query(
-                SignalWindow.topic_key,
-                func.count(SignalWindow.id).label("occurrences"),
-                func.avg(SignalWindow.reliability_score).label("avg_reliability"),
-            )
-            .join(SessionRecord, SignalWindow.session_id == SessionRecord.id)
-            .join(Student, SessionRecord.student_id == Student.id)
-            .filter(Student.school_id == school_id)
-            .group_by(SignalWindow.topic_key)
-            .order_by(func.count(SignalWindow.id).desc())
-            .limit(20)
-            .all()
-        )
-        if rows:
-            return [
-                {
-                    "topic_key": r.topic_key,
-                    "occurrences": r.occurrences,
-                    "avg_reliability": round(float(r.avg_reliability), 3) if r.avg_reliability else None,
-                }
-                for r in rows
-            ]
+        """Aggregate school themes from Profile JSON (school_view.themes)."""
         return profile_topic_clusters(self.db, school_id)
 
     # -- Hypothesis / construct distribution --------------------------------
@@ -315,20 +292,6 @@ class SchoolAnalyticsService:
             .scalar()
         ) or 0
 
-        # Top topics for this grade
-        top_topics = (
-            self.db.query(
-                SignalWindow.topic_key,
-                func.count(SignalWindow.id).label("cnt"),
-            )
-            .join(SessionRecord, SignalWindow.session_id == SessionRecord.id)
-            .filter(SessionRecord.student_id.in_(self.db.query(base.c.id)))
-            .group_by(SignalWindow.topic_key)
-            .order_by(func.count(SignalWindow.id).desc())
-            .limit(10)
-            .all()
-        )
-
         # Red-flag count for this grade
         red_flag_total = 0
         profiles = (
@@ -347,9 +310,7 @@ class SchoolAnalyticsService:
             "session_count": session_count,
             "completed_sessions": completed,
             "red_flag_total": red_flag_total,
-            "top_topics": [
-                {"topic_key": t.topic_key, "count": t.cnt} for t in top_topics
-            ],
+            "top_topics": [],
         }
 
     # -- Batch analysis summary ---------------------------------------------

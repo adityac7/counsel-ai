@@ -1,105 +1,74 @@
-"""E2E tests for CounselAI dashboard pages.
-
-Covers: /dashboard, and the v1 dashboard HTML pages served under
-/api/v1/dashboard/counsellor, /api/v1/dashboard/students/{id}/insights,
-/api/v1/dashboard/schools/{id}/dashboard.
-"""
+"""Real-page smoke coverage for dashboard entry surfaces."""
 
 from __future__ import annotations
 
-import pytest
 from playwright.sync_api import Page, expect
 
 
-# ---------------------------------------------------------------------------
-# Main dashboard page
-# ---------------------------------------------------------------------------
-class TestMainDashboard:
-    """Tests for /dashboard page."""
+def _load_without_js_or_asset_failures(page: Page, url: str):
+    errors: list[str] = []
+    asset_failures: list[str] = []
 
-    def test_dashboard_loads(self, page: Page, server_url: str):
-        resp = page.goto(f"{server_url}/dashboard")
-        assert resp is not None
-        assert resp.status == 200
+    page.on("pageerror", lambda err: errors.append(str(err)))
 
-    def test_dashboard_title(self, page: Page, server_url: str):
-        page.goto(f"{server_url}/dashboard")
-        # Page should have a meaningful title
-        title = page.title()
-        assert title  # non-empty
+    def on_response(response):
+        if response.request.resource_type in {"script", "stylesheet"} and response.status >= 400:
+            asset_failures.append(f"{response.status} {response.url}")
 
-    def test_dashboard_has_content(self, page: Page, server_url: str):
-        page.goto(f"{server_url}/dashboard")
-        body = page.locator("body")
-        expect(body).not_to_be_empty()
+    page.on("response", on_response)
+    response = page.goto(url, wait_until="networkidle")
+
+    assert response is not None
+    assert response.status == 200
+    assert errors == []
+    assert asset_failures == []
 
 
-# ---------------------------------------------------------------------------
-# Counsellor workbench
-# ---------------------------------------------------------------------------
-class TestCounsellorDashboard:
-    """Tests for /api/v1/dashboard/counsellor HTML page."""
+class TestDashboardSmoke:
+    def test_dashboard_overview_loads(self, page: Page, server_url: str):
+        _load_without_js_or_asset_failures(page, f"{server_url}/dashboard")
+        expect(page.locator("h1")).to_contain_text("Dashboard")
+        expect(page.locator("#sessions-body")).to_be_visible()
 
-    def test_counsellor_page_loads(self, page: Page, server_url: str):
-        resp = page.goto(f"{server_url}/api/v1/dashboard/counsellor")
-        # May return 200 or 500 depending on DB state — just verify it responds
-        assert resp is not None
-        assert resp.status in (200, 500)
+    def test_counsellor_workbench_loads(self, page: Page, server_url: str):
+        _load_without_js_or_asset_failures(page, f"{server_url}/api/v1/dashboard/counsellor")
+        expect(page.locator("h1")).to_contain_text("Counsellor workbench")
+        expect(page.locator("#student-list")).to_be_visible()
 
-    def test_counsellor_page_has_structure(self, page: Page, server_url: str):
-        resp = page.goto(f"{server_url}/api/v1/dashboard/counsellor")
-        if resp and resp.status == 200:
-            body_text = page.inner_text("body")
-            assert len(body_text) > 0
+    def test_seeded_review_page_loads(self, page: Page, server_url: str, seeded_dashboard_data):
+        review_session_id = seeded_dashboard_data["sessions"]["review"]
+        _load_without_js_or_asset_failures(
+            page,
+            f"{server_url}/api/v1/dashboard/counsellor/sessions/{review_session_id}",
+        )
+        assert "Session Review" in page.title()
+        expect(page.locator("[data-tab='profile']")).to_be_visible()
 
+    def test_seeded_student_insights_loads(self, page: Page, server_url: str, seeded_dashboard_data):
+        student_id = seeded_dashboard_data["students"]["history"]
+        _load_without_js_or_asset_failures(
+            page,
+            f"{server_url}/api/v1/dashboard/students/{student_id}/insights",
+        )
+        expect(page.locator("h1")).to_contain_text(seeded_dashboard_data["names"]["history_student"])
 
-# ---------------------------------------------------------------------------
-# Index page (acts as live session entry)
-# ---------------------------------------------------------------------------
-class TestIndexPage:
-    """Tests for / — the main entry point."""
-
-    def test_index_loads(self, page: Page, server_url: str):
-        resp = page.goto(server_url)
-        assert resp is not None
-        assert resp.status == 200
-
-    def test_index_has_no_js_errors(self, page: Page, server_url: str):
-        errors = []
-        page.on("pageerror", lambda err: errors.append(str(err)))
-        page.goto(server_url)
-        page.wait_for_timeout(2000)
-        # Filter out expected errors (WebSocket connection failures, etc.)
-        critical_errors = [
-            e for e in errors
-            if "WebSocket" not in e and "getUserMedia" not in e and "RTC" not in e
-        ]
-        assert len(critical_errors) == 0, f"JS errors on page: {critical_errors}"
+    def test_seeded_school_dashboard_loads(self, page: Page, server_url: str, seeded_dashboard_data):
+        school_id = seeded_dashboard_data["schools"][0]
+        _load_without_js_or_asset_failures(
+            page,
+            f"{server_url}/api/v1/dashboard/schools/{school_id}/dashboard",
+        )
+        expect(page.locator("h1")).to_contain_text(seeded_dashboard_data["names"]["school_primary"])
 
 
-# ---------------------------------------------------------------------------
-# Navigation between pages
-# ---------------------------------------------------------------------------
-class TestNavigation:
-    """Test navigating between main pages."""
-
-    def test_index_to_dashboard(self, page: Page, server_url: str):
-        page.goto(server_url)
-        # Navigate to dashboard
-        resp = page.goto(f"{server_url}/dashboard")
-        assert resp is not None
-        assert resp.status == 200
-
-    def test_dashboard_to_index(self, page: Page, server_url: str):
-        page.goto(f"{server_url}/dashboard")
-        resp = page.goto(server_url)
-        assert resp is not None
-        assert resp.status == 200
-
-    def test_multiple_page_loads_stable(self, page: Page, server_url: str):
-        """Load pages multiple times to check for state leaks."""
-        for _ in range(3):
-            resp = page.goto(server_url)
-            assert resp is not None and resp.status == 200
-            resp = page.goto(f"{server_url}/dashboard")
-            assert resp is not None and resp.status == 200
+class TestDashboardResponsiveSmoke:
+    def test_dashboard_mobile_layout_has_no_horizontal_overflow(
+        self,
+        mobile_page: Page,
+        server_url: str,
+    ):
+        _load_without_js_or_asset_failures(mobile_page, f"{server_url}/dashboard")
+        no_overflow = mobile_page.evaluate(
+            "() => document.documentElement.scrollWidth <= window.innerWidth"
+        )
+        assert no_overflow is True

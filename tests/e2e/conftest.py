@@ -1,21 +1,27 @@
 """Playwright E2E test fixtures for CounselAI.
 
 All tests run against a live server at SERVER_URL (default http://localhost:8501).
-No real Gemini/OpenAI calls are made — tests only verify UI rendering,
+No real Gemini calls are made — tests only verify UI rendering,
 navigation, and HTTP contract shapes.
+
+Set COUNSELAI_HEADED=1 for visible browser (UAT mode with slow_mo).
 """
 
 from __future__ import annotations
 
 import os
 
+import httpx
 import pytest
 from playwright.sync_api import Browser, BrowserContext, Page, sync_playwright
+
+from tests.e2e.seed_data import ensure_seeded_dashboard_data
 
 # ---------------------------------------------------------------------------
 # Config
 # ---------------------------------------------------------------------------
 SERVER_URL = os.getenv("COUNSELAI_TEST_URL", "http://localhost:8501")
+HEADED = os.getenv("COUNSELAI_HEADED", "0") == "1"
 
 # Viewport presets
 DESKTOP_VIEWPORT = {"width": 1280, "height": 720}
@@ -34,7 +40,8 @@ def _pw():
 @pytest.fixture(scope="session")
 def browser(_pw) -> Browser:
     b = _pw.chromium.launch(
-        headless=True,
+        headless=not HEADED,
+        slow_mo=400 if HEADED else 0,
         args=[
             "--use-fake-device-for-media-stream",
             "--use-fake-ui-for-media-stream",
@@ -42,6 +49,15 @@ def browser(_pw) -> Browser:
     )
     yield b
     b.close()
+
+
+# ---------------------------------------------------------------------------
+# httpx client for API contract tests
+# ---------------------------------------------------------------------------
+@pytest.fixture(scope="session")
+def api_client():
+    with httpx.Client(base_url=SERVER_URL, timeout=10) as client:
+        yield client
 
 
 # ---------------------------------------------------------------------------
@@ -86,3 +102,13 @@ def mobile_page(mobile_context: BrowserContext) -> Page:
 @pytest.fixture(scope="session")
 def server_url() -> str:
     return SERVER_URL
+
+
+@pytest.fixture(scope="session")
+def seeded_dashboard_data() -> dict[str, object]:
+    return ensure_seeded_dashboard_data()
+
+
+@pytest.fixture(scope="session")
+def seeded_session_ids(seeded_dashboard_data: dict[str, object]) -> dict[str, str]:
+    return dict(seeded_dashboard_data["sessions"])

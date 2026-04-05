@@ -10,7 +10,7 @@ import logging
 from contextlib import asynccontextmanager, contextmanager
 from typing import AsyncGenerator, Generator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.engine import Engine
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
@@ -81,12 +81,27 @@ def init_db(url: str = _DEFAULT_URL) -> None:
         expire_on_commit=False,
     )
 
+    # Enable FK enforcement on every SQLite connection (PRAGMA is per-connection)
+    if url.startswith("sqlite"):
+        @event.listens_for(_engine.sync_engine, "connect")
+        def _set_sqlite_fk(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
+
     # Build sync engine for dashboard service layers
     sync_url = _async_to_sync_url(url)
     connect_args: dict = {}
     if sync_url.startswith("sqlite"):
         connect_args = {"check_same_thread": False}
     _sync_engine = create_engine(sync_url, echo=False, connect_args=connect_args)
+
+    if sync_url.startswith("sqlite"):
+        @event.listens_for(_sync_engine, "connect")
+        def _set_sqlite_fk_sync(dbapi_conn, connection_record):
+            cursor = dbapi_conn.cursor()
+            cursor.execute("PRAGMA foreign_keys=ON")
+            cursor.close()
     _sync_session_factory = sessionmaker(bind=_sync_engine, expire_on_commit=False)
 
     logger.info("Database engine initialised: %s", url.split("?")[0])
