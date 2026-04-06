@@ -7,7 +7,7 @@ service layers) session factories from a single configuration.
 from __future__ import annotations
 
 import logging
-from contextlib import asynccontextmanager, contextmanager
+from contextlib import contextmanager
 from typing import AsyncGenerator, Generator
 
 from sqlalchemy import create_engine, event, text
@@ -169,19 +169,6 @@ def get_sync_db() -> Generator[Session, None, None]:
         raise
     finally:
         session.close()
-
-
-@asynccontextmanager
-async def session_scope() -> AsyncGenerator[AsyncSession, None]:
-    """Context-manager wrapper around get_db for non-FastAPI usage."""
-    factory = get_session_factory()
-    async with factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
 
 
 async def create_all_tables() -> None:

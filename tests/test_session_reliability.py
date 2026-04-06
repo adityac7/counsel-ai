@@ -13,7 +13,7 @@ import pytest
 from fastapi.testclient import TestClient
 
 from counselai.api.app import app
-from counselai.dashboard.counsellor_review import get_session_review
+from counselai.dashboard.counsellor_service import get_session_review
 from counselai.dashboard.school import SchoolAnalyticsService
 from counselai.dashboard.student import build_student_dashboard
 from counselai.storage.db import (

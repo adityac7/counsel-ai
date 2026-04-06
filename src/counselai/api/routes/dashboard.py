@@ -11,14 +11,12 @@ from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from sqlalchemy.orm import Session
 
-from counselai.api.deps import get_sync_db
-from counselai.dashboard.counsellor_queue import (
+from counselai.storage.db import get_sync_db
+from counselai.dashboard.counsellor_service import (
     QueueFilters,
     get_available_grades,
     get_available_schools,
     get_counsellor_queue,
-)
-from counselai.dashboard.counsellor_review import (
     get_session_evidence,
     get_session_review,
 )

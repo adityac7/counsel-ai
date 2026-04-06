@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.orm import Session, joinedload
 
 from counselai.storage.models import (
@@ -30,59 +30,82 @@ def get_student(db: Session, student_id: uuid.UUID) -> Student | None:
 def get_student_sessions(
     db: Session, student_id: uuid.UUID, *, limit: int = 50
 ) -> list[SessionRecord]:
-    """Return completed sessions for a student, newest first."""
+    """Return completed sessions for a student, newest first.
+
+    Eagerly loads profiles to avoid N+1 queries in callers.
+    """
     stmt = (
         select(SessionRecord)
         .where(
             SessionRecord.student_id == student_id,
             SessionRecord.status == SessionStatus.completed,
         )
+        .options(joinedload(SessionRecord.profiles))
         .order_by(SessionRecord.started_at.desc())
         .limit(limit)
     )
-    return list(db.execute(stmt).scalars().all())
+    return list(db.execute(stmt).unique().scalars().all())
 
 
-def get_latest_profile(db: Session, session_id: uuid.UUID) -> Profile | None:
-    """Return the most recent profile for a session."""
-    stmt = (
-        select(Profile)
-        .where(Profile.session_id == session_id)
-        .order_by(Profile.created_at.desc())
-        .limit(1)
-    )
-    return db.execute(stmt).scalar_one_or_none()
+def _empty_student_view() -> dict[str, Any]:
+    """Return a blank student-safe view dict."""
+    return {
+        "strengths": [],
+        "interests": [],
+        "growth_areas": [],
+        "next_steps": [],
+        "summary": "",
+        "encouragement": "",
+    }
 
 
-def get_student_view(profile: Profile | None) -> dict[str, Any]:
+def get_student_view(
+    profile: Profile | None,
+    *,
+    session: SessionRecord | None = None,
+) -> dict[str, Any]:
     """Extract the student-safe view from a profile record.
 
     Returns a dict with: strengths, interests, growth_areas,
-    suggested_next_steps, summary, encouragement.
+    next_steps, summary, encouragement.
     Never includes red flags, risk scores, or clinical language.
+
+    If *profile* has no ``student_view_json`` but *session* carries a
+    ``session_summary``, a minimal view is built from the summary so the
+    dashboard is not blank.
     """
-    if profile is None:
+    if profile is None and session is None:
+        return _empty_student_view()
+
+    view = (profile.student_view_json or {}) if profile else {}
+
+    # If the view is empty but we have a session summary, build a minimal view
+    if not view and session and session.session_summary:
         return {
-            "strengths": [],
-            "interests": [],
-            "growth_areas": [],
-            "suggested_next_steps": [],
-            "summary": "",
-            "encouragement": "",
+            **_empty_student_view(),
+            "summary": session.session_summary,
         }
-    view = profile.student_view_json or {}
+
     return {
         "strengths": view.get("strengths", []),
         "interests": view.get("interests", []),
         "growth_areas": view.get("growth_areas", []),
-        "suggested_next_steps": view.get("suggested_next_steps", []),
+        # Canonical key is "next_steps"; fall back to legacy "suggested_next_steps"
+        "next_steps": view.get("next_steps") or view.get("suggested_next_steps", []),
         "summary": view.get("summary", ""),
         "encouragement": view.get("encouragement", ""),
     }
 
 
+def _latest_profile_from_session(session: SessionRecord) -> Profile | None:
+    """Get the latest profile from an eagerly-loaded session.profiles list."""
+    if not session.profiles:
+        return None
+    return sorted(session.profiles, key=lambda p: p.created_at, reverse=True)[0]
+
+
 def build_growth_snapshots(
-    db: Session, student_id: uuid.UUID, *, limit: int = 10
+    sessions: list[SessionRecord],
 ) -> list[dict[str, Any]]:
     """Build growth snapshots from historical sessions.
 
@@ -90,12 +113,11 @@ def build_growth_snapshots(
     and a condensed student-safe summary. Shows how the student
     has grown across sessions.
     """
-    sessions = get_student_sessions(db, student_id, limit=limit)
     snapshots = []
 
     for session in sessions:
-        profile = get_latest_profile(db, session.id)
-        view = get_student_view(profile)
+        profile = _latest_profile_from_session(session)
+        view = get_student_view(profile, session=session)
 
         snapshots.append({
             "session_id": str(session.id),
@@ -128,13 +150,13 @@ def build_student_dashboard(
 
     sessions = get_student_sessions(db, student_id)
     latest_profile = None
-    latest_view = get_student_view(None)
+    latest_view = _empty_student_view()
 
     if sessions:
-        latest_profile = get_latest_profile(db, sessions[0].id)
-        latest_view = get_student_view(latest_profile)
+        latest_profile = _latest_profile_from_session(sessions[0])
+        latest_view = get_student_view(latest_profile, session=sessions[0])
 
-    snapshots = build_growth_snapshots(db, student_id)
+    snapshots = build_growth_snapshots(sessions[:10])
 
     # Aggregate unique topics explored
     topics = list({s.case_study_id for s in sessions})

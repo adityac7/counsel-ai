@@ -1,104 +1,17 @@
 /**
  * CounselAI Live — entry point.
  *
- * Consolidates: state.js, screens.js, ui.js, and the original app.js
- * into a single module. All previously-exported symbols are re-exported
- * so that session.js, media.js, and analysis.js can import from './app.js'.
+ * State + DOM refs live in state.js (no imports, no cycles).
+ * This module provides UI helpers and wires up event listeners.
  */
 
-// ============================================================
-// STATE — shared mutable state for the live session
-// ============================================================
+import state from './state.js';
+import { dom, showScreen } from './state.js';
 
-const state = {
-  // Media
-  mediaStream: null,
-  recorder: null,
-  recordedChunks: [],
-
-  // Timer
-  timerStart: null,
-  timerHandle: null,
-
-  // Transcript
-  currentAiEntry: null,
-  transcriptEntries: [],
-  currentStudentEntry: null,
-  studentTranscriptTimer: null,
-  lastStudentTranscript: '',
-  waitingForStudentTranscript: false,
-  lastUserItemId: null,
-
-  // Session
-  sessionMeta: null,
-  eventCount: 0,
-  geminiModelTurnCount: 0,
-  intentionalSessionEnd: false,
-
-  // Session ID from server (for linking analysis to session)
-  savedSessionId: null,
-  pendingTranscriptFlush: null,
-
-  // Gemini
-  geminiWs: null,
-  geminiAudioCtx: null,
-  geminiPlaybackCtx: null,
-  geminiPlaybackTime: 0,
-  geminiMicProcessor: null,
-  geminiVideoInterval: null,
-  geminiReconnecting: false,
-  geminiConnectionState: 'CLOSED',
-  audioChunksPlayed: 0,
-
-  // Event tracking
-  eventTypeCounts: {},
-
-  // Mute state
-  isMuted: false,
-};
-
+// Re-export state and state.js symbols so existing callers that
+// import from './app.js' continue to work without changes.
 export default state;
-
-// ============================================================
-// SCREENS — show/hide the three main screens + DOM refs
-// ============================================================
-
-const screens = {
-  welcome: document.getElementById('welcome'),
-  live: document.getElementById('live'),
-  summary: document.getElementById('summary'),
-};
-
-export function showScreen(name) {
-  Object.values(screens).forEach(s => s.classList.add('hidden'));
-  if (screens[name]) screens[name].classList.remove('hidden');
-}
-
-// DOM element refs used across modules
-export const dom = {
-  statusText: document.getElementById('status-text'),
-  statusDot: document.getElementById('status-dot'),
-  timerEl: document.getElementById('timer'),
-  transcriptEl: document.getElementById('transcript'),
-  orb: document.getElementById('orb'),
-  preview: document.getElementById('preview'),
-  previewWrap: document.getElementById('preview-wrap'),
-  aiAudio: document.getElementById('ai-audio'),
-  enableAudioBtn: document.getElementById('enable-audio-btn'),
-  rtcDebug: document.getElementById('rtc-debug'),
-  toast: document.getElementById('toast'),
-  caseStudyText: document.getElementById('case-study-text'),
-  profileMetrics: document.getElementById('profile-metrics'),
-  personalitySection: document.getElementById('personality-section'),
-  cognitiveSection: document.getElementById('cognitive-section'),
-  emotionalSection: document.getElementById('emotional-section'),
-  behavioralSection: document.getElementById('behavioral-section'),
-  conversationSection: document.getElementById('conversation-section'),
-  recommendationsEl: document.getElementById('recommendations'),
-};
-
-// Expose showScreen globally for tests that call it directly
-window.showScreen = showScreen;
+export { dom, showScreen };
 
 // ============================================================
 // UI — status, toast, logging, debug, formatting
@@ -224,9 +137,7 @@ async function startSession() {
   const hasVideoTrack = await setupMedia();
   setupRecorder(hasVideoTrack);
 
-  state.geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-  state.geminiPlaybackCtx.resume().then(() => uiLog('OK', 'Playback AudioContext resumed'));
-  state.geminiPlaybackTime = 0;
+  // Playback context is created inside startGeminiSession
   await startGeminiSession(name, scenario);
 
   state.timerStart = Date.now();

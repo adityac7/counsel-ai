@@ -63,11 +63,18 @@ async def _get_or_create_student(
     student_age: int,
     school_name: str,
 ) -> Student:
-    stmt = select(Student).where(Student.full_name == student_name)
+    school = await _get_or_create_school(db, school_name=school_name)
+
+    # Match on all identifying fields to avoid collisions (e.g. two "Priya"s
+    # at different schools or in different grades).
+    stmt = select(Student).where(
+        Student.full_name == student_name,
+        Student.grade == student_grade,
+        Student.section == (student_section or None),
+        Student.school_id == (school.id if school else None),
+    )
     result = await db.execute(stmt)
     student = result.scalar_one_or_none()
-
-    school = await _get_or_create_school(db, school_name=school_name)
 
     if student is None:
         student = Student(
@@ -83,11 +90,7 @@ async def _get_or_create_student(
         return student
 
     # Keep the existing student row aligned with the latest session metadata.
-    student.grade = student_grade or student.grade
-    student.section = student_section or student.section
     student.age = student_age or student.age
-    if school is not None:
-        student.school_id = school.id
     await db.flush()
     return student
 
@@ -157,8 +160,8 @@ async def finalize_live_session(
             0, int((final_ended_at - started_at).total_seconds())
         )
     session.turn_count = len(turns)
-    session.observations_json = observations or []
-    session.segments_json = segments or []
+    session.observations_json = list(observations) if observations else []
+    session.segments_json = list(segments) if segments else []
 
     await db.execute(delete(Turn).where(Turn.session_id == session_uuid))
     for i, turn in enumerate(turns):
@@ -168,8 +171,8 @@ async def finalize_live_session(
                 session_id=session_uuid,
                 turn_index=i,
                 speaker=turn["role"],
-                start_ms=0,
-                end_ms=0,
+                start_ms=turn.get("start_ms", 0),
+                end_ms=turn.get("end_ms", 0),
                 text=turn["text"],
                 source="gemini-live",
             )

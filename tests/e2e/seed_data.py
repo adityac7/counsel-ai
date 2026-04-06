@@ -345,6 +345,15 @@ def ensure_seeded_dashboard_data() -> dict[str, Any]:
             growth_areas=["Consistency under pressure"],
             next_steps=["Practice one refusal line before the next session"],
         )
+        review_session.observations_json = [
+            {"modality": "content", "signal": "risk_language", "detail": "Student mentions smoking", "confidence": 0.85},
+            {"modality": "audio", "signal": "hesitation", "detail": "Long pause before answering", "confidence": 0.7},
+            {"modality": "cross_modal", "signal": "peer_pressure", "detail": "Voice drops when discussing friends", "confidence": 0.8},
+        ]
+        review_session.segments_json = [
+            {"segment": "opening", "topic": "Greeting and rapport", "start_turn": 0, "end_turn": 0},
+            {"segment": "exploration", "topic": "Peer pressure and smoking", "start_turn": 1, "end_turn": 2},
+        ]
         _review_profile(review_session)
         _legacy_report(legacy_session)
 

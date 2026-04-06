@@ -7,13 +7,16 @@ The /analyze-session endpoint uses a single unified Gemini call
 import asyncio
 import json
 import logging
-import os
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 
 from counselai.analysis.dashboard_persistence import persist_session_analysis
+from counselai.settings import settings
+from counselai.storage.db import get_sync_session_factory, init_db
+from counselai.storage.models import SessionRecord, Turn
 
 logger = logging.getLogger(__name__)
 
@@ -44,13 +47,13 @@ async def analyze_session(
     except (json.JSONDecodeError, TypeError):
         transcript_data = []
 
-    if session_id and not any(
-        isinstance(entry, dict) and entry.get("text", "").strip()
-        for entry in transcript_data
-    ):
-        transcript_data = _load_transcript_turns_from_session(session_id) or transcript_data
+    # DB turns are authoritative when session_id is present
+    if session_id:
+        db_turns = _load_transcript_turns_from_session(session_id)
+        if db_turns:
+            transcript_data = db_turns
 
-    if os.environ.get("COUNSELAI_DEBUG"):
+    if settings.debug:
         try:
             with open("/tmp/counselai_last_transcript.json", "w") as f:
                 json.dump(transcript_data, f, indent=2)
@@ -85,11 +88,13 @@ async def analyze_session(
             status_code=400,
         )
 
-    # Load observations from DB if available
+    # Load observations and case study context from DB if available
     observations_data = []
     segments_data = []
+    case_study_text = ""
     if session_id:
         observations_data, segments_data = _load_observations_from_session(session_id)
+        case_study_text = _load_case_study_context(session_id)
 
     # Single unified Gemini call — replaces face_analyzer + voice_analyzer + profile_generator
     analysis_result = {}
@@ -100,6 +105,7 @@ async def analyze_session(
         _video = video_bytes if len(video_bytes) > 1000 else None
         _obs = observations_data
         _segs = segments_data
+        _case = case_study_text
         analysis_result = await asyncio.wait_for(
             loop.run_in_executor(
                 None,
@@ -108,6 +114,7 @@ async def analyze_session(
                     student_name=student_name,
                     student_grade=student_class,
                     student_school=student_school,
+                    case_study=_case,
                     duration_seconds=int(session_duration),
                     video_bytes=_video,
                     observations=_obs,
@@ -118,10 +125,12 @@ async def analyze_session(
         )
     except asyncio.TimeoutError:
         logger.warning("Unified analysis timed out after 60s")
-        analysis_result = {"session_summary": "Analysis timed out."}
+        from counselai.analysis.unified_analyzer import _fallback_result
+        analysis_result = _fallback_result("Timed out after 60s")
     except Exception as exc:
         logger.error("Unified analysis failed: %s", exc, exc_info=True)
-        analysis_result = {"session_summary": "Analysis encountered an error."}
+        from counselai.analysis.unified_analyzer import _fallback_result
+        analysis_result = _fallback_result(str(exc))
 
     # Persist to session record
     _persist_analysis_to_session(
@@ -146,20 +155,41 @@ async def analyze_session(
     )
 
 
+def _load_case_study_context(session_id: str | None) -> str:
+    """Load case study scenario text for the session's case_study_id."""
+    if not session_id:
+        return ""
+    try:
+        init_db()
+        factory = get_sync_session_factory()
+        db = factory()
+        try:
+            sid = uuid.UUID(session_id)
+            session = db.get(SessionRecord, sid)
+            if session is None or not session.case_study_id:
+                return ""
+            from case_studies import CASE_STUDIES
+            for cs in CASE_STUDIES:
+                if cs.get("id") == session.case_study_id:
+                    return f"[{cs['id']}] {cs.get('title', '')}: {cs.get('scenario_text', '')}"
+            return f"Case study ID: {session.case_study_id}"
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Failed to load case study for session %s: %s", session_id, exc)
+        return ""
+
+
 def _load_observations_from_session(session_id: str | None) -> tuple[list[dict], list[dict]]:
     """Load real-time observations and segments from DB session record."""
     if not session_id:
         return [], []
     try:
-        import uuid as _uuid
-        from counselai.storage.db import get_sync_session_factory, init_db
-        from counselai.storage.models import SessionRecord
-
         init_db()
         factory = get_sync_session_factory()
         db = factory()
         try:
-            sid = _uuid.UUID(session_id)
+            sid = uuid.UUID(session_id)
             session = db.get(SessionRecord, sid)
             if session is None:
                 return [], []
@@ -179,15 +209,11 @@ def _load_transcript_turns_from_session(session_id: str | None) -> list[dict]:
         return []
 
     try:
-        import uuid as _uuid
-        from counselai.storage.db import get_sync_session_factory, init_db
-        from counselai.storage.models import Turn
-
         init_db()
         factory = get_sync_session_factory()
         db = factory()
         try:
-            sid = _uuid.UUID(session_id)
+            sid = uuid.UUID(session_id)
             turns = (
                 db.query(Turn)
                 .filter(Turn.session_id == sid)
@@ -222,18 +248,16 @@ def _persist_analysis_to_session(
         return
 
     try:
-        import uuid as _uuid
-        from counselai.storage.db import get_sync_session_factory, init_db
-
         init_db()
         factory = get_sync_session_factory()
         db = factory()
         try:
-            sid = _uuid.UUID(session_id)
+            sid = uuid.UUID(session_id)
 
             # Build dashboard payload from unified analysis
             dashboard_payload = {
                 "counsellor_view": {
+                    "summary": analysis_result.get("session_summary", ""),
                     "constructs": analysis_result.get("constructs", []),
                     "cross_modal_notes": [],
                     "follow_up": analysis_result.get("follow_up", {}),
@@ -251,7 +275,7 @@ def _persist_analysis_to_session(
                     for c in analysis_result.get("constructs", [])
                 ],
                 "red_flags": [
-                    {"flag": f.get("key", ""), "severity": f.get("severity", "medium"), "reason": f.get("reason", "")}
+                    {"key": f.get("key", ""), "severity": f.get("severity", "medium"), "reason": f.get("reason", "")}
                     for f in analysis_result.get("risk_assessment", {}).get("flags", [])
                 ],
             }

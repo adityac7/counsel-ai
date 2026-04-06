@@ -107,13 +107,14 @@ async function loadStudents(){
   try{
     const res=await fetch('/api/v1/dashboard/counsellor/queue?limit=200');const data=await res.json();
     const items=Array.isArray(data.items)?data.items:[];
-    // Group sessions by student name to build a student list
+    // Group sessions by student_id to build a student list
     const byStudent={};
     items.forEach(s=>{
-      const key=s.student_name||'Unknown';
+      const key=s.student_id||s.session_id;
       if(!byStudent[key])byStudent[key]={
         id:s.session_id,
-        name:key,
+        student_id:key,
+        name:s.student_name||'Unknown',
         grade:s.student_grade,
         section:s.student_section,
         school_name:s.school_name,

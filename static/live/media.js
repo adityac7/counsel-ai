@@ -4,8 +4,9 @@
  * Consolidates: media-capture.js + waveform.js
  * All previously-exported symbols are re-exported.
  */
-import state from './app.js';
-import { dom, uiLog, showToast, updateDebugSnapshot } from './app.js';
+import state from './state.js';
+import { dom } from './state.js';
+import { uiLog, showToast, updateDebugSnapshot } from './app.js';
 
 // ============================================================
 // WAVEFORM — canvas-based frequency bars

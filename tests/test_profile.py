@@ -116,9 +116,7 @@ def test_analyze_session_returns_expected_schema_keys(monkeypatch):
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch("counselai.analysis.unified_analyzer.genai") as mock_genai:
-        mock_genai.Client.return_value = mock_client
-
+    with patch("counselai.analysis.unified_analyzer.get_gemini_client", return_value=mock_client):
         transcript = [
             {"role": "counsellor", "text": "What would you do if your friend was cheating?"},
             {"role": "student", "text": "I would talk to him privately first"},
@@ -171,9 +169,7 @@ def test_analyze_session_calls_gemini_with_transcript(monkeypatch):
     mock_client = MagicMock()
     mock_client.models.generate_content.return_value = mock_response
 
-    with patch("counselai.analysis.unified_analyzer.genai") as mock_genai:
-        mock_genai.Client.return_value = mock_client
-
+    with patch("counselai.analysis.unified_analyzer.get_gemini_client", return_value=mock_client):
         transcript = [
             {"role": "student", "text": "I feel pressured by my friends."},
         ]

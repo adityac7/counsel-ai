@@ -12,15 +12,14 @@ from __future__ import annotations
 
 import json
 import logging
-import os
 from typing import Any
 
-from google import genai
 from google.genai import types as gt
 
-logger = logging.getLogger(__name__)
+from counselai.api.gemini_client import get_gemini_client, GEMINI_ANALYSIS_MODEL
+from counselai.settings import settings
 
-ANALYSIS_MODEL = "gemini-3.1-flash-lite-preview"
+logger = logging.getLogger(__name__)
 
 ANALYSIS_PROMPT = """\
 You are an expert Indian school counsellor analyst. Analyze the following \
@@ -335,11 +334,7 @@ def analyze_session(
 
     Returns the full structured analysis JSON, or a minimal fallback on failure.
     """
-    api_key = os.getenv("GEMINI_API_KEY")
-    if not api_key:
-        raise EnvironmentError("GEMINI_API_KEY is not set")
-
-    client = genai.Client(api_key=api_key)
+    client = get_gemini_client()
 
     transcript_text = _build_transcript_text(transcript_data)
     observations_section = _build_observations_section(observations or [])
@@ -371,7 +366,7 @@ def analyze_session(
 
     try:
         response = client.models.generate_content(
-            model=ANALYSIS_MODEL,
+            model=GEMINI_ANALYSIS_MODEL,
             contents=contents,
             config=gt.GenerateContentConfig(
                 response_mime_type="application/json",

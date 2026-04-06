@@ -1,10 +1,14 @@
 /**
  * Post-session analysis — endSession, profile rendering, summary display.
  */
-import state from './app.js';
-import { showScreen, dom, setStatus, showToast, formatTime, uiLog } from './app.js';
+import state from './state.js';
+import { dom, showScreen } from './state.js';
+import { setStatus, showToast, formatTime, uiLog } from './app.js';
 import { stopWaveform, finalizeRecording } from './media.js';
-import { flushPendingStudentTranscript } from './session.js';
+import { waitForSessionSaved } from './session.js';
+
+// Listen for session timeout events dispatched by session.js
+window.addEventListener('counselai:session_timeout', () => endSession());
 
 function renderSection(sectionEl, items) {
   sectionEl.innerHTML = '';
@@ -263,32 +267,42 @@ function describeRecordingIssue(mediaStatus) {
 // --- End session ---
 
 export async function endSession() {
+  // Stop all audio/video immediately
+  state.intentionalSessionEnd = true;
   setStatus('Processing...');
   clearInterval(state.timerHandle);
   stopWaveform();
 
+  // Kill playback immediately so AI voice stops
+  if (state.geminiPlaybackCtx) {
+    try { state.geminiPlaybackCtx.suspend(); } catch {}
+  }
+
+  // Stop camera/mic — turns off green light
+  if (dom.preview) { dom.preview.srcObject = null; dom.preview.pause(); }
+  if (state.mediaStream) {
+    state.mediaStream.getTracks().forEach(t => t.stop());
+    state.mediaStream = null;
+  }
+
   setAnalysisProgress(0, state.savedSessionId ? `ID: ${state.savedSessionId.slice(0,8)}` : 'Waiting for server...');
   const videoBlob = await finalizeRecording();
 
-  // Stop ingest first so the final transcript flush uses a stable audio buffer.
+  // Stop ingest
   if (state.geminiVideoInterval) { clearInterval(state.geminiVideoInterval); state.geminiVideoInterval = null; }
   if (state.geminiTranscriptTimer) { clearTimeout(state.geminiTranscriptTimer); state.geminiTranscriptTimer = null; }
   if (state.geminiMicProcessor) { try { state.geminiMicProcessor.disconnect(); } catch {} state.geminiMicProcessor = null; }
 
-  try {
-    await flushPendingStudentTranscript();
-  } catch (err) {
-    console.error('[CounselAI] Final transcript flush failed:', err);
+  // Signal end-of-session to server and wait for save confirmation
+  if (state.geminiWs && state.geminiWs.readyState === WebSocket.OPEN) {
+    try { state.geminiWs.send(JSON.stringify({ type: 'end_session' })); } catch {}
+    await waitForSessionSaved(5000);
   }
 
-  // Cleanup Gemini session resources
-  state.geminiTranscriptBuffer = [];
-  state.lastTranscriptionTime = 0;
+  // Close all audio contexts and WebSocket
   if (state.geminiAudioCtx) { try { state.geminiAudioCtx.close(); } catch {} state.geminiAudioCtx = null; }
   if (state.geminiPlaybackCtx) { try { state.geminiPlaybackCtx.close(); } catch {} state.geminiPlaybackCtx = null; }
-  state.intentionalSessionEnd = true;
   if (state.geminiWs) { try { state.geminiWs.close(); } catch {} state.geminiWs = null; }
-  if (state.mediaStream) state.mediaStream.getTracks().forEach(t => t.stop());
 
   const duration = formatTime(Date.now() - state.timerStart);
   const summaryMetaBase = `${state.sessionMeta.name} \u2022 Class ${state.sessionMeta.className} \u2022 ${duration}`;
@@ -324,6 +338,14 @@ export async function endSession() {
   [dom.personalitySection, dom.cognitiveSection, dom.emotionalSection, dom.behavioralSection, dom.conversationSection].forEach(el => el.textContent = 'Analyzing...');
   dom.recommendationsEl.textContent = 'Generating recommendations...';
   dom.profileMetrics.textContent = 'Computing scores...';
+
+  if (!state.savedSessionId) {
+    uiLog('ERR', 'No session_id received from server — cannot submit analysis.');
+    setAnalysisError('Session was not saved by the server. Analysis cannot proceed.');
+    showToast('Session save failed. Please try again or contact support.');
+    showAnalysisUnavailable('No session_id available — the server did not confirm the session was saved.');
+    return;
+  }
 
   try {
     const fd = new FormData();

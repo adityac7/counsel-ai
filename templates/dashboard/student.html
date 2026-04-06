@@ -57,9 +57,9 @@
   <div class="card"><h2>🌱 Growth areas</h2>
     <div class="tags">{% for g in data.latest.growth_areas %}<span class="tag tag-growth">{{ g }}</span>{% endfor %}</div>
   </div>{% endif %}
-  {% if data.latest.suggested_next_steps %}
+  {% if data.latest.next_steps %}
   <div class="card"><h2>🚀 Next steps</h2>
-    <div class="tags">{% for step in data.latest.suggested_next_steps %}<span class="tag tag-step">{{ step }}</span>{% endfor %}</div>
+    <div class="tags">{% for step in data.latest.next_steps %}<span class="tag tag-step">{{ step }}</span>{% endfor %}</div>
   </div>{% endif %}
 </div>
 

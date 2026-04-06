@@ -7,6 +7,7 @@ Let Gemini handle silence, turns, and conversation flow.
 
 import asyncio
 import base64
+import collections
 import json
 import logging
 import re
@@ -60,44 +61,85 @@ def _to_roman(text: str) -> str:
     return result.strip()
 
 
+def _now_ms() -> int:
+    """Current time in milliseconds (monotonic-ish wall clock for turn timing)."""
+    return int(time.time() * 1000)
+
+
 @dataclass
 class TranscriptCollector:
     """Accumulates transcription chunks into complete turns."""
-    turns: list = field(default_factory=list)
-    observations: list = field(default_factory=list)
-    segments: list = field(default_factory=list)
+    turns: collections.deque = field(default_factory=lambda: collections.deque(maxlen=5000))
+    observations: collections.deque = field(default_factory=lambda: collections.deque(maxlen=1000))
+    segments: collections.deque = field(default_factory=lambda: collections.deque(maxlen=1000))
     _current_student: str = ""
     _current_counsellor: str = ""
     _turn_counter: int = 0
+    _turn_start_ms: int = 0
+    _session_origin_ms: int = field(default_factory=_now_ms)
+
+    def _relative_ms(self) -> int:
+        """Milliseconds elapsed since the collector was created."""
+        return _now_ms() - self._session_origin_ms
 
     def add_student(self, text: str) -> None:
         # Flush counsellor if switching roles
         if self._current_counsellor:
-            self.turns.append({"role": "counsellor", "text": self._current_counsellor.strip()})
+            self.turns.append({
+                "role": "counsellor",
+                "text": self._current_counsellor.strip(),
+                "start_ms": self._turn_start_ms,
+                "end_ms": self._relative_ms(),
+            })
             self._current_counsellor = ""
+        if not self._current_student:
+            self._turn_start_ms = self._relative_ms()
         self._current_student += (" " if self._current_student else "") + text
 
     def add_counsellor(self, text: str) -> None:
         # Flush student if switching roles
         if self._current_student:
-            self.turns.append({"role": "student", "text": self._current_student.strip()})
+            self.turns.append({
+                "role": "student",
+                "text": self._current_student.strip(),
+                "start_ms": self._turn_start_ms,
+                "end_ms": self._relative_ms(),
+            })
             self._current_student = ""
+        if not self._current_counsellor:
+            self._turn_start_ms = self._relative_ms()
         self._current_counsellor += (" " if self._current_counsellor else "") + text
 
     def flush(self) -> None:
         """Flush any remaining partial turn."""
+        now = self._relative_ms()
         if self._current_student:
-            self.turns.append({"role": "student", "text": self._current_student.strip()})
+            self.turns.append({
+                "role": "student",
+                "text": self._current_student.strip(),
+                "start_ms": self._turn_start_ms,
+                "end_ms": now,
+            })
             self._current_student = ""
         if self._current_counsellor:
-            self.turns.append({"role": "counsellor", "text": self._current_counsellor.strip()})
+            self.turns.append({
+                "role": "counsellor",
+                "text": self._current_counsellor.strip(),
+                "start_ms": self._turn_start_ms,
+                "end_ms": now,
+            })
             self._current_counsellor = ""
 
     def on_turn_complete(self) -> None:
         """Called when Gemini signals turnComplete — flush counsellor turn."""
         self._turn_counter += 1
         if self._current_counsellor:
-            self.turns.append({"role": "counsellor", "text": self._current_counsellor.strip()})
+            self.turns.append({
+                "role": "counsellor",
+                "text": self._current_counsellor.strip(),
+                "start_ms": self._turn_start_ms,
+                "end_ms": self._relative_ms(),
+            })
             self._current_counsellor = ""
 
     def add_observation(self, observation: dict) -> None:
@@ -113,11 +155,14 @@ class TranscriptCollector:
         self.segments.append(segment)
 
 
-async def browser_to_gemini(ws: WebSocket, session, transcript: TranscriptCollector | None = None) -> None:
+async def browser_to_gemini(ws: WebSocket, session, transcript: TranscriptCollector | None = None) -> str | None:
     """Forward audio/video from browser WebSocket to Gemini Live session.
 
     This is the ONLY authority on session lifetime. When the browser
     disconnects, the session ends. Period.
+
+    Returns "end_session" if the browser sent an explicit end_session message,
+    None otherwise.
     """
     chunk_count = 0
     try:
@@ -130,6 +175,13 @@ async def browser_to_gemini(ws: WebSocket, session, transcript: TranscriptCollec
                 msg = json.loads(raw)
             except json.JSONDecodeError:
                 continue
+
+            # Graceful end-session request from browser
+            if msg.get("type") == "end_session":
+                logger.info("Browser requested end_session")
+                if transcript:
+                    transcript.flush()
+                return "end_session"
 
             ri = msg.get("realtimeInput", {})
             chunks = ri.get("mediaChunks", [])
@@ -146,7 +198,8 @@ async def browser_to_gemini(ws: WebSocket, session, transcript: TranscriptCollec
                     continue
 
                 if mime.startswith("audio/"):
-                    # Forward ALL audio to Gemini — it has its own VAD
+                    # Forward all audio to Gemini — it has its own VAD.
+                    # Server-side gating causes Gemini to close the session.
                     await session.send_realtime_input(
                         audio=gt.Blob(data=decoded, mime_type="audio/pcm")
                     )
@@ -212,46 +265,6 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                         # Signal to the caller that we need to reconnect
                         resumption_state["go_away"] = True
                         return  # Exit so caller can reconnect
-
-                    # Handle tool calls — Gemini calling log_observation / segment_transition
-                    tool_call = getattr(response, "tool_call", None)
-                    if tool_call and transcript:
-                        for fc in getattr(tool_call, "function_calls", []):
-                            fn_name = getattr(fc, "name", "")
-                            fn_args = getattr(fc, "args", {}) or {}
-                            fn_id = getattr(fc, "id", "")
-
-                            if fn_name == "log_observation":
-                                transcript.add_observation(dict(fn_args))
-                                logger.info(
-                                    "Observation: %s/%s (%.0f%%) — %s",
-                                    fn_args.get("observation_type", "?"),
-                                    fn_args.get("emotion", "?"),
-                                    (fn_args.get("confidence", 0) or 0) * 100,
-                                    (fn_args.get("description", ""))[:80],
-                                )
-                            elif fn_name == "segment_transition":
-                                transcript.add_segment(dict(fn_args))
-                                logger.info(
-                                    "Segment: %s — %s",
-                                    fn_args.get("segment_name", "?"),
-                                    fn_args.get("reason", ""),
-                                )
-
-                            # Respond with SILENT scheduling — no audio interruption
-                            try:
-                                await session.send_tool_response(
-                                    function_responses=[
-                                        gt.FunctionResponse(
-                                            id=fn_id,
-                                            name=fn_name,
-                                            response={"status": "ok"},
-                                        )
-                                    ]
-                                )
-                            except Exception as tool_exc:
-                                logger.warning("Tool response error: %s", tool_exc)
-                        continue  # Tool calls don't have serverContent
 
                     srv = response.server_content
                     if not srv:

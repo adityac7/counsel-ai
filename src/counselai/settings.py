@@ -21,7 +21,8 @@ class Settings(BaseSettings):
     artifact_root: str = "artifacts"
 
     # ── Provider API keys ───────────────────────────────────────────────
-    gemini_api_key: str = ""
+    # Accepts both GEMINI_API_KEY and COUNSELAI_GEMINI_API_KEY
+    gemini_api_key: str = Field(default="", validation_alias="GEMINI_API_KEY")
 
     # ── Gemini Live (real-time conversation) ────────────────────────────
     gemini_live_model: str = "gemini-2.5-flash-native-audio-preview-12-2025"

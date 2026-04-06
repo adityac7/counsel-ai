@@ -34,7 +34,7 @@ from counselai.api.websocket_handler import (
     keepalive_ping,
     session_timer,
 )
-from counselai.storage.repositories.live_sessions import (
+from counselai.storage.live_sessions import (
     LiveSessionHandle,
     create_live_session,
     finalize_live_session,
@@ -145,13 +145,21 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                     logger.info("Connected to Gemini Live: %s", GEMINI_LIVE_MODEL)
                     await ws.send_json({"type": "setup_complete"})
 
-                    # System prompt is now in LiveConnectConfig.system_instruction
-                    # Send silent audio to trigger greeting
+                    # Trigger Gemini to greet the student proactively.
+                    # Silent audio alone doesn't work — Gemini's VAD ignores it.
+                    # send_client_content with turn_complete=True forces Gemini's turn.
                     silent = generate_silent_audio()
                     await session.send_realtime_input(
                         audio=gt.Blob(data=silent, mime_type="audio/pcm")
                     )
-                    logger.info("System prompt in config, silent audio sent to trigger greeting")
+                    await session.send_client_content(
+                        turns=gt.Content(
+                            role="user",
+                            parts=[gt.Part(text="Begin the session. Greet the student now.")],
+                        ),
+                        turn_complete=True,
+                    )
+                    logger.info("Greeting trigger sent to Gemini")
 
                     await ws.send_json({"type": "connection_active"})
                     is_first_connection = False
@@ -192,6 +200,39 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                     task.cancel()
                 await asyncio.gather(*pending, return_exceptions=True)
 
+                # Handle explicit end_session from browser
+                if b2g in done and not b2g.cancelled() and b2g.exception() is None:
+                    result = b2g.result()
+                    if result == "end_session":
+                        logger.info("Graceful end_session — finalizing now")
+                        transcript.flush()
+                        if live_session is not None:
+                            try:
+                                async with get_session_factory()() as db:
+                                    saved_session_id = await finalize_live_session(
+                                        db,
+                                        session_id=live_session.session_id,
+                                        turns=transcript.turns,
+                                        observations=transcript.observations,
+                                        segments=transcript.segments,
+                                        status=final_status,
+                                        ended_at=datetime.now(timezone.utc),
+                                    )
+                                if saved_session_id:
+                                    try:
+                                        await ws.send_json({"type": "session_saved", "session_id": saved_session_id})
+                                    except Exception:
+                                        pass
+                                    # Mark as already finalized so we skip the post-loop finalize
+                                    live_session = None
+                            except Exception as exc:
+                                logger.error("Failed to finalize on end_session: %s", exc, exc_info=True)
+                        try:
+                            await ws.close(1000, "Session ended")
+                        except Exception:
+                            pass
+                        return
+
                 # If GoAway, reconnect transparently
                 if resumption_state.get("go_away"):
                     reconnect_count += 1
@@ -201,6 +242,10 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                         MAX_RECONNECTS,
                         bool(resumption_state.get("handle")),
                     )
+                    if reconnect_count > MAX_RECONNECTS:
+                        logger.error("Reconnect attempts exhausted (%d)", MAX_RECONNECTS)
+                        final_status = SessionStatus.failed
+                        break
                     continue  # Reconnect with resumption handle
 
                 # Otherwise, session ended normally (browser disconnected)

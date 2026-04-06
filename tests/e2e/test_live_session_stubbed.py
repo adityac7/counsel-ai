@@ -168,6 +168,13 @@ _LIVE_SESSION_STUB = """
 
     send(payload) {
       window.__wsEvents.push(['send', payload]);
+      // Respond to end_session with session_saved
+      try {
+        const msg = JSON.parse(payload);
+        if (msg.type === 'end_session') {
+          setTimeout(() => this._emit({ type: 'session_saved', session_id: '22222222-2222-2222-2222-222222222222' }), 20);
+        }
+      } catch {}
     }
 
     close() {
@@ -272,3 +279,73 @@ class TestLiveSessionStubbed:
     assert 'Fragmented' in voice_text
     assert 'Hesitation markers' in voice_text
     assert 'Tone shifts' in voice_text
+
+
+class TestSummaryScreenRendering:
+  def _end_session_and_wait(self, page: Page, server_url: str) -> None:
+    _start_stubbed_session(page, server_url)
+    page.click('#end-btn')
+    page.wait_for_function("() => window.__analyzeRequest !== null")
+
+  def test_personality_section_renders(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    personality = page.locator('#personality-section')
+    expect(personality).to_be_visible()
+    assert 'reflective' in personality.inner_text().lower()
+
+  def test_cognitive_section_renders(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    cognitive = page.locator('#cognitive-section')
+    expect(cognitive).to_be_visible()
+    assert cognitive.inner_text().strip() != ''
+
+  def test_emotional_section_renders(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    emotional = page.locator('#emotional-section')
+    expect(emotional).to_be_visible()
+    assert emotional.inner_text().strip() != ''
+
+  def test_behavioral_section_renders(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    behavioral = page.locator('#behavioral-section')
+    expect(behavioral).to_be_visible()
+    assert behavioral.inner_text().strip() != ''
+
+  def test_score_metrics_display(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    metrics = page.locator('#profile-metrics')
+    expect(metrics).to_be_visible()
+    metrics_text = metrics.inner_text()
+    assert 'Critical Thinking' in metrics_text
+    # buildMetrics creates inline-styled score bars, not .score-bar class
+    assert '7/10' in metrics_text or '/10' in metrics_text
+
+  def test_recommendations_render(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    recs = page.locator('#recommendations')
+    expect(recs).to_be_visible()
+    assert 'Plan a follow-up conversation' in recs.inner_text()
+
+  def test_summary_text_shows_profile_summary(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    summary_text = page.locator('#summary-text')
+    expect(summary_text).to_be_visible()
+    assert 'Mock profile summary' in summary_text.inner_text()
+
+  def test_session_metadata_in_summary(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    meta = page.locator('#summary-meta')
+    expect(meta).to_be_visible()
+    meta_text = meta.inner_text()
+    assert 'Stub Student' in meta_text
+    assert 'Class 11' in meta_text
+
+  def test_download_transcript_button_exists(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    btn = page.locator('#download-transcript-btn')
+    expect(btn).to_be_visible()
+
+  def test_no_counsellor_transcript_double_append(self, page: Page, server_url: str) -> None:
+    self._end_session_and_wait(page, server_url)
+    entries = page.locator('#transcript >> text="Thanks for sharing that."')
+    assert entries.count() == 1

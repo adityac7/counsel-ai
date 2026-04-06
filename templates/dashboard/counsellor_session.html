@@ -198,29 +198,35 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
 
 <!-- Signals Tab -->
 <div class="tab-content" id="tab-signals">
-  {% if data.signal_windows %}<div class="card"><h2>🪟 Topic windows ({{ data.signal_windows|length }})</h2>
+  <div class="card"><h2>🪟 Topic windows ({{ data.signal_windows|length }})</h2>
+    {% if data.signal_windows %}
     {% for w in data.signal_windows %}<div class="window-card"><div class="window-header">
-      <span class="window-topic">{{ w.topic_key }}</span>
-      <span class="window-time">{{ '%d:%02d'|format(w.start_ms // 60000, (w.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(w.end_ms // 60000, (w.end_ms // 1000) % 60) }} · {{ '%.0f'|format(w.reliability_score * 100) }}%</span>
+      <span class="window-topic">{{ w.topic or w.topic_key or w.segment }}</span>
+      <span class="window-time">Turns {{ w.start_turn }}–{{ w.end_turn }}</span>
     </div></div>{% endfor %}
-  </div>{% endif %}
+    {% else %}<div class="empty">No topic windows recorded.</div>{% endif %}
+  </div>
 
-  {% if data.hypotheses %}<div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
+  <div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
+    {% if data.hypotheses %}
     {% for h in data.hypotheses %}<div class="construct"><div class="construct-header"><div><span class="construct-label">{{ h.label }}</span> <span class="construct-status {{ h.status }}">{{ h.status }}</span></div>
       {% if h.score is not none %}<span style="font-size:14px">{{ '%.0f'|format(h.score * 100) }}%</span>{% endif %}
     </div><div class="construct-body">{{ h.evidence_summary }}</div></div>{% endfor %}
-  </div>{% endif %}
+    {% else %}<div class="empty">No hypotheses recorded.</div>{% endif %}
+  </div>
 
-  {% for modality, obs_list in data.observations.items() %}<div class="card">
-    <h2><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> Observations ({{ obs_list|length }})</h2>
+  <div class="card"><h2>Observations ({{ data.observations|length }})</h2>
+  {% if data.observations %}
+  {% for modality, obs_list in data.observations.items() %}<div style="margin-bottom:12px">
+    <h3><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> ({{ obs_list|length }})</h3>
     {% for obs in obs_list[:20] %}<div class="evidence-node">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="font-size:14px">{{ obs.signal_key }}</strong><span class="confidence-bar">{{ '%.0f'|format(obs.confidence * 100) }}%</span></div>
       {% if obs.value %}<div class="muted" style="font-size:13px">{% for k, v in obs.value.items() %}<span style="margin-right:12px">{{ k }}: <strong>{{ v }}</strong></span>{% endfor %}</div>{% endif %}
     </div>{% endfor %}
     {% if obs_list|length > 20 %}<div class="muted" style="padding:8px">… and {{ obs_list|length - 20 }} more</div>{% endif %}
   </div>{% endfor %}
-
-  {% if not data.signal_windows and not data.hypotheses and not data.observations %}<div class="card"><div class="empty">No signal data available.</div></div>{% endif %}
+  {% else %}<div class="empty">No observations recorded.</div>{% endif %}
+  </div>
 </div>
 {% endblock %}
 

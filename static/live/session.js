@@ -5,9 +5,9 @@
  * Consolidates: gemini-session.js + transcript.js
  * All previously-exported symbols are re-exported.
  */
-import state from './app.js';
-import { dom, setConnectionState, setStatus, showToast, setDebug, uiLog, updateDebugSnapshot } from './app.js';
-import { endSession } from './analysis.js';
+import state from './state.js';
+import { dom } from './state.js';
+import { setConnectionState, setStatus, showToast, setDebug, uiLog, updateDebugSnapshot } from './app.js';
 
 // ============================================================
 // TRANSCRIPT — add entries, accumulate student chunks, extract
@@ -17,7 +17,9 @@ export function addStudentTranscript(text, source) {
   const raw = typeof text === 'string' ? text : String(text ?? '');
   const clean = raw.trim();
   if (!clean) return false;
-  if (clean === state.lastStudentTranscript) return false;
+  // Only dedup consecutive speech within the same turn (currentStudentEntry is non-null).
+  // Once the turn ends (currentStudentEntry resets to null), allow identical text from new turns.
+  if (state.currentStudentEntry && clean === state.lastStudentTranscript) return false;
   state.lastStudentTranscript = clean;
 
   if (!state.currentStudentEntry) {
@@ -33,7 +35,7 @@ export function addStudentTranscript(text, source) {
   }
 
   if (state.studentTranscriptTimer) clearTimeout(state.studentTranscriptTimer);
-  state.studentTranscriptTimer = setTimeout(() => { state.currentStudentEntry = null; }, 1500);
+  state.studentTranscriptTimer = setTimeout(() => { state.currentStudentEntry = null; state.lastStudentTranscript = ''; }, 1500);
 
   state.waitingForStudentTranscript = false;
   return true;
@@ -110,6 +112,7 @@ function base64ToInt16Array(base64) {
 }
 
 export function playGeminiAudio(base64Data) {
+  if (state.intentionalSessionEnd) return;
   if (!state.geminiPlaybackCtx) { uiLog('ERR', '[audio] No playback context!'); return; }
   if (state.geminiPlaybackCtx.state !== 'running') {
     state.geminiPlaybackCtx.resume().catch(e => uiLog('ERR', '[audio] Resume failed: ' + e.message));
@@ -136,11 +139,32 @@ export function playGeminiAudio(base64Data) {
   if (state.audioChunksPlayed % 50 === 0) uiLog('INFO', state.audioChunksPlayed + ' audio chunks played');
 }
 
-// Transcription is now handled natively by Gemini Live's input_audio_transcription.
-// No polling needed — transcription events arrive via serverContent.inputTranscription.
-export async function flushPendingStudentTranscript() {
-  // No-op: native transcription doesn't buffer client-side.
-  return '';
+// ============================================================
+// SESSION SAVED HANDSHAKE — resolves when server confirms save
+// ============================================================
+
+let _sessionSavedResolve = null;
+
+/**
+ * Returns a promise that resolves when the server sends a `session_saved`
+ * message. If the message doesn't arrive within `timeoutMs`, the promise
+ * resolves anyway so analysis can proceed with whatever session_id we have.
+ */
+export function waitForSessionSaved(timeoutMs = 5000) {
+  return new Promise(resolve => {
+    // Already received before we started waiting
+    if (state.savedSessionId && state.pendingTranscriptFlush === 'done') {
+      resolve(state.savedSessionId);
+      return;
+    }
+    _sessionSavedResolve = resolve;
+    setTimeout(() => {
+      if (_sessionSavedResolve) {
+        _sessionSavedResolve = null;
+        resolve(state.savedSessionId);
+      }
+    }, timeoutMs);
+  });
 }
 
 // ============================================================
@@ -192,7 +216,7 @@ export function handleGeminiMessage(msg) {
     }
     if (msg.type === 'session_timeout') {
       uiLog('WARN', 'Session timed out by server');
-      endSession();
+      window.dispatchEvent(new CustomEvent('counselai:session_timeout'));
       return;
     }
     if (msg.type === 'reconnected') {
@@ -209,7 +233,13 @@ export function handleGeminiMessage(msg) {
     }
     if (msg.type === 'session_saved') {
       state.savedSessionId = msg.session_id;
+      state.pendingTranscriptFlush = 'done';
       uiLog('OK', 'Session saved: ' + msg.session_id);
+      if (_sessionSavedResolve) {
+        const resolve = _sessionSavedResolve;
+        _sessionSavedResolve = null;
+        resolve(msg.session_id);
+      }
       return;
     }
     if (msg.type === 'go_away') {
@@ -235,10 +265,17 @@ export function handleGeminiMessage(msg) {
   if (serverContent.modelTurn && serverContent.modelTurn.parts) {
     dom.orb.classList.add('speaking');
     setStatus('Speaking...');
+    state._lastAiEntry = null;
+
+    // Create AI entry immediately — audio-native models send audio first,
+    // text arrives later via outputTranscription
+    if (!state.currentAiEntry) {
+      state.currentAiEntry = addEntry('ai', '');
+    }
+
     for (const part of serverContent.modelTurn.parts) {
       if (part.inlineData && part.inlineData.data) playGeminiAudio(part.inlineData.data);
       if (part.text) {
-        if (!state.currentAiEntry) state.currentAiEntry = addEntry('ai', '');
         state.currentAiEntry.body.textContent += part.text;
         state.currentAiEntry.data.text = state.currentAiEntry.body.textContent;
         dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
@@ -248,7 +285,10 @@ export function handleGeminiMessage(msg) {
 
   if (serverContent.turnComplete) {
     dom.orb.classList.remove('speaking');
-    if (state.currentAiEntry) state.currentAiEntry = null;
+    if (state.currentAiEntry) {
+      state._lastAiEntry = state.currentAiEntry;
+      state.currentAiEntry = null;
+    }
     state.currentStudentEntry = null;
     setStatus('Listening...');
   }
@@ -261,17 +301,19 @@ export function handleGeminiMessage(msg) {
     }
   }
 
-  // Output transcription (counsellor)
+  // Output transcription (counsellor) — final text for the AI turn.
+  // Only replace streamed text if transcription is longer (more complete).
   if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
     const txt = serverContent.outputTranscription.text.trim();
     if (txt) {
-      if (!state.currentAiEntry) state.currentAiEntry = addEntry('ai', '');
-      const existing = state.currentAiEntry.body.textContent;
-      if (existing && !existing.endsWith(' ') && !txt.startsWith(' ')) {
-        state.currentAiEntry.body.textContent += ' ';
+      const target = state.currentAiEntry || state._lastAiEntry;
+      if (target) {
+        const existing = (target.data.text || '').trim();
+        if (txt.length >= existing.length) {
+          target.body.textContent = txt;
+          target.data.text = txt;
+        }
       }
-      state.currentAiEntry.body.textContent += txt;
-      state.currentAiEntry.data.text = state.currentAiEntry.body.textContent;
       dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
     }
   }
@@ -283,16 +325,22 @@ export function handleGeminiMessage(msg) {
 
 export async function startGeminiSession(name, scenario) {
   uiLog('INFO', 'Starting Gemini Live session...');
+  if (!state.mediaStream || !(state.mediaStream instanceof MediaStream)) {
+    throw new Error('Microphone not available — please allow mic access and try again.');
+  }
+
+  // Create playback context first (24kHz for Gemini audio output)
+  if (!state.geminiPlaybackCtx) {
+    state.geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
+    state.geminiPlaybackCtx.resume().then(() => uiLog('OK', 'Playback AudioContext resumed'));
+    state.geminiPlaybackTime = 0;
+  }
+
+  // Create mic capture context (16kHz for Gemini audio input)
   state.geminiAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
   const micSource = state.geminiAudioCtx.createMediaStreamSource(state.mediaStream);
   const bufferSize = 4096;
   state.geminiMicProcessor = state.geminiAudioCtx.createScriptProcessor(bufferSize, 1, 1);
-
-  if (!state.geminiPlaybackCtx) {
-    state.geminiPlaybackCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 24000 });
-    state.geminiPlaybackCtx.resume();
-    state.geminiPlaybackTime = 0;
-  }
 
   const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsLang = state.sessionMeta.lang || 'hinglish';

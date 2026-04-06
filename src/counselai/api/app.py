@@ -67,6 +67,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+@app.middleware("http")
+async def no_cache_js(request: Request, call_next):
+    """Prevent browser caching of JS modules during development."""
+    response = await call_next(request)
+    if request.url.path.startswith("/static/live/") and request.url.path.endswith(".js"):
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
 # ---------------------------------------------------------------------------
 # Mount routers
 # ---------------------------------------------------------------------------

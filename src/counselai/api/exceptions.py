@@ -15,14 +15,3 @@ class GeminiAPIKeyMissing(GeminiClientError):
 
 class TranscriptionError(CounselAIError):
     """Raised when audio transcription fails."""
-
-
-class WebSocketSessionError(CounselAIError):
-    """Raised when a WebSocket session encounters an unrecoverable error."""
-
-
-class InsufficientSessionData(CounselAIError):
-    """Raised when session data is too sparse for analysis."""
-
-    def __init__(self, msg: str = "Insufficient session data for analysis."):
-        super().__init__(msg)

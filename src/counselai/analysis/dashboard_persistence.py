@@ -13,6 +13,42 @@ from counselai.storage.models import Hypothesis, Profile, School, SessionRecord
 ANALYZE_SESSION_PROFILE_VERSION = "analyze-session-v1"
 
 
+def _normalize_red_flags(raw_flags: list) -> list[dict[str, Any]]:
+    """Ensure red_flags_json always stores {key, severity, reason} objects."""
+    normalized = []
+    for flag in raw_flags:
+        if isinstance(flag, str):
+            normalized.append({"key": flag, "severity": "medium", "reason": flag})
+        elif isinstance(flag, dict):
+            normalized.append({
+                "key": flag.get("key") or flag.get("flag") or "unknown",
+                "severity": flag.get("severity", "medium"),
+                "reason": flag.get("reason") or flag.get("description") or "",
+            })
+    return normalized
+
+
+def _normalize_student_view(view: dict[str, Any]) -> dict[str, Any]:
+    """Ensure student_view_json includes both next_steps and suggested_next_steps."""
+    if not isinstance(view, dict):
+        view = {}
+    steps = view.get("next_steps") or view.get("suggested_next_steps") or []
+    view["next_steps"] = steps
+    view["suggested_next_steps"] = steps
+    return view
+
+
+def _normalize_counsellor_view(view: dict[str, Any]) -> dict[str, Any]:
+    """Ensure counsellor_view_json includes summary, constructs, recommended_follow_ups."""
+    if not isinstance(view, dict):
+        view = {}
+    view.setdefault("summary", "")
+    view.setdefault("constructs", [])
+    follow_up = view.get("follow_up") or {}
+    view.setdefault("recommended_follow_ups", follow_up.get("actions", []))
+    return view
+
+
 def _get_or_create_school(db: Session, school_name: str) -> School | None:
     clean_name = school_name.strip()
     if not clean_name:
@@ -80,50 +116,24 @@ def _upsert_hypotheses(
     session_id: uuid.UUID,
     hypotheses: list[dict[str, Any]],
 ) -> None:
-    construct_keys = [item["construct_key"] for item in hypotheses if item.get("construct_key")]
-    if not construct_keys:
-        return
-
-    existing_rows = (
-        db.query(Hypothesis)
-        .filter(
-            Hypothesis.session_id == session_id,
-            Hypothesis.construct_key.in_(construct_keys),
-        )
-        .all()
-    )
-    existing_by_key = {row.construct_key: row for row in existing_rows}
-    seen_keys: set[str] = set()
+    # Delete all existing hypotheses for this session first to prevent stale/duplicate constructs
+    db.query(Hypothesis).filter(Hypothesis.session_id == session_id).delete()
 
     for item in hypotheses:
         construct_key = item.get("construct_key")
         if not construct_key:
             continue
 
-        seen_keys.add(construct_key)
-        row = existing_by_key.get(construct_key)
-        if row is None:
-            row = Hypothesis(
-                session_id=session_id,
-                construct_key=construct_key,
-                label=item["label"],
-                status=item["status"],
-                score=item["score"],
-                evidence_summary=item["evidence_summary"],
-                evidence_refs_json=item.get("evidence_refs", {}),
-            )
-            db.add(row)
-            continue
-
-        row.label = item["label"]
-        row.status = item["status"]
-        row.score = item["score"]
-        row.evidence_summary = item["evidence_summary"]
-        row.evidence_refs_json = item.get("evidence_refs", {})
-
-    for construct_key, row in existing_by_key.items():
-        if construct_key not in seen_keys:
-            db.delete(row)
+        row = Hypothesis(
+            session_id=session_id,
+            construct_key=construct_key,
+            label=item["label"],
+            status=item["status"],
+            score=item["score"],
+            evidence_summary=item["evidence_summary"],
+            evidence_refs_json=item.get("evidence_refs", {}),
+        )
+        db.add(row)
 
     db.flush()
 
@@ -147,10 +157,16 @@ def persist_session_analysis(
 
     session.report = json.dumps(report_data, default=str)
 
-    student_view = dashboard_payload["student_view"]
-    counsellor_view = dashboard_payload["counsellor_view"]
-    school_view = dashboard_payload["school_view"]
-    red_flags = dashboard_payload["red_flags"]
+    # Normalize shapes before persisting
+    student_view = _normalize_student_view(dashboard_payload.get("student_view") or {})
+    counsellor_view = _normalize_counsellor_view(dashboard_payload.get("counsellor_view") or {})
+    school_view = dashboard_payload.get("school_view") or {}
+    red_flags = _normalize_red_flags(dashboard_payload.get("red_flags") or [])
+
+    # Write normalized shapes back so _upsert_profile stores canonical data
+    dashboard_payload["student_view"] = student_view
+    dashboard_payload["counsellor_view"] = counsellor_view
+    dashboard_payload["red_flags"] = red_flags
 
     session.session_summary = (
         counsellor_view.get("summary")
@@ -158,10 +174,12 @@ def persist_session_analysis(
         or session.session_summary
     )
     session.risk_level = _highest_risk_level(red_flags)
+
+    follow_up_actions = dashboard_payload.get("follow_up_actions") or counsellor_view.get("recommended_follow_ups") or []
     session.follow_up_needed = bool(
         red_flags
-        or counsellor_view.get("recommended_follow_ups")
-        or student_view.get("suggested_next_steps")
+        or follow_up_actions
+        or student_view.get("next_steps")
     )
     themes = school_view.get("themes") if isinstance(school_view, dict) else None
     if themes:

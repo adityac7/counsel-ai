@@ -15,13 +15,11 @@ from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 from sqlalchemy.pool import StaticPool
 
-from counselai.dashboard.counsellor_queue import (
+from counselai.dashboard.counsellor_service import (
     QueueFilters,
     get_available_grades,
     get_available_schools,
     get_counsellor_queue,
-)
-from counselai.dashboard.counsellor_review import (
     get_session_evidence,
     get_session_review,
 )
@@ -62,13 +60,13 @@ def db_engine():
                 status TEXT NOT NULL DEFAULT 'completed',
                 started_at TEXT, ended_at TEXT,
                 duration_seconds INTEGER,
-                artifact_manifest_path TEXT,
                 primary_language TEXT, processing_version TEXT,
                 session_summary TEXT, risk_level TEXT,
                 follow_up_needed INTEGER DEFAULT 0,
                 topics_discussed TEXT,
-                student_mood_start TEXT, student_mood_end TEXT,
                 turn_count INTEGER, report TEXT,
+                observations_json TEXT DEFAULT '[]',
+                segments_json TEXT DEFAULT '[]',
                 created_at TEXT, updated_at TEXT
             )
         """))

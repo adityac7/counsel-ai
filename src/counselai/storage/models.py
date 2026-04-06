@@ -137,7 +137,6 @@ class SessionRecord(Base):
     started_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
     ended_at: Mapped[datetime | None] = mapped_column(DateTime)
     duration_seconds: Mapped[int | None] = mapped_column(Integer)
-    artifact_manifest_path: Mapped[str | None] = mapped_column(Text)
     primary_language: Mapped[str | None] = mapped_column(String(20))
     processing_version: Mapped[str | None] = mapped_column(String(20))
 
@@ -147,9 +146,6 @@ class SessionRecord(Base):
     follow_up_needed: Mapped[bool] = mapped_column(Boolean, default=False)
     topics_discussed: Mapped[dict | None] = mapped_column(JSONType)  # list of strings
 
-    # Session quality metrics
-    student_mood_start: Mapped[str | None] = mapped_column(String(50))
-    student_mood_end: Mapped[str | None] = mapped_column(String(50))
     turn_count: Mapped[int | None] = mapped_column(Integer)
 
     # Full post-session report (JSON blob from report_generator)
@@ -172,38 +168,11 @@ class SessionRecord(Base):
     profiles: Mapped[list["Profile"]] = relationship(
         back_populates="session", cascade="all, delete-orphan"
     )
-    feedback: Mapped[list["SessionFeedback"]] = relationship(
-        back_populates="session", cascade="all, delete-orphan"
-    )
-
     __table_args__ = (
         Index("ix_sessions_student_id", "student_id"),
         Index("ix_sessions_status", "status"),
         Index("ix_sessions_started_at", "started_at"),
         Index("ix_sessions_risk_level", "risk_level"),
-    )
-
-
-class SessionFeedback(Base):
-    """Post-session feedback from student or counsellor."""
-    __tablename__ = "session_feedback"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
-    session_id: Mapped[uuid.UUID] = mapped_column(
-        UUIDType, ForeignKey("sessions.id"), nullable=False
-    )
-    respondent: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="student"
-    )  # "student" or "counsellor"
-    rating: Mapped[int | None] = mapped_column(Integer)  # 1-5
-    helpful: Mapped[bool | None] = mapped_column(Boolean)
-    comments: Mapped[str | None] = mapped_column(Text)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
-
-    session: Mapped[SessionRecord] = relationship(back_populates="feedback")
-
-    __table_args__ = (
-        Index("ix_session_feedback_session_id", "session_id"),
     )
 
 
