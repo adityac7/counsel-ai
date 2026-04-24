@@ -5,98 +5,149 @@
 
 {% block head %}
 <style>
-/* Overview-specific styles (supplements dashboard.css) */
-.detail { margin-top: 24px; display: none; }
+/* Overview page — supplements dashboard.css */
+.detail { margin-top: 24px; display: none; animation: fadeUp 0.35s ease; }
 .detail.active { display: block; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
 .card-inner {
-  padding: 16px;
+  padding: 18px 22px;
   margin-bottom: 12px;
   border-radius: var(--radius-md);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
+  background: var(--c-slate-50, #F8FAFC);
+  border: 1px solid var(--c-slate-200, #E2E8F0);
+  border-left: 3px solid var(--c-indigo-500, #6366F1);
 }
-.card-inner strong { color: var(--text-primary); font-size: 14px; }
-.metrics-bar { margin-bottom: 8px; }
+.card-inner strong {
+  display: block;
+  color: var(--c-indigo-700, #4338CA);
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  font-weight: 700;
+  margin-bottom: 10px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--c-slate-200, #E2E8F0);
+  font-family: var(--font-body);
+}
+.metrics-bar { margin-bottom: 12px; }
 .metrics-bar .bar-label {
   display: flex;
   justify-content: space-between;
-  font-size: 13px;
-  margin-bottom: 4px;
-  color: var(--text-secondary);
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+  color: var(--c-slate-600, #475569);
 }
-.metrics-bar .bar-label strong { color: var(--text-primary); }
+.metrics-bar .bar-label strong {
+  color: var(--c-slate-900, #0F172A);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  margin: 0; padding: 0; border: none;
+  display: inline; font-weight: 700;
+}
 .metrics-bar .track {
-  height: 6px;
-  background: var(--bg-subtle);
-  border-radius: 4px;
+  height: 8px;
+  background: var(--c-slate-100, #F1F5F9);
+  border-radius: 6px;
   overflow: hidden;
-  border: 1px solid var(--border-subtle);
+  border: 1px solid var(--c-slate-200, #E2E8F0);
 }
 .metrics-bar .fill {
   height: 100%;
-  border-radius: 4px;
-  background: var(--brand);
-  transition: width 0.4s;
+  border-radius: 6px;
+  background: var(--brand-gradient);
+  transition: width 0.7s cubic-bezier(0.22, 1, 0.36, 1);
 }
+
 .transcript {
-  max-height: 340px;
+  max-height: 380px;
   overflow-y: auto;
-  margin-top: 8px;
-  padding: 12px;
+  margin-top: 10px;
+  padding: 16px;
   border-radius: var(--radius-md);
-  background: var(--bg-subtle);
-  border: 1px solid var(--border-subtle);
+  background: var(--c-surface-2, #F8FAFC);
+  border: 1px solid var(--c-slate-200, #E2E8F0);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
 }
-.entry { padding: 8px 12px; border-radius: 8px; margin-bottom: 6px; }
-.entry.student { background: var(--bg-subtle); border: 1px solid var(--border-subtle); }
-.entry.counsellor { background: var(--brand-light); border: 1px solid #B8E4DC; }
+
+/* Chat bubbles — student right (indigo), counsellor left (slate) */
+.entry {
+  padding: 10px 14px;
+  border-radius: 14px 14px 4px 14px;
+  margin-bottom: 0;
+  max-width: 78%;
+  align-self: flex-end;
+  background: var(--brand-gradient);
+  border: none;
+  display: flex;
+  flex-direction: column;
+}
+.entry.student {
+  background: var(--brand-gradient);
+  border: none;
+  align-self: flex-end;
+  border-radius: 14px 14px 4px 14px;
+}
+.entry.counsellor {
+  background: var(--c-slate-100, #F1F5F9);
+  border: 1px solid var(--c-slate-200, #E2E8F0);
+  align-self: flex-start;
+  margin-left: 0;
+  border-radius: 14px 14px 14px 4px;
+}
 .entry .role {
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin-bottom: 2px;
+  font-size: 0.58rem;
+  font-weight: 700;
+  margin-bottom: 4px;
   text-transform: uppercase;
-  letter-spacing: 0.03em;
-  font-weight: 500;
+  letter-spacing: 0.08em;
+  color: rgba(255,255,255,0.7);
 }
+.entry.counsellor .role { color: var(--c-slate-500, #64748B); }
+.entry > div:last-child {
+  font-family: var(--font-body);
+  font-weight: 400;
+  font-size: 0.92rem;
+  color: #fff;
+  line-height: 1.6;
+}
+.entry.counsellor > div:last-child { color: var(--c-slate-800, #1E293B); }
 </style>
 {% endblock %}
 
 {% block content %}
 <div class="page-header">
-  <h1>Dashboard</h1>
-  <div class="subtitle">Session analytics and student insights</div>
+  <h1>Session <em>Overview</em></h1>
+  <div class="subtitle">A complete record of every student session — profiles, signals, and analysis.</div>
 </div>
 
 <div class="stats-row" id="stats-row">
   <div class="stat-card">
-    <div class="icon brand">📊</div>
+    <div class="icon">#</div>
     <div class="val" id="st-total">—</div>
     <div class="label">Total sessions</div>
   </div>
   <div class="stat-card">
-    <div class="icon success">👥</div>
+    <div class="icon">S</div>
     <div class="val" id="st-students">—</div>
     <div class="label">Students</div>
   </div>
   <div class="stat-card">
-    <div class="icon warning">🏫</div>
+    <div class="icon">A</div>
     <div class="val" id="st-schools">—</div>
     <div class="label">Active schools</div>
   </div>
   <div class="stat-card">
-    <div class="icon danger">⏱</div>
+    <div class="icon">T</div>
     <div class="val" id="st-avg">—</div>
     <div class="label">Avg duration</div>
-  </div>
-</div>
-
-<div class="card">
-  <h2>Recent sessions</h2>
-  <div class="table-wrap">
-    <table>
-      <thead><tr><th>Student</th><th>Grade</th><th>School</th><th>Date</th><th>Duration</th><th>Status</th><th>Flags</th></tr></thead>
-      <tbody id="sessions-body"><tr><td colspan="7" style="padding:20px;color:var(--text-tertiary)">Loading sessions…</td></tr></tbody>
-    </table>
   </div>
 </div>
 
@@ -105,7 +156,7 @@
 
 {% block scripts %}
 <script>
-const sessionsBody=document.getElementById('sessions-body'),detailEl=document.getElementById('session-detail');
+const detailEl=document.getElementById('session-detail');
 function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
 function fmtDate(v){if(!v)return'—';const d=new Date(v);return isNaN(d)?v:d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'})}
 function fmtDur(s){if(s==null||isNaN(+s))return'—';s=Math.max(0,+s);const m=Math.floor(s/60),sec=Math.floor(s%60);return m>0?`${m}m ${sec}s`:`${sec}s`}
@@ -157,7 +208,7 @@ function profileSections(p){
   const beh=[behavioral?.confidence_level?`Confidence: ${behavioral.confidence_level}`:'',behavioral?.social_dynamics?`Social: ${behavioral.social_dynamics}`:'',behavioral?.leadership_potential?`Leadership: ${behavioral.leadership_potential}`:''].filter(Boolean);
   const flags=Array.isArray(view.red_flags)?view.red_flags:Array.isArray(p?.red_flags)?p.red_flags:[];
   const reasonText=f=>typeof f==='string'?f:f.reason||f.description||JSON.stringify(f);
-  const flagsHtml=flags.length?flags.map(f=>`<div style="padding:6px 10px;background:var(--danger-bg);border-radius:8px;margin-bottom:4px;color:var(--danger)">⚠ ${esc(reasonText(f))}</div>`).join(''):'<div class="muted">No red flags.</div>';
+  const flagsHtml=flags.length?flags.map(f=>`<div style="padding:10px 14px;background:var(--ember-wash);border-left:3px solid var(--ember);border-radius:0 8px 8px 0;margin-bottom:6px;color:var(--ember);font-family:var(--font-display);font-style:italic;font-weight:300;font-size:0.95rem">${esc(reasonText(f))}</div>`).join(''):'<div class="muted">No red flags.</div>';
   const summaryText=view.summary||p?.summary||'No summary available.';
   p.summary = summaryText;
   return{personality:renderRows(pers),cognitive:renderRows(cog),emotional:renderRows(emo),behavioral:renderRows(beh),redFlags:flagsHtml,summary:esc(p?.summary||'No summary available.')}}
@@ -187,9 +238,9 @@ async function openSession(id){
     </div>`;
   }catch(e){detailEl.innerHTML=`<div class="card"><div class="muted">Error loading session.</div></div>`}}
 
-async function load(){
+async function loadStats(){
   try{
-    const res=await fetch('/api/v1/dashboard/counsellor/queue?limit=50');
+    const res=await fetch('/api/v1/dashboard/counsellor/queue?limit=200');
     if(!res.ok)throw new Error(`API returned ${res.status}`);
     const pl=await res.json();
     const ss=Array.isArray(pl.items)?pl.items:[];
@@ -202,27 +253,10 @@ async function load(){
     document.getElementById('st-schools').textContent=schools.size||'—';
     const durations=ss.map(s=>+s.duration_seconds).filter(d=>!isNaN(d)&&d>0);
     document.getElementById('st-avg').textContent=durations.length?fmtDur(durations.reduce((a,b)=>a+b,0)/durations.length):'—';
-
-    if(!ss.length){
-      sessionsBody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="icon">📋</div><div class="title">No sessions yet</div><div class="desc">Start a counselling session to see data here.</div></div></td></tr>`;
-      return;
-    }
-
-    sessionsBody.innerHTML=ss.map(s=>`<tr class="row" data-id="${esc(s.session_id)}">
-      <td><strong>${esc(s.student_name||'Student')}</strong></td>
-      <td>${esc(s.student_grade||'—')}</td>
-      <td>${esc(s.school_name||'—')}</td>
-      <td>${fmtDate(s.started_at)}</td>
-      <td>${fmtDur(s.duration_seconds)}</td>
-      <td>${statusChip(s.status)}</td>
-      <td>${severityChip(s.red_flag_count,s.max_severity)}</td>
-    </tr>`).join('');
-
-    document.querySelectorAll('.row').forEach(r=>r.addEventListener('click',()=>openSession(r.dataset.id)));
   }catch(e){
-    console.error('Dashboard load failed:',e);
-    sessionsBody.innerHTML=`<tr><td colspan="7"><div class="empty-state"><div class="icon">⚠️</div><div class="title">Failed to load sessions</div><div class="desc">Check API connection and try again.</div></div></td></tr>`}}
+    console.error('Dashboard stats load failed:',e);
+  }}
 
-load();
+loadStats();
 </script>
 {% endblock %}

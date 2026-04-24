@@ -180,6 +180,18 @@ async def create_all_tables() -> None:
             await conn.execute(text("PRAGMA journal_mode=WAL"))
             await conn.execute(text("PRAGMA foreign_keys=ON"))
         await conn.run_sync(Base.metadata.create_all)
+        # Additive column migrations for SQLite (ALTER TABLE ADD COLUMN is idempotent via try/except)
+        if str(engine.url).startswith("sqlite"):
+            for col_ddl in [
+                "ALTER TABLE session_token_usage ADD COLUMN input_modality_json TEXT",
+                "ALTER TABLE session_token_usage ADD COLUMN output_modality_json TEXT",
+                "ALTER TABLE session_token_usage ADD COLUMN analysis_input_tokens INTEGER NOT NULL DEFAULT 0",
+                "ALTER TABLE session_token_usage ADD COLUMN analysis_output_tokens INTEGER NOT NULL DEFAULT 0",
+            ]:
+                try:
+                    await conn.execute(text(col_ddl))
+                except Exception:
+                    pass  # column already exists
     logger.info("All tables created.")
 
 

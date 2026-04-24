@@ -1,11 +1,13 @@
-"""Unified post-session analysis — ONE Gemini call for all dashboard views.
+"""Unified post-session analysis — ONE Gemini call producing 9-dimension report.
 
-Replaces the previous 4-module pipeline (face_analyzer + voice_analyzer +
-profile_generator + report_generator) with a single structured-output call
-to gemini-3.1-flash-lite-preview.
-
-Input: session transcript (list of turns) + real-time observations + student context
-Output: structured JSON matching ANALYSIS_SCHEMA — feeds all 3 dashboards
+Replaces the previous flat analysis with a structured 9-dimension scoring system
+based on the CounselAI Report Engine rubrics. The single call produces:
+- 9 dimension scores with evidence
+- 4-5 key moments
+- Counsellor snapshot
+- Risk assessment
+- Next session recommendation
+- Student / school / follow-up views
 """
 
 from __future__ import annotations
@@ -17,22 +19,86 @@ from typing import Any
 from google.genai import types as gt
 
 from counselai.api.gemini_client import get_gemini_client, GEMINI_ANALYSIS_MODEL
-from counselai.settings import settings
 
 logger = logging.getLogger(__name__)
 
 ANALYSIS_PROMPT = """\
-You are an expert Indian school counsellor analyst. Analyze the following \
-counselling session transcript and produce a comprehensive structured analysis.
+You are an expert educational psychologist and Indian school counsellor analyst. \
+Analyze the following counselling session transcript and produce a comprehensive \
+structured analysis scoring the student on 9 behavioural dimensions.
 
 The student is in classes 9-12 (ages 14-18) in the Indian education system.
 
-Base EVERYTHING on what was actually said. Quote the student when citing evidence.
-Risk assessment is the most critical section — when in doubt, err on caution.
-Never diagnose — say "shows signs consistent with" not "has depression/anxiety."
-Keep summaries in plain language a teacher or parent can understand.
-Cultural context matters — what looks like low engagement may be a student taught \
-not to share feelings with adults.
+## RULES
+- Base EVERYTHING on what was actually said. Quote the student when citing evidence.
+- Risk assessment is the most critical section — when in doubt, err on caution.
+- Dimension scores are integers 1-10. Do NOT inflate scores to be kind.
+- Key moment quotes must be EXACT from the transcript — do not paraphrase.
+- Growth tips must be SPECIFIC to this student, not generic advice.
+- Never diagnose — say "shows signs consistent with" not "has depression/anxiety."
+- Cultural context matters — what looks like low engagement may be cultural.
+
+## SCORING RUBRICS FOR 9 DIMENSIONS
+
+### DOMAIN: THINKING
+
+**1. Analytical Depth** — Can they decompose a complex situation into constituent factors?
+- Emerging (1-3): Restates problem as given; single-factor thinking
+- Developing (4-6): Identifies 2-3 factors; applies a concept
+- Proficient (7-8): Identifies most factors; reasons with trade-offs
+- Advanced (9-10): Connects to systemic patterns; identifies non-obvious factors
+
+**2. Critical Reasoning** — Do they question assumptions and demand evidence?
+- Emerging (1-3): Accepts scenario at face value; no counter-arguments
+- Developing (4-6): Questions one assumption OR raises one counter-argument
+- Proficient (7-8): Challenges 2+ assumptions; supports claims with evidence
+- Advanced (9-10): Systematically tests assumptions; evaluates evidence quality
+
+**3. Decision Reasoning** — Can they commit to a justified position under ambiguity?
+- Emerging (1-3): Avoids choosing; "I don't know" without reasoning
+- Developing (4-6): Chooses but can't articulate why; OR articulates but won't commit
+- Proficient (7-8): Clear position + stated reasoning + 1-2 trade-offs acknowledged
+- Advanced (9-10): Multi-layered reasoning + trade-offs + conditions for changing mind
+
+### DOMAIN: CHARACTER
+
+**4. Perspective & Empathy** — Can they authentically see through multiple stakeholders' eyes?
+- Emerging (1-3): Single perspective; doesn't consider others
+- Developing (4-6): Mentions others exist but surface-level
+- Proficient (7-8): Inhabits 2-3 perspectives with emotional depth
+- Advanced (9-10): Holds contradictory perspectives; identifies hidden stakeholders
+
+**5. Ethical Compass** — What BASIS drives their moral reasoning?
+- Emerging (1-3): Consequence-based (punishment/reward)
+- Developing (4-6): Rule-based (authority/norms)
+- Proficient (7-8): Principle-based (values/trust/fairness)
+- Advanced (9-10): Principle-based with nuance (conflicting principles weighed)
+
+**6. Self-Reflection** — Do they think about their OWN thinking?
+- Emerging (1-3): No metacognitive statements; no acknowledged uncertainty
+- Developing (4-6): Occasional "I'm not sure" without follow-through
+- Proficient (7-8): Explicit metacognition ("I initially thought X, but...")
+- Advanced (9-10): Actively seeks disconfirmation; articulates learning
+
+**7. Resilience & Adaptability** — When challenged, do they crumble, rigidify, or adapt?
+- Emerging (1-3): Immediately abandons position; agrees with everything
+- Developing (4-6): Gets defensive OR rigid; won't engage with new info
+- Proficient (7-8): Engages with challenge; modifies reasoning; recovers confidence
+- Advanced (9-10): Thrives on challenge; uses pushback as fuel for deeper thinking
+
+### DOMAIN: EXPRESSION
+
+**8. Communication & Presence** — Are ideas expressed clearly AND with conviction?
+- Emerging (1-3): Unclear ideas; excessive fillers; flat delivery
+- Developing (4-6): Clear in parts; loses coherence under complexity
+- Proficient (7-8): Clear logical flow; controlled pace; minimal fillers
+- Advanced (9-10): Compelling clarity; ideas build naturally; conviction throughout
+
+**9. Engagement & Curiosity** — Were they genuinely invested and exploring?
+- Emerging (1-3): Minimal responses; waits for prompts; no curiosity
+- Developing (4-6): Responds adequately but doesn't elaborate; no questions
+- Proficient (7-8): Elaborates without prompting; asks 1-2 questions; sustained focus
+- Advanced (9-10): Drives conversation; probing questions; delight in complexity
 
 ## Transcript
 {transcript}
@@ -45,40 +111,58 @@ Case study: {case_study}
 Session duration: {duration_seconds}s
 {observations_section}
 {segments_section}
-## Instructions for face_data and voice_data
-Use the real-time observations above (if available) to populate the face_data and \
-voice_data sections. If video was provided, also use visible facial cues. \
-If no observations or video are available, provide your best assessment from \
-transcript content alone (speech patterns, emotional language, etc.).\
+## KEY MOMENTS
+Identify 4-5 pivotal moments where the student showed a cognitive/emotional shift, \
+demonstrated a strength or weakness, changed position, showed empathy, or responded \
+to a challenge. Quotes must be EXACT from the transcript.
+
+## COUNSELLOR SNAPSHOT
+Write 2-3 sentences: dominant moral reasoning pattern, engagement level, \
+notable confidence shifts, resilience pattern (crumble/rigidify/adapt/thrive), \
+risk flag status. Clinical and signal-rich.
+
+## NEXT SESSION
+Recommend the next case study category + difficulty based on strengths/growth areas.\
 """
 
 ANALYSIS_SCHEMA = {
     "type": "object",
     "properties": {
-        "session_summary": {"type": "string"},
-        "engagement_score": {"type": "integer"},
-        "key_themes": {
+        "dimensions": {
             "type": "array",
             "items": {
                 "type": "object",
                 "properties": {
-                    "theme": {"type": "string"},
-                    "evidence": {"type": "string"},
-                    "severity": {"type": "string", "enum": ["low", "medium", "high"]},
+                    "name": {"type": "string"},
+                    "domain": {"type": "string"},
+                    "score": {"type": "integer", "minimum": 1, "maximum": 10},
+                    "because": {"type": "string"},
+                    "key_moment_quote": {"type": "string"},
+                    "key_moment_turn": {"type": "integer"},
+                    "growth_tip": {"type": "string"},
+                    "evidence_sources": {
+                        "type": "array",
+                        "items": {"type": "boolean"},
+                    },
                 },
-                "required": ["theme", "evidence", "severity"],
+                "required": ["name", "domain", "score", "because", "key_moment_quote", "key_moment_turn", "growth_tip"],
             },
         },
-        "emotional_analysis": {
-            "type": "object",
-            "properties": {
-                "primary_emotion": {"type": "string"},
-                "secondary_emotions": {"type": "array", "items": {"type": "string"}},
-                "trajectory": {"type": "string"},
-                "emotional_vocabulary": {"type": "string", "enum": ["limited", "developing", "articulate"]},
+        "key_moments": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "turn": {"type": "integer"},
+                    "quote": {"type": "string"},
+                    "audio_signal": {"type": "string"},
+                    "dims": {"type": "array", "items": {"type": "integer"}},
+                    "insight": {"type": "string"},
+                },
+                "required": ["turn", "quote", "insight"],
             },
-            "required": ["primary_emotion", "trajectory", "emotional_vocabulary"],
         },
+        "snapshot": {"type": "string"},
         "risk_assessment": {
             "type": "object",
             "properties": {
@@ -100,93 +184,16 @@ ANALYSIS_SCHEMA = {
             },
             "required": ["level", "flags", "protective_factors", "immediate_safety_concern"],
         },
-        "constructs": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "key": {"type": "string"},
-                    "label": {"type": "string"},
-                    "score": {"type": "number"},
-                    "status": {"type": "string", "enum": ["supported", "mixed", "weak"]},
-                    "evidence_summary": {"type": "string"},
-                },
-                "required": ["key", "label", "score", "status", "evidence_summary"],
-            },
-        },
-        "personality_snapshot": {
-            "type": "object",
-            "properties": {
-                "traits": {"type": "array", "items": {"type": "string"}},
-                "communication_style": {"type": "string"},
-                "decision_making": {"type": "string"},
-            },
-            "required": ["traits", "communication_style", "decision_making"],
-        },
-        "cognitive_profile": {
-            "type": "object",
-            "properties": {
-                "critical_thinking": {"type": "integer"},
-                "perspective_taking": {"type": "integer"},
-                "moral_reasoning_stage": {"type": "string"},
-                "problem_solving_style": {"type": "string"},
-            },
-            "required": ["critical_thinking", "perspective_taking"],
-        },
-        "emotional_profile": {
-            "type": "object",
-            "properties": {
-                "eq_score": {"type": "integer"},
-                "empathy_level": {"type": "string"},
-                "stress_response": {"type": "string"},
-                "anxiety_markers": {"type": "array", "items": {"type": "string"}},
-            },
-            "required": ["eq_score", "empathy_level", "stress_response"],
-        },
-        "behavioral_insights": {
-            "type": "object",
-            "properties": {
-                "confidence": {"type": "integer"},
-                "leadership_potential": {"type": "string"},
-                "peer_influence": {"type": "string"},
-                "academic_pressure": {"type": "string"},
-                "resilience": {"type": "string"},
-                "coping_strategies": {"type": "array", "items": {"type": "string"}},
-            },
-            "required": ["confidence", "resilience"],
-        },
-        "key_moments": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "quote": {"type": "string"},
-                    "insight": {"type": "string"},
-                },
-                "required": ["quote", "insight"],
-            },
-        },
+        "next_session_rec": {"type": "string"},
+        "session_summary": {"type": "string"},
         "student_view": {
             "type": "object",
             "properties": {
                 "strengths": {"type": "array", "items": {"type": "string"}},
-                "interests": {"type": "array", "items": {"type": "string"}},
                 "growth_areas": {"type": "array", "items": {"type": "string"}},
                 "encouragement": {"type": "string"},
-                "next_steps": {"type": "array", "items": {"type": "string"}},
             },
             "required": ["strengths", "growth_areas", "encouragement"],
-        },
-        "school_view": {
-            "type": "object",
-            "properties": {
-                "themes": {"type": "array", "items": {"type": "string"}},
-                "academic_pressure_level": {"type": "string", "enum": ["none", "mild", "moderate", "severe"]},
-                "family_dynamics_concern": {"type": "string", "enum": ["none", "mild", "moderate", "severe"]},
-                "peer_relationship_issues": {"type": "string", "enum": ["none", "mild", "moderate", "severe"]},
-                "career_confusion": {"type": "string", "enum": ["none", "mild", "moderate", "severe"]},
-            },
-            "required": ["themes", "academic_pressure_level"],
         },
         "follow_up": {
             "type": "object",
@@ -194,102 +201,30 @@ ANALYSIS_SCHEMA = {
                 "actions": {"type": "array", "items": {"type": "string"}},
                 "topics_for_next_session": {"type": "array", "items": {"type": "string"}},
                 "referral_needed": {"type": "boolean"},
-                "referral_type": {"type": "string"},
                 "urgency": {"type": "string", "enum": ["routine", "soon", "urgent", "immediate"]},
             },
             "required": ["actions", "referral_needed", "urgency"],
         },
-        "red_flags": {"type": "array", "items": {"type": "string"}},
-        "recommendations": {"type": "array", "items": {"type": "string"}},
-        # Face and voice analysis — populated from real-time observations + video
-        "face_data": {
-            "type": "object",
-            "properties": {
-                "dominant_emotion": {"type": "string"},
-                "emotion_trajectory": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "point": {"type": "string"},
-                            "emotion": {"type": "string"},
-                        },
-                        "required": ["point", "emotion"],
-                    },
-                },
-                "engagement_indicators": {"type": "string"},
-                "notable_expressions": {"type": "array", "items": {"type": "string"}},
-                "eye_contact_score": {"type": "integer"},
-                "facial_tension_score": {"type": "integer"},
-                "emotion_stability": {"type": "string"},
-            },
-            "required": ["dominant_emotion", "engagement_indicators"],
-        },
-        "voice_data": {
-            "type": "object",
-            "properties": {
-                "speech_patterns": {"type": "string"},
-                "confidence_level": {"type": "string"},
-                "hesitation_markers": {"type": "array", "items": {"type": "string"}},
-                "emotional_tone_shifts": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {
-                            "point": {"type": "string"},
-                            "shift": {"type": "string"},
-                        },
-                        "required": ["point", "shift"],
-                    },
-                },
-                "overall_confidence_score": {"type": "integer"},
-                "speech_rate": {"type": "string"},
-                "volume_pattern": {"type": "string"},
-            },
-            "required": ["speech_patterns", "confidence_level"],
-        },
-        # Per-segment analysis (maps to case study parts)
-        "segment_analysis": {
-            "type": "array",
-            "items": {
-                "type": "object",
-                "properties": {
-                    "segment_name": {"type": "string"},
-                    "content_summary": {"type": "string"},
-                    "emotional_state": {"type": "string"},
-                    "audio_signals": {"type": "string"},
-                    "video_signals": {"type": "string"},
-                    "key_insight": {"type": "string"},
-                },
-                "required": ["segment_name", "content_summary", "emotional_state"],
-            },
-        },
     },
     "required": [
-        "session_summary", "engagement_score", "key_themes",
-        "emotional_analysis", "risk_assessment", "constructs",
-        "personality_snapshot", "cognitive_profile", "emotional_profile",
-        "behavioral_insights", "key_moments",
-        "student_view", "school_view", "follow_up",
-        "red_flags", "recommendations",
-        "face_data", "voice_data", "segment_analysis",
+        "dimensions", "key_moments", "snapshot", "risk_assessment",
+        "next_session_rec", "session_summary", "student_view", "follow_up",
     ],
 }
 
 
 def _build_transcript_text(transcript_data: list[dict]) -> str:
-    """Format transcript turns into readable text."""
+    """Format transcript turns into readable text with turn numbers."""
     lines = []
-    for entry in transcript_data:
+    for i, entry in enumerate(transcript_data, 1):
         role = entry.get("role", "unknown").upper()
         text = entry.get("text", "").strip()
         if text:
-            lines.append(f"[{role}] {text}")
+            lines.append(f"[Turn {i} | {role}] {text}")
     return "\n".join(lines) if lines else "(No transcript available)"
 
 
 def _build_observations_section(observations: list[dict]) -> str:
-    """Format real-time observations into analysis context."""
     if not observations:
         return ""
     lines = ["## Real-Time Observations (captured during session via audio/video analysis)"]
@@ -303,7 +238,6 @@ def _build_observations_section(observations: list[dict]) -> str:
 
 
 def _build_segments_section(segments: list[dict]) -> str:
-    """Format segment transitions into analysis context."""
     if not segments:
         return ""
     lines = ["## Session Segments (topic transitions detected during session)"]
@@ -326,13 +260,10 @@ def analyze_session(
     observations: list[dict] | None = None,
     segments: list[dict] | None = None,
 ) -> dict[str, Any]:
-    """Run unified post-session analysis with a single multimodal Gemini call.
+    """Run unified post-session analysis with a single Gemini call.
 
-    Accepts transcript + optional video + real-time observations.
-    When observations are provided, they give temporal per-turn context
-    for face/voice/emotional analysis that pure transcript misses.
-
-    Returns the full structured analysis JSON, or a minimal fallback on failure.
+    Returns the full structured analysis JSON with 9 dimensions, key moments,
+    snapshot, risk assessment, and recommendations.
     """
     client = get_gemini_client()
 
@@ -351,7 +282,6 @@ def analyze_session(
         segments_section=segments_section,
     )
 
-    # Build multimodal contents: text prompt + optional video
     contents: list = [prompt]
     if video_bytes and len(video_bytes) > 1000:
         contents.append(
@@ -364,6 +294,7 @@ def analyze_session(
     if obs_count or seg_count:
         logger.info("Including %d observations and %d segments in analysis", obs_count, seg_count)
 
+    raw: str | None = None
     try:
         response = client.models.generate_content(
             model=GEMINI_ANALYSIS_MODEL,
@@ -372,54 +303,87 @@ def analyze_session(
                 response_mime_type="application/json",
                 response_schema=ANALYSIS_SCHEMA,
                 temperature=0.3,
-                max_output_tokens=6000,
+                max_output_tokens=8000,
             ),
         )
         raw = (response.text or "").strip()
         result = json.loads(raw)
         logger.info(
-            "Unified analysis complete: risk=%s, themes=%d, observations=%d, segments=%d",
+            "Unified analysis complete via %s: risk=%s, dimensions=%d, moments=%d",
+            GEMINI_ANALYSIS_MODEL,
             result.get("risk_assessment", {}).get("level", "?"),
-            len(result.get("key_themes", [])),
-            obs_count,
-            seg_count,
+            len(result.get("dimensions", [])),
+            len(result.get("key_moments", [])),
         )
+        try:
+            um = response.usage_metadata
+            result["_analysis_usage"] = {
+                "input_tokens": int(getattr(um, "prompt_token_count", 0) or 0),
+                "output_tokens": int(getattr(um, "candidates_token_count", 0) or 0),
+            }
+        except Exception:
+            pass
         return result
     except Exception as exc:
         logger.error("Unified analysis failed: %s", exc, exc_info=True)
-        return _fallback_result(str(exc))
+        return _fallback_result(str(exc), raw_output=raw)
 
 
-def _fallback_result(error_msg: str = "") -> dict[str, Any]:
-    """Minimal valid result when Gemini call fails."""
+def _fallback_result(error_msg: str = "", *, raw_output: str | None = None) -> dict[str, Any]:
+    """Well-formed skeleton matching ANALYSIS_SCHEMA when the Gemini call fails."""
+    logger.warning(
+        "Unified analysis falling back to skeleton result. error=%r raw_output=%r",
+        error_msg,
+        (raw_output[:500] + "...") if raw_output and len(raw_output) > 500 else raw_output,
+    )
+
+    summary = "Analysis could not be completed." + (f" Error: {error_msg}" if error_msg else "")
+
+    dim_names = [
+        ("Analytical Depth", "Thinking"),
+        ("Critical Reasoning", "Thinking"),
+        ("Decision Reasoning", "Thinking"),
+        ("Perspective & Empathy", "Character"),
+        ("Ethical Compass", "Character"),
+        ("Self-Reflection", "Character"),
+        ("Resilience & Adaptability", "Character"),
+        ("Communication & Presence", "Expression"),
+        ("Engagement & Curiosity", "Expression"),
+    ]
+
     return {
-        "session_summary": "Analysis could not be completed." + (f" Error: {error_msg}" if error_msg else ""),
-        "engagement_score": 0,
-        "key_themes": [],
-        "emotional_analysis": {
-            "primary_emotion": "unknown",
-            "secondary_emotions": [],
-            "trajectory": "Unable to determine",
-            "emotional_vocabulary": "limited",
-        },
+        "dimensions": [
+            {
+                "name": name,
+                "domain": domain,
+                "score": 1,
+                "because": "Fallback — no analysis produced.",
+                "key_moment_quote": "",
+                "key_moment_turn": 0,
+                "growth_tip": "",
+                "evidence_sources": [False, False, False],
+            }
+            for name, domain in dim_names
+        ],
+        "key_moments": [],
+        "snapshot": summary,
         "risk_assessment": {
             "level": "none",
             "flags": [],
             "protective_factors": [],
             "immediate_safety_concern": False,
         },
-        "constructs": [],
-        "personality_snapshot": {"traits": [], "communication_style": "", "decision_making": ""},
-        "cognitive_profile": {"critical_thinking": 0, "perspective_taking": 0},
-        "emotional_profile": {"eq_score": 0, "empathy_level": "", "stress_response": ""},
-        "behavioral_insights": {"confidence": 0, "resilience": ""},
-        "key_moments": [],
-        "student_view": {"strengths": [], "growth_areas": [], "encouragement": "", "interests": [], "next_steps": []},
-        "school_view": {"themes": [], "academic_pressure_level": "none"},
-        "follow_up": {"actions": [], "referral_needed": False, "urgency": "routine"},
-        "red_flags": [],
-        "recommendations": [],
-        "face_data": {"dominant_emotion": "unknown", "engagement_indicators": "Not analyzed"},
-        "voice_data": {"speech_patterns": "unknown", "confidence_level": "Not analyzed"},
-        "segment_analysis": [],
+        "next_session_rec": "",
+        "session_summary": summary,
+        "student_view": {
+            "strengths": [],
+            "growth_areas": [],
+            "encouragement": "",
+        },
+        "follow_up": {
+            "actions": [],
+            "topics_for_next_session": [],
+            "referral_needed": False,
+            "urgency": "routine",
+        },
     }

@@ -3,12 +3,21 @@
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from typing import Any
 
 from sqlalchemy.orm import Session
 
-from counselai.storage.models import Hypothesis, Profile, School, SessionRecord
+from counselai.storage.models import (
+    Hypothesis,
+    Profile,
+    School,
+    SessionRecord,
+    SessionTokenUsage,
+)
+
+logger = logging.getLogger(__name__)
 
 ANALYZE_SESSION_PROFILE_VERSION = "analyze-session-v1"
 
@@ -103,10 +112,12 @@ def _upsert_profile(
         )
         db.add(profile)
 
-    profile.student_view_json = dashboard_payload["student_view"]
-    profile.counsellor_view_json = dashboard_payload["counsellor_view"]
-    profile.school_view_json = dashboard_payload["school_view"]
-    profile.red_flags_json = dashboard_payload["red_flags"]
+    # Use .get() with sensible defaults so a missing subtree does not abort
+    # persistence — we'd rather record partial data than drop everything.
+    profile.student_view_json = dashboard_payload.get("student_view") or {}
+    profile.counsellor_view_json = dashboard_payload.get("counsellor_view") or {}
+    profile.school_view_json = dashboard_payload.get("school_view") or {}
+    profile.red_flags_json = dashboard_payload.get("red_flags") or []
     db.flush()
 
 
@@ -150,12 +161,35 @@ def persist_session_analysis(
     student_school: str,
     student_age: int,
 ) -> bool:
-    """Persist analysis artifacts onto the existing live session."""
+    """Persist analysis artifacts onto the existing live session.
+
+    This function is intentionally tolerant of partial payloads: if a
+    specific subtree (``student_view``, ``counsellor_view``, ``school_view``,
+    ``red_flags``, ``hypotheses``) is missing, a WARNING is logged and the
+    function continues with the subtrees that *are* present. Previously a
+    missing key would raise ``KeyError`` and abort the entire write — that
+    behaviour was the root cause of "analysis not saved properly" when the
+    LLM response omitted a single field.
+    """
     session = db.get(SessionRecord, session_id)
     if session is None:
+        logger.warning("persist_session_analysis: session %s not found", session_id)
         return False
 
     session.report = json.dumps(report_data, default=str)
+    session.processing_version = ANALYZE_SESSION_PROFILE_VERSION
+
+    # Warn about missing required subtrees; empty red_flags/hypotheses is normal.
+    for key in ("student_view", "counsellor_view", "school_view"):
+        if not dashboard_payload.get(key):
+            logger.warning(
+                "persist_session_analysis: dashboard_payload missing/empty %r — persisting remaining subtrees",
+                key,
+            )
+    if not dashboard_payload.get("red_flags"):
+        logger.debug("persist_session_analysis: no red_flags (no risk detected — normal)")
+    if not dashboard_payload.get("hypotheses"):
+        logger.warning("persist_session_analysis: dashboard_payload missing/empty 'hypotheses'")
 
     # Normalize shapes before persisting
     student_view = _normalize_student_view(dashboard_payload.get("student_view") or {})
@@ -166,6 +200,7 @@ def persist_session_analysis(
     # Write normalized shapes back so _upsert_profile stores canonical data
     dashboard_payload["student_view"] = student_view
     dashboard_payload["counsellor_view"] = counsellor_view
+    dashboard_payload["school_view"] = school_view
     dashboard_payload["red_flags"] = red_flags
 
     session.session_summary = (
@@ -207,8 +242,100 @@ def persist_session_analysis(
     _upsert_hypotheses(
         db,
         session_id=session_id,
-        hypotheses=dashboard_payload["hypotheses"],
+        hypotheses=dashboard_payload.get("hypotheses") or [],
     )
 
     db.flush()
     return True
+
+
+def persist_session_usage(
+    db: Session,
+    *,
+    session_id: uuid.UUID,
+    input_tokens: int,
+    output_tokens: int,
+    cached_tokens: int,
+    total_tokens: int,
+    model: str,
+    input_modality: dict | None = None,
+    output_modality: dict | None = None,
+) -> SessionTokenUsage:
+    """Upsert a ``SessionTokenUsage`` row for the given session.
+
+    One row per session (unique on ``session_id``). If an existing row is
+    found it is updated in-place; otherwise a new row is inserted. The caller
+    is expected to commit/flush the enclosing transaction.
+    """
+    existing = (
+        db.query(SessionTokenUsage)
+        .filter(SessionTokenUsage.session_id == session_id)
+        .one_or_none()
+    )
+
+    im_json = json.dumps(input_modality) if input_modality else None
+    om_json = json.dumps(output_modality) if output_modality else None
+
+    if existing is None:
+        row = SessionTokenUsage(
+            session_id=session_id,
+            model=model,
+            input_tokens=int(input_tokens or 0),
+            output_tokens=int(output_tokens or 0),
+            cached_tokens=int(cached_tokens or 0),
+            total_tokens=int(total_tokens or 0),
+            input_modality_json=im_json,
+            output_modality_json=om_json,
+        )
+        db.add(row)
+        db.flush()
+        return row
+
+    existing.model = model
+    existing.input_tokens = int(input_tokens or 0)
+    existing.output_tokens = int(output_tokens or 0)
+    existing.cached_tokens = int(cached_tokens or 0)
+    existing.total_tokens = int(total_tokens or 0)
+    if im_json is not None:
+        existing.input_modality_json = im_json
+    if om_json is not None:
+        existing.output_modality_json = om_json
+    db.flush()
+    return existing
+
+
+def add_analysis_tokens(
+    db: Session,
+    *,
+    session_id: uuid.UUID,
+    input_tokens: int,
+    output_tokens: int,
+    model: str,
+) -> None:
+    """Add analysis-call token counts on top of an existing ``SessionTokenUsage`` row.
+
+    Called after the post-session Gemini analysis completes. If no live-session
+    usage row exists yet, creates a minimal one.
+    """
+    existing = (
+        db.query(SessionTokenUsage)
+        .filter(SessionTokenUsage.session_id == session_id)
+        .one_or_none()
+    )
+
+    if existing is None:
+        row = SessionTokenUsage(
+            session_id=session_id,
+            model=model,
+            input_tokens=0,
+            output_tokens=0,
+            cached_tokens=0,
+            total_tokens=0,
+            analysis_input_tokens=int(input_tokens or 0),
+            analysis_output_tokens=int(output_tokens or 0),
+        )
+        db.add(row)
+    else:
+        existing.analysis_input_tokens = (existing.analysis_input_tokens or 0) + int(input_tokens or 0)
+        existing.analysis_output_tokens = (existing.analysis_output_tokens or 0) + int(output_tokens or 0)
+    db.flush()

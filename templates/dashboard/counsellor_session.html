@@ -4,109 +4,223 @@
 {% block title %}Session Review{% endblock %}
 
 {% block head %}
+<link rel="stylesheet" href="/static/report.css">
 <style>
-/* Session review — page-specific styles (supplements dashboard.css) */
+/* Session review — supplements dashboard.css */
 .session-header {
   display: flex; justify-content: space-between; align-items: flex-start;
-  flex-wrap: wrap; gap: 16px; margin-bottom: 28px;
+  flex-wrap: wrap; gap: 18px; margin-bottom: 32px;
+  padding-bottom: 24px;
+  border-bottom: 1px solid var(--c-slate-200, #E2E8F0);
 }
-.session-header h1 { font-size: 24px; font-weight: 700; color: var(--text-primary); letter-spacing: -0.02em; }
-.session-meta { display: flex; flex-wrap: wrap; gap: 14px; margin-top: 8px; }
-.meta-item { color: var(--text-secondary); font-size: 14px; }
-.meta-item strong { color: var(--text-primary); }
-.chip-brand { background: var(--brand-light); color: var(--brand-text); }
-.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 24px; }
+.session-header h1 {
+  font-family: var(--font-display);
+  font-size: clamp(1.9rem, 4vw, 2.8rem);
+  font-weight: 800;
+  color: var(--c-slate-900, #0F172A);
+  letter-spacing: -0.035em;
+  line-height: 1.05;
+}
+.session-meta { display: flex; flex-wrap: wrap; gap: 16px; margin-top: 12px; }
+.meta-item {
+  color: var(--c-slate-500, #64748B);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  font-family: var(--font-body);
+}
+.meta-item strong {
+  color: var(--c-slate-900, #0F172A);
+  font-family: var(--font-display);
+  font-size: 0.95rem;
+  font-weight: 700;
+  text-transform: none;
+  letter-spacing: -0.02em;
+  margin-left: 4px;
+}
+.chip-brand {
+  background: var(--c-indigo-50, #EEF2FF);
+  color: var(--c-indigo-700, #4338CA);
+  border: 1px solid rgba(79,70,229,.2);
+  border-radius: 999px; padding: 3px 10px;
+  font-size: 0.66rem; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  display: inline-flex; align-items: center;
+}
+
+/* Tabs */
+.tabs {
+  display: flex; gap: 0;
+  border-bottom: 2px solid var(--c-slate-200, #E2E8F0);
+  margin-bottom: 28px; overflow-x: auto;
+}
 .tab {
-  padding: 10px 20px; cursor: pointer; color: var(--text-tertiary);
-  border-bottom: 2px solid transparent; margin-bottom: -1px;
-  font-size: 14px; font-weight: 500; transition: all 0.15s;
+  padding: 12px 22px; cursor: pointer;
+  color: var(--c-slate-500, #64748B);
+  border-bottom: 2.5px solid transparent; margin-bottom: -2px;
+  font-size: 0.72rem; font-weight: 600;
+  text-transform: uppercase; letter-spacing: 0.08em;
+  transition: all 0.2s ease; white-space: nowrap;
+  font-family: var(--font-body);
 }
-.tab:hover { color: var(--text-primary); }
-.tab.active { color: var(--brand-text); border-color: var(--brand); font-weight: 600; }
+.tab:hover { color: var(--c-slate-800, #1E293B); }
+.tab.active { color: var(--c-indigo-700, #4338CA); border-color: var(--c-indigo-600, #4F46E5); font-weight: 700; }
 .tab-content { display: none; }
-.tab-content.active { display: block; }
-h2 { font-size: 16px; margin-bottom: 14px; font-weight: 600; color: var(--text-primary); }
-h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight: 600; }
+.tab-content.active { display: block; animation: fadeUp 0.3s ease; }
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+h2 {
+  font-family: var(--font-display); font-size: 1.15rem;
+  margin-bottom: 18px; font-weight: 700;
+  color: var(--c-slate-900, #0F172A); letter-spacing: -0.025em;
+}
+h3 {
+  font-size: 0.68rem; margin-bottom: 12px;
+  color: var(--c-indigo-700, #4338CA); font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.09em; font-family: var(--font-body);
+}
+
+/* Constructs */
 .construct {
-  background: var(--bg-subtle); border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-md); padding: 16px; margin-bottom: 12px;
+  background: var(--c-slate-50, #F8FAFC);
+  border: 1.5px solid var(--c-slate-200, #E2E8F0);
+  border-left: 4px solid var(--c-indigo-500, #6366F1);
+  border-radius: var(--radius-md); padding: 18px 22px; margin-bottom: 12px;
+  transition: all 0.2s ease;
 }
-.construct-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.construct-label { font-weight: 600; font-size: 14px; color: var(--text-primary); }
-.construct-score { display: flex; align-items: center; gap: 8px; }
-.score-bar { width: 80px; height: 6px; background: var(--bg-hover); border-radius: 3px; overflow: hidden; }
-.score-fill { height: 100%; border-radius: 3px; transition: width 0.3s; }
-.construct-status { font-size: 12px; padding: 2px 8px; border-radius: 20px; font-weight: 500; }
-.construct-status.supported { background: var(--success-bg); color: var(--success); }
-.construct-status.mixed { background: var(--warning-bg); color: var(--warning); }
-.construct-status.weak { background: var(--danger-bg); color: var(--danger); }
-.construct-body { color: var(--text-secondary); font-size: 14px; line-height: 1.6; }
+.construct:hover { transform: translateX(3px); border-left-color: var(--c-indigo-700, #4338CA); box-shadow: var(--shadow-sm); }
+.construct-header {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 10px; gap: 12px;
+}
+.construct-label {
+  font-family: var(--font-display); font-weight: 700; font-size: 1rem;
+  color: var(--c-slate-900, #0F172A); letter-spacing: -0.02em;
+}
+.construct-score { display: flex; align-items: center; gap: 10px; }
+.score-bar {
+  width: 90px; height: 7px;
+  background: var(--c-slate-200, #E2E8F0);
+  border-radius: 6px; overflow: hidden; border: none;
+}
+.score-fill { height: 100%; border-radius: 6px; transition: width 0.7s cubic-bezier(0.22,1,0.36,1); }
+.construct-status {
+  font-size: 0.62rem; padding: 3px 9px; border-radius: 999px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border: 1px solid transparent; font-family: var(--font-body);
+}
+.construct-status.supported { background: #ECFDF5; color: #047857; border-color: rgba(16,185,129,.2); }
+.construct-status.mixed     { background: #FFFBEB; color: #B45309; border-color: rgba(245,158,11,.25); }
+.construct-status.weak      { background: #FFF1F2; color: #BE123C; border-color: rgba(225,29,72,.2); }
+.construct-body {
+  color: var(--c-slate-700, #334155); font-size: 0.93rem;
+  line-height: 1.7; font-family: var(--font-body);
+}
+
+/* Evidence tags */
 .evidence-tag {
-  display: inline-block; padding: 2px 8px; margin: 2px 4px 2px 0;
-  background: var(--brand-light); border-radius: var(--radius-sm);
-  font-size: 12px; color: var(--brand-text);
+  display: inline-block; padding: 3px 9px; margin: 3px 4px 3px 0;
+  background: #EEF2FF; border: 1px solid rgba(99,102,241,.2);
+  border-radius: 999px; font-size: 0.65rem; color: #4338CA;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-body);
 }
+
+/* Pull quotes */
 .quote {
-  border-left: 3px solid var(--brand); padding: 6px 12px; margin: 6px 0;
-  background: var(--brand-light); border-radius: 0 8px 8px 0;
-  font-style: italic; font-size: 14px; color: var(--text-secondary);
+  border-left: 3px solid var(--c-amber-500, #F59E0B);
+  padding: 10px 16px; margin: 10px 0;
+  background: #FFFBEB; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-style: italic; font-size: 0.97rem; color: var(--c-slate-800, #1E293B);
+  line-height: 1.7; font-family: var(--font-body); position: relative;
 }
+.quote::before { display: none; }
+
+/* Red flags */
 .red-flag {
-  background: var(--danger-bg); border: 1px solid #F5C6C6;
-  border-radius: var(--radius-md); padding: 14px; margin-bottom: 10px;
+  background: #FFF1F2; border: 1px solid rgba(225,29,72,.15);
+  border-left: 4px solid #E11D48; border-radius: var(--radius-md);
+  padding: 14px 18px; margin-bottom: 10px;
 }
 .severity {
-  display: inline-block; padding: 2px 8px; border-radius: 20px;
-  font-size: 12px; font-weight: 600; margin-right: 8px;
+  display: inline-block; padding: 3px 9px; border-radius: 999px;
+  font-size: 0.62rem; font-weight: 700; margin-right: 8px;
+  text-transform: uppercase; letter-spacing: 0.06em;
+  border: 1px solid transparent; font-family: var(--font-body);
 }
-.severity.high { background: var(--danger-bg); color: var(--danger); }
-.severity.medium { background: var(--warning-bg); color: var(--warning); }
-.severity.low { background: var(--success-bg); color: var(--success); }
-.red-flag .reason { margin-top: 6px; color: var(--text-secondary); font-size: 14px; }
-.red-flag .action { margin-top: 6px; color: var(--brand-text); font-size: 13px; font-weight: 500; }
-.transcript-container { max-height: 500px; overflow-y: auto; padding-right: 8px; }
-.turn { padding: 10px 14px; border-radius: var(--radius-md); margin-bottom: 8px; }
-.turn.student { background: var(--bg-subtle); border: 1px solid var(--border-subtle); }
-.turn.counsellor { background: var(--brand-light); border: 1px solid #B8E4DC; }
+.severity.high   { background: #FFF1F2; color: #BE123C; border-color: rgba(225,29,72,.2); }
+.severity.medium { background: #FFFBEB; color: #B45309; border-color: rgba(245,158,11,.25); }
+.severity.low    { background: #ECFDF5; color: #047857; border-color: rgba(16,185,129,.2); }
+.red-flag .reason {
+  margin-top: 8px; color: var(--c-slate-700, #334155);
+  font-size: 0.93rem; font-family: var(--font-body); line-height: 1.65;
+}
+.red-flag .action {
+  margin-top: 8px; color: var(--c-indigo-700, #4338CA);
+  font-size: 0.85rem; font-weight: 600; font-family: var(--font-body);
+}
+
+/* Transcript turns */
+.transcript-container { max-height: 540px; overflow-y: auto; padding-right: 8px; display: flex; flex-direction: column; gap: 8px; }
+.turn { padding: 12px 16px; border-radius: 14px; margin-bottom: 0; max-width: 80%; }
+.turn.student {
+  background: linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%);
+  border: none; border-radius: 14px 14px 4px 14px;
+  align-self: flex-end; margin-left: auto;
+}
+.turn.counsellor {
+  background: #F1F5F9; border: 1px solid #E2E8F0;
+  border-radius: 14px 14px 14px 4px; align-self: flex-start;
+}
 .turn .speaker {
-  font-size: 12px; color: var(--text-tertiary); margin-bottom: 3px;
-  display: flex; justify-content: space-between;
+  font-size: 0.6rem; color: rgba(255,255,255,0.65); margin-bottom: 5px;
+  display: flex; justify-content: space-between; text-transform: uppercase;
+  letter-spacing: 0.08em; font-weight: 700; font-family: var(--font-body);
 }
-.turn .text { font-size: 14px; line-height: 1.6; color: var(--text-primary); }
+.turn.counsellor .speaker { color: var(--c-slate-500, #64748B); }
+.turn .text { font-size: 0.93rem; line-height: 1.65; color: #fff; font-family: var(--font-body); }
+.turn.counsellor .text { color: var(--c-slate-800, #1E293B); }
+
+/* Evidence nodes */
 .evidence-node {
-  background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+  background: #F8FAFC; border: 1px solid #E2E8F0;
   border-radius: var(--radius-md); padding: 12px; margin-bottom: 10px;
 }
 .modality-badge {
-  display: inline-block; padding: 2px 8px; border-radius: 20px;
-  font-size: 11px; font-weight: 600; margin-right: 6px;
+  display: inline-block; padding: 2px 8px; border-radius: 999px;
+  font-size: 0.66rem; font-weight: 700; margin-right: 6px;
+  text-transform: uppercase; letter-spacing: 0.06em; font-family: var(--font-body);
 }
-.modality-badge.content { background: var(--brand-light); color: var(--brand-text); }
-.modality-badge.audio { background: var(--info-bg); color: var(--info); }
-.modality-badge.video { background: var(--warning-bg); color: var(--warning); }
-.modality-badge.cross_modal { background: var(--danger-bg); color: var(--danger); }
-.confidence-bar { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--text-tertiary); }
+.modality-badge.content    { background: #EEF2FF; color: #4338CA; }
+.modality-badge.audio      { background: #F5F3FF; color: #6D28D9; }
+.modality-badge.video      { background: #FFFBEB; color: #B45309; }
+.modality-badge.cross_modal{ background: #FFF1F2; color: #BE123C; }
+
+.confidence-bar { display: inline-flex; align-items: center; gap: 6px; font-size: 0.8rem; color: #64748B; font-family: var(--font-mono); }
 .window-card {
-  background: var(--bg-subtle); border: 1px solid var(--border-subtle);
+  background: #F8FAFC; border: 1px solid #E2E8F0;
   border-radius: var(--radius-md); padding: 12px; margin-bottom: 8px;
 }
 .window-header { display: flex; justify-content: space-between; align-items: center; }
-.window-topic { font-weight: 600; color: var(--brand-text); font-size: 14px; }
-.window-time { font-size: 13px; color: var(--text-tertiary); }
+.window-topic { font-weight: 700; color: #4338CA; font-size: 0.9rem; font-family: var(--font-display); letter-spacing: -0.02em; }
+.window-time { font-size: 0.8rem; color: #64748B; font-family: var(--font-mono); }
+
 .note-item {
-  padding: 8px 12px; margin-bottom: 6px; background: var(--brand-light);
-  border-left: 3px solid var(--brand); border-radius: 0 8px 8px 0;
-  font-size: 14px; color: var(--text-primary);
+  padding: 10px 16px; margin-bottom: 8px; background: #EEF2FF;
+  border-left: 3px solid #6366F1; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.93rem; color: #1E293B; font-family: var(--font-body); line-height: 1.65;
 }
 .followup-item {
-  padding: 8px 12px; margin-bottom: 6px; background: var(--info-bg);
-  border-left: 3px solid var(--info); border-radius: 0 8px 8px 0;
-  font-size: 14px; color: var(--text-primary);
+  padding: 10px 16px; margin-bottom: 8px; background: #FFFBEB;
+  border-left: 3px solid #F59E0B; border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.93rem; color: #1E293B; font-family: var(--font-body); line-height: 1.65;
 }
-.empty { color: var(--text-tertiary); font-style: italic; padding: 12px 0; }
-@media(max-width: 900px) {
-  .grid-2 { grid-template-columns: 1fr; }
-}
+.empty { color: #94A3B8; font-style: italic; padding: 12px 0; font-size: 0.9rem; }
+
+@media(max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
 </style>
 {% endblock %}
 
@@ -129,7 +243,7 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
       {% if data.student.section %}<span class="meta-item">Section <strong>{{ data.student.section }}</strong></span>{% endif %}
       {% if data.student.age %}<span class="meta-item">Age <strong>{{ data.student.age }}</strong></span>{% endif %}
       {% if data.student.school %}<span class="meta-item">School <strong>{{ data.student.school }}</strong></span>{% endif %}
-      <span class="meta-item">Case <strong>{{ data.session.case_study_id }}</strong></span>
+      <span class="meta-item">Case Study <strong>{{ case_study_title or data.session.case_study_id }}</strong></span>
       <span class="chip chip-success">{{ data.session.status }}</span>
     </div>
   </div>
@@ -142,116 +256,128 @@ h3 { font-size: 14px; margin-bottom: 10px; color: var(--brand-text); font-weight
 </div>
 
 <div class="tabs">
-  <div class="tab active" data-tab="profile" onclick="switchTab('profile')">📋 Profile</div>
-  <div class="tab" data-tab="evidence" onclick="switchTab('evidence')">🔍 Evidence</div>
-  <div class="tab" data-tab="transcript" onclick="switchTab('transcript')">💬 Transcript</div>
-  <div class="tab" data-tab="signals" onclick="switchTab('signals')">📊 Signals</div>
+  <div class="tab active" data-tab="overview"    onclick="switchTab('overview')">Overview</div>
+  <div class="tab"        data-tab="dimensions"  onclick="switchTab('dimensions')">Dimensions</div>
+  <div class="tab"        data-tab="career"      onclick="switchTab('career')">Career</div>
+  <div class="tab"        data-tab="transcript"  onclick="switchTab('transcript')">Transcript</div>
 </div>
 
-<!-- Profile Tab -->
-<div class="tab-content active" id="tab-profile">
-  {% if data.profile %}{% set cv = data.profile.counsellor_view %}
-  {% if cv.summary %}<div class="card"><h2>📝 Summary</h2><p>{{ cv.summary }}</p></div>{% endif %}
+{% if data.report_data %}
 
-  {% set flags = data.profile.red_flags %}
-  {% if flags and flags|length > 0 %}
-  <div class="card"><h2>🚩 Red flags ({{ flags|length }})</h2>
-    {% for rf in flags %}<div class="red-flag">
-      <span class="severity {{ rf.severity or 'medium' }}">{{ (rf.severity or 'medium')|upper }}</span>
-      <strong>{{ rf.key or 'Unknown' }}</strong>
-      <div class="reason">{{ rf.reason or '' }}</div>
-      {% if rf.recommended_action %}<div class="action">→ {{ rf.recommended_action }}</div>{% endif %}
-      {% if rf.evidence_refs %}<div style="margin-top:6px">{% for ref in rf.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
-    </div>{% endfor %}
-  </div>{% endif %}
-
-  {% if cv.constructs %}<div class="card"><h2>🧩 Constructs ({{ cv.constructs|length }})</h2>
-    {% for c in cv.constructs %}<div class="construct">
-      <div class="construct-header"><div><span class="construct-label">{{ c.label or c.key }}</span> <span class="construct-status {{ c.status or 'weak' }}">{{ c.status or 'weak' }}</span></div>
-        {% if c.score is not none %}<div class="construct-score"><div class="score-bar"><div class="score-fill" style="width:{{ (c.score * 100)|int }}%;background:{% if c.score >= 0.7 %}var(--success){% elif c.score >= 0.4 %}var(--warning){% else %}var(--danger){% endif %}"></div></div><span style="font-size:14px">{{ '%.0f'|format(c.score * 100) }}%</span></div>{% endif %}
-      </div>
-      <div class="construct-body">{{ c.evidence_summary or '' }}</div>
-      {% if c.supporting_quotes %}{% for q in c.supporting_quotes %}<div class="quote">"{{ q }}"</div>{% endfor %}{% endif %}
-      {% if c.evidence_refs %}<div style="margin-top:6px">{% for ref in c.evidence_refs %}<span class="evidence-tag">{{ ref.ref_id if ref is mapping else ref }}</span>{% endfor %}</div>{% endif %}
-    </div>{% endfor %}
-  </div>{% endif %}
-
-  {% if cv.cross_modal_notes %}<div class="card"><h2>🔗 Cross-modal notes</h2>{% for note in cv.cross_modal_notes %}<div class="note-item">{{ note }}</div>{% endfor %}</div>{% endif %}
-  {% if cv.recommended_follow_ups %}<div class="card"><h2>📌 Follow-ups</h2>{% for fu in cv.recommended_follow_ups %}<div class="followup-item">{{ fu }}</div>{% endfor %}</div>{% endif %}
-  {% else %}<div class="card"><div class="empty">No profile generated yet.</div></div>{% endif %}
+<!-- ── Tab 1: Overview ─────────────────────────────────────────────── -->
+<div class="tab-content active" id="tab-overview">
+  <!-- Metadata Strip -->
+  <div class="rpt-meta-strip">
+    <div class="rpt-meta-item"><span class="rpt-meta-label">Duration</span><span class="rpt-meta-value" id="rpt-duration"></span></div>
+    <div class="rpt-meta-item"><span class="rpt-meta-label">Turns</span><span class="rpt-meta-value" id="rpt-turns"></span></div>
+    <div class="rpt-meta-item"><span class="rpt-meta-label">Session Depth</span><span class="rpt-depth-pill" id="rpt-depth"></span></div>
+  </div>
+  <!-- Snapshot -->
+  <div class="rpt-snapshot">
+    <div class="rpt-snapshot-label">Counsellor Snapshot</div>
+    <p class="rpt-snapshot-text" id="rpt-snapshot-text">Loading...</p>
+  </div>
+  <!-- Risk Flags -->
+  <div class="rpt-flags green" id="rpt-flags-bar">
+    <span class="rpt-flag-dot"></span>
+    <span id="rpt-flags-text">Checking risk flags...</span>
+  </div>
+  <!-- Radar + Callouts -->
+  <div class="rpt-overview">
+    <div class="rpt-radar-card">
+      <div class="rpt-section-label">Assessment Profile</div>
+      <svg id="rpt-radar" viewBox="0 0 340 340" style="width:100%;max-width:340px;"></svg>
+    </div>
+    <div class="rpt-callouts" id="rpt-callouts"></div>
+  </div>
+  <!-- Key Moments -->
+  <div class="rpt-moments-card">
+    <div class="rpt-section-label">Key Moments</div>
+    <div class="rpt-moments-grid" id="rpt-moments-grid"></div>
+  </div>
 </div>
 
-<!-- Evidence Tab -->
-<div class="tab-content" id="tab-evidence"><div class="card" id="evidence-loading"><p class="muted">Loading evidence…</p></div></div>
+<!-- ── Tab 2: Dimensions ───────────────────────────────────────────── -->
+<div class="tab-content" id="tab-dimensions">
+  <div class="rpt-section-label">9 Dimensions Assessment</div>
+  <div class="rpt-dim-grid" id="rpt-dim-grid"></div>
+  <!-- Strengths & Growth -->
+  <div class="rpt-sg" id="rpt-sg-section"></div>
+  <!-- Next Session -->
+  <div class="rpt-next-session" id="rpt-next-session">
+    <span class="rpt-next-icon">&rarr;</span>
+    <span class="rpt-next-text" id="rpt-next-text"></span>
+  </div>
+</div>
 
-<!-- Transcript Tab -->
-<div class="tab-content" id="tab-transcript"><div class="card">
-  <h2>💬 Transcript ({{ data.turns|length }} turns)</h2>
+<!-- ── Tab 3: Career ───────────────────────────────────────────────── -->
+<div class="tab-content" id="tab-career">
+  <div class="rpt-career">
+    <div class="rpt-career-header">
+      <div class="rpt-section-label" style="margin-bottom:0">Career Aptitude Signals</div>
+      <span class="rpt-career-badge">6-Stage Pipeline &middot; <span id="rpt-career-count"></span></span>
+    </div>
+    <div class="rpt-career-subtitle" id="rpt-career-subtitle"></div>
+    <div class="rpt-section-label" style="font-size:0.62rem;margin-bottom:6px;">Detected Skill Synergies</div>
+    <div class="rpt-synergy-row" id="rpt-synergy-row"></div>
+    <div class="rpt-career-rank-list" id="rpt-career-rank-list"></div>
+    <div style="display:flex;gap:16px;align-items:center;margin-top:4px;">
+      <button class="rpt-method-toggle" id="rpt-method-toggle-btn" type="button">How we scored this</button>
+      <button class="rpt-career-expand-btn" id="rpt-career-expand-btn" type="button">Show all careers</button>
+    </div>
+    <div class="rpt-method-panel" id="rpt-method-panel"></div>
+    <div class="rpt-career-full" id="rpt-career-full">
+      <div class="rpt-career-full-grid" id="rpt-career-full-grid"></div>
+    </div>
+    <div class="rpt-stream-section">
+      <div class="rpt-section-label" style="font-size:0.62rem;margin-bottom:6px;" id="rpt-stream-title">Stream Alignment</div>
+      <div class="rpt-stream-row" id="rpt-stream-row"></div>
+    </div>
+    <div class="rpt-career-caveat">Career aptitude signals are based on behavioral patterns in a structured ethical scenario discussion. They indicate natural reasoning tendencies but do not account for academic aptitude, technical skills, or student interests. Professional career counselling is recommended.</div>
+  </div>
+</div>
+
+{% else %}
+<!-- No report data — show placeholder in first tab, others empty -->
+<div class="tab-content active" id="tab-overview">
+  <div class="card"><div class="empty">No assessment report available for this session. The analysis may not have completed successfully.</div></div>
+</div>
+<div class="tab-content" id="tab-dimensions"></div>
+<div class="tab-content" id="tab-career"></div>
+{% endif %}
+
+<!-- ── Tab 4: Transcript ───────────────────────────────────────────── -->
+<div class="tab-content {% if not data.report_data %}active{% endif %}" id="tab-transcript"><div class="card">
+  <h2>Transcript &middot; {{ data.turns|length }} turns</h2>
   {% if data.turns %}<div class="transcript-container">
     {% for t in data.turns %}<div class="turn {{ t.speaker }}">
       <div class="speaker"><span>{{ t.speaker|capitalize }} — Turn {{ t.turn_index }}</span>
-        <span style="font-size:11px;color:var(--text-tertiary)">{{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}{% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}</span>
+        <span>{{ '%d:%02d'|format(t.start_ms // 60000, (t.start_ms // 1000) % 60) }}–{{ '%d:%02d'|format(t.end_ms // 60000, (t.end_ms // 1000) % 60) }}{% if t.confidence is not none %} · {{ '%.0f'|format(t.confidence * 100) }}%{% endif %}</span>
       </div><div class="text">{{ t.text }}</div>
     </div>{% endfor %}
   </div>{% else %}<div class="empty">No transcript turns recorded.</div>{% endif %}
 </div></div>
 
-<!-- Signals Tab -->
-<div class="tab-content" id="tab-signals">
-  <div class="card"><h2>🪟 Topic windows ({{ data.signal_windows|length }})</h2>
-    {% if data.signal_windows %}
-    {% for w in data.signal_windows %}<div class="window-card"><div class="window-header">
-      <span class="window-topic">{{ w.topic or w.topic_key or w.segment }}</span>
-      <span class="window-time">Turns {{ w.start_turn }}–{{ w.end_turn }}</span>
-    </div></div>{% endfor %}
-    {% else %}<div class="empty">No topic windows recorded.</div>{% endif %}
-  </div>
-
-  <div class="card"><h2>🧪 Hypotheses ({{ data.hypotheses|length }})</h2>
-    {% if data.hypotheses %}
-    {% for h in data.hypotheses %}<div class="construct"><div class="construct-header"><div><span class="construct-label">{{ h.label }}</span> <span class="construct-status {{ h.status }}">{{ h.status }}</span></div>
-      {% if h.score is not none %}<span style="font-size:14px">{{ '%.0f'|format(h.score * 100) }}%</span>{% endif %}
-    </div><div class="construct-body">{{ h.evidence_summary }}</div></div>{% endfor %}
-    {% else %}<div class="empty">No hypotheses recorded.</div>{% endif %}
-  </div>
-
-  <div class="card"><h2>Observations ({{ data.observations|length }})</h2>
-  {% if data.observations %}
-  {% for modality, obs_list in data.observations.items() %}<div style="margin-bottom:12px">
-    <h3><span class="modality-badge {{ modality }}">{{ modality|upper }}</span> ({{ obs_list|length }})</h3>
-    {% for obs in obs_list[:20] %}<div class="evidence-node">
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px"><strong style="font-size:14px">{{ obs.signal_key }}</strong><span class="confidence-bar">{{ '%.0f'|format(obs.confidence * 100) }}%</span></div>
-      {% if obs.value %}<div class="muted" style="font-size:13px">{% for k, v in obs.value.items() %}<span style="margin-right:12px">{{ k }}: <strong>{{ v }}</strong></span>{% endfor %}</div>{% endif %}
-    </div>{% endfor %}
-    {% if obs_list|length > 20 %}<div class="muted" style="padding:8px">… and {{ obs_list|length - 20 }} more</div>{% endif %}
-  </div>{% endfor %}
-  {% else %}<div class="empty">No observations recorded.</div>{% endif %}
-  </div>
-</div>
 {% endblock %}
 
 {% block scripts %}
+<script src="/static/report-renderer.js"></script>
+{% if data.report_data %}
+<script id="rpt-report-data" type="application/json">{{ data.report_data | tojson | safe }}</script>
 <script>
-function switchTab(n){document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+n));if(n==='evidence'&&!window._evLoaded)loadEvidence()}
-function esc(t){return String(t||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}
-
-async function loadEvidence(){
-  const sid='{{ data.session.id }}',el=document.getElementById('tab-evidence');
-  try{const res=await fetch(`/api/v1/dashboard/counsellor/sessions/${sid}/evidence`);const ev=await res.json();
-    if(ev.error){el.innerHTML=`<div class="card"><div class="empty">${ev.error}</div></div>`;return}
-    let h='';const mc=ev.modality_counts||{};
-    h+=`<div class="card"><h2>🔍 Evidence overview</h2><div style="display:flex;gap:16px;flex-wrap:wrap"><div class="meta-item">Total: <strong>${ev.total_observations}</strong></div>${Object.entries(mc).map(([k,v])=>`<div class="meta-item"><span class="modality-badge ${k}">${k}</span> <strong>${v}</strong></div>`).join('')}</div></div>`;
-    if(ev.hypothesis_links?.length){h+=`<div class="card"><h2>🧪 Hypothesis links</h2>`;ev.hypothesis_links.forEach(x=>{h+=`<div class="construct"><div class="construct-header"><div><span class="construct-label">${esc(x.label)}</span> <span class="construct-status ${x.status}">${x.status}</span></div><span style="font-size:14px">${x.score!=null?Math.round(x.score*100)+'%':'—'}</span></div><div class="construct-body">${esc(x.evidence_summary)}</div></div>`});h+=`</div>`}
-    const byMod={};(ev.evidence_nodes||[]).forEach(n=>{const m=n.modality||'unknown';(byMod[m]=byMod[m]||[]).push(n)});
-    for(const[mod,nodes]of Object.entries(byMod)){h+=`<div class="card"><h2><span class="modality-badge ${mod}">${mod.toUpperCase()}</span> Evidence (${nodes.length})</h2>`;
-      nodes.slice(0,30).forEach(n=>{h+=`<div class="evidence-node"><div style="display:flex;justify-content:space-between;margin-bottom:4px"><strong style="font-size:14px">${esc(n.signal_key)}</strong><span class="confidence-bar">${Math.round(n.confidence*100)}%</span></div>`;
-        if(n.window){const ws=Math.floor(n.window.start_ms/60000),wss=Math.floor((n.window.start_ms/1000)%60);h+=`<div class="muted" style="font-size:13px;margin-bottom:4px"><span class="evidence-tag">${esc(n.window.topic_key)}</span> ${ws}:${String(wss).padStart(2,'0')}</div>`}
-        if(n.related_turns?.length)n.related_turns.forEach(t=>{h+=`<div class="quote">[Turn ${t.turn_index}] "${esc(t.text)}"</div>`});
-        const val=n.value||{},vk=Object.keys(val);if(vk.length){h+=`<div class="muted" style="font-size:13px;margin-top:4px">`;vk.forEach(k=>{h+=`<span style="margin-right:10px">${esc(k)}: <strong>${esc(String(val[k]))}</strong></span>`});h+=`</div>`}
-        h+=`</div>`});
-      if(nodes.length>30)h+=`<div class="muted" style="padding:8px">… and ${nodes.length-30} more</div>`;h+=`</div>`}
-    if(!ev.evidence_nodes?.length)h+=`<div class="card"><div class="empty">No evidence data.</div></div>`;
-    el.innerHTML=h;window._evLoaded=true;
-  }catch(e){el.innerHTML=`<div class="card"><div class="empty">Failed to load evidence.</div></div>`}}
+  (function renderCounsellorReport(){
+    try {
+      const raw = document.getElementById('rpt-report-data').textContent;
+      const D = JSON.parse(raw);
+      if (typeof window.renderReport === 'function') window.renderReport(D);
+    } catch (e) { console.error('Failed to render report:', e); }
+  })();
+</script>
+{% endif %}
+<script>
+function switchTab(n){
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('active',t.dataset.tab===n));
+  document.querySelectorAll('.tab-content').forEach(c=>c.classList.toggle('active',c.id==='tab-'+n));
+}
 </script>
 {% endblock %}

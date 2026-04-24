@@ -10,38 +10,130 @@ import { dom } from './state.js';
 import { setConnectionState, setStatus, showToast, setDebug, uiLog, updateDebugSnapshot } from './app.js';
 
 // ============================================================
+// LIVE STATUS PANEL — speaker pills, session timer, mic waveform
+// Replaces the on-screen transcript display. Transcript entries
+// are still accumulated into state.transcriptEntries for the
+// end-of-session analysis payload, they're just no longer shown
+// to the student mid-session.
+// ============================================================
+
+const liveStatus = {
+  pillStudent: document.getElementById('pill-student'),
+  pillAi:      document.getElementById('pill-ai'),
+  sessionTimer:document.getElementById('session-timer'),
+  waveform:    document.getElementById('mic-waveform'),
+  waveformCtx: null,
+  bars:        new Array(50).fill(0),
+  speakerClearTimer: null,
+};
+if (liveStatus.waveform && liveStatus.waveform.getContext) {
+  liveStatus.waveformCtx = liveStatus.waveform.getContext('2d');
+}
+
+function setActiveSpeaker(who) {
+  // who: 'student' | 'ai' | null
+  if (liveStatus.pillStudent) liveStatus.pillStudent.classList.toggle('active', who === 'student');
+  if (liveStatus.pillAi)      liveStatus.pillAi.classList.toggle('active', who === 'ai');
+  state.aiSpeaking = who === 'ai';
+}
+
+function pad2(n) { return String(n).padStart(2, '0'); }
+function formatMmSs(ms) {
+  const s = Math.max(0, Math.floor(ms / 1000));
+  return `${pad2(Math.floor(s / 60))}:${pad2(s % 60)}`;
+}
+function tickSessionTimer() {
+  if (!liveStatus.sessionTimer) return;
+  if (!state.timerStart) return;
+  liveStatus.sessionTimer.textContent = formatMmSs(Date.now() - state.timerStart);
+}
+// Piggy-back on app.js's existing 500ms interval via rAF fallback: if the
+// element exists, run our own lightweight interval so the new display
+// updates even if app.js's #timer tick hasn't been adapted.
+if (liveStatus.sessionTimer) {
+  setInterval(tickSessionTimer, 500);
+}
+
+function drawWaveform() {
+  const ctx = liveStatus.waveformCtx;
+  const cvs = liveStatus.waveform;
+  if (!ctx || !cvs) return;
+  const w = cvs.width, h = cvs.height;
+  ctx.clearRect(0, 0, w, h);
+  const n = liveStatus.bars.length;
+  const gap = 2;
+  const barW = Math.max(1, Math.floor((w - gap * (n - 1)) / n));
+  for (let i = 0; i < n; i++) {
+    const v = Math.min(1, liveStatus.bars[i]);
+    const bh = Math.max(2, Math.round(v * (h - 4)));
+    const x  = i * (barW + gap);
+    const y  = Math.round((h - bh) / 2);
+    // Gradient-like flat fill using indigo; brightens with amplitude.
+    const alpha = 0.35 + 0.65 * v;
+    ctx.fillStyle = `rgba(99, 102, 241, ${alpha.toFixed(3)})`;
+    ctx.fillRect(x, y, barW, bh);
+  }
+}
+
+function pushWaveformSample(rmsInt16) {
+  // rmsInt16 is int16-scaled (server sends round(rms*32768)). Normalize.
+  // Typical speech lands roughly in 400–6000 range; use soft ceiling.
+  const normalized = Math.min(1, Math.max(0, rmsInt16 / 4000));
+  liveStatus.bars.push(normalized);
+  if (liveStatus.bars.length > 50) liveStatus.bars.shift();
+  drawWaveform();
+}
+
+// ============================================================
 // TRANSCRIPT — add entries, accumulate student chunks, extract
 // ============================================================
 
 export function addStudentTranscript(text, source) {
   const raw = typeof text === 'string' ? text : String(text ?? '');
-  const clean = raw.trim();
-  if (!clean) return false;
+  if (!raw || !raw.trim()) return false;
   // Only dedup consecutive speech within the same turn (currentStudentEntry is non-null).
   // Once the turn ends (currentStudentEntry resets to null), allow identical text from new turns.
-  if (state.currentStudentEntry && clean === state.lastStudentTranscript) return false;
-  state.lastStudentTranscript = clean;
+  if (state.currentStudentEntry && raw === state.lastStudentTranscript) return false;
+  state.lastStudentTranscript = raw;
 
   if (!state.currentStudentEntry) {
-    state.currentStudentEntry = addEntry('student', clean);
-  } else {
-    const existing = state.currentStudentEntry.body.textContent;
-    if (existing && !existing.endsWith(' ') && !clean.startsWith(' ')) {
-      state.currentStudentEntry.body.textContent += ' ';
-    }
-    state.currentStudentEntry.body.textContent += clean;
+    // First chunk — strip leading whitespace so the entry doesn't start
+    // with a stray space. Interior chunks are kept verbatim.
+    state.currentStudentEntry = addEntry('student', raw.replace(/^\s+/, ''));
+  } else if (state.currentStudentEntry.body) {
+    // Append raw — Gemini's chunks carry their own spacing:
+    //   " I" (leading space = new word)  vs  "t" (no space = sub-word)
+    // Trimming or inserting spaces here breaks sub-word fragments
+    // ("not" → "no t", "able" → "a ble").
+    state.currentStudentEntry.body.textContent += raw;
     state.currentStudentEntry.data.text = state.currentStudentEntry.body.textContent;
-    dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
+    if (dom.transcriptEl) dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
+  } else {
+    // Transcript DOM not present — still track text on the data entry so
+    // state.transcriptEntries stays correct for end-of-session analysis.
+    state.currentStudentEntry.data.text = (state.currentStudentEntry.data.text || '') + raw;
   }
 
   if (state.studentTranscriptTimer) clearTimeout(state.studentTranscriptTimer);
-  state.studentTranscriptTimer = setTimeout(() => { state.currentStudentEntry = null; state.lastStudentTranscript = ''; }, 1500);
+  state.studentTranscriptTimer = setTimeout(() => { state.currentStudentEntry = null; state.lastStudentTranscript = ''; }, 3000);
 
   state.waitingForStudentTranscript = false;
   return true;
 }
 
 export function addEntry(role, text) {
+  // Transcript display is disabled in live UI (see live-status panel).
+  // We still push a `data` record into state.transcriptEntries so the
+  // end-of-session analysis pipeline receives the full conversation.
+  // If the hidden #transcript element exists, we also append a DOM
+  // node so anything inspecting innerHTML / .entry nodes keeps working.
+  const data = { role: role === 'ai' ? 'counsellor' : 'student', text: text || '' };
+  state.transcriptEntries.push(data);
+
+  if (!dom.transcriptEl) {
+    return { body: null, data };
+  }
+
   const entry = document.createElement('div');
   entry.className = `entry ${role === 'ai' ? 'ai' : ''}`;
   entry.dataset.role = role;
@@ -54,8 +146,6 @@ export function addEntry(role, text) {
   entry.append(tag, body);
   dom.transcriptEl.append(entry);
   dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
-  const data = { role: role === 'ai' ? 'counsellor' : 'student', text: text || '' };
-  state.transcriptEntries.push(data);
   return { body, data };
 }
 
@@ -130,6 +220,7 @@ export function playGeminiAudio(base64Data) {
   const source = state.geminiPlaybackCtx.createBufferSource();
   source.buffer = buffer;
   source.connect(state.geminiPlaybackCtx.destination);
+  if (state.geminiAudioCaptureDest) source.connect(state.geminiAudioCaptureDest);
   const now = state.geminiPlaybackCtx.currentTime;
   const startAt = Math.max(now, state.geminiPlaybackTime);
   source.start(startAt);
@@ -179,14 +270,17 @@ export function handleGeminiMessage(msg) {
   if (!serverContent) {
     if (msg.type === 'keepalive') return;
     if (msg.type === 'audioLevel') {
-      // Show/hide "Student is speaking..." indicator
-      const indicator = document.getElementById('speaking-indicator');
-      if (indicator) {
-        if (msg.isSpeech) {
-          indicator.style.display = 'block';
-          if (state._speakingTimeout) clearTimeout(state._speakingTimeout);
-          state._speakingTimeout = setTimeout(() => { indicator.style.display = 'none'; }, 1500);
-        }
+      // Drive mic waveform from every audioLevel tick.
+      if (typeof msg.rms === 'number') pushWaveformSample(msg.rms);
+
+      // Light the Student pill while speech is detected — don't clobber the
+      // AI pill if the AI is currently speaking (modelTurn audio sets that).
+      if (msg.isSpeech && !state.aiSpeaking) {
+        setActiveSpeaker('student');
+        if (liveStatus.speakerClearTimer) clearTimeout(liveStatus.speakerClearTimer);
+        liveStatus.speakerClearTimer = setTimeout(() => {
+          if (!state.aiSpeaking) setActiveSpeaker(null);
+        }, 1200);
       }
       return;
     }
@@ -248,6 +342,13 @@ export function handleGeminiMessage(msg) {
       setStatus('Reconnecting...');
       return;
     }
+    if (msg.type === 'ai_speaking') {
+      // Server-authoritative signal that Gemini is producing TTS audio.
+      // Client gates outbound video frames on this flag — no point sending
+      // frames while the counsellor is talking.
+      state.aiSpeaking = !!msg.state;
+      return;
+    }
     if (msg.type === 'error') {
       setConnectionState('ERROR');
       if (msg.reconnect_failed) {
@@ -263,58 +364,96 @@ export function handleGeminiMessage(msg) {
 
   // Model audio/text output
   if (serverContent.modelTurn && serverContent.modelTurn.parts) {
-    dom.orb.classList.add('speaking');
     setStatus('Speaking...');
     state._lastAiEntry = null;
 
     // Create AI entry immediately — audio-native models send audio first,
-    // text arrives later via outputTranscription
+    // text arrives later via outputTranscription.
+    // Apply any buffered transcription that arrived before this modelTurn.
     if (!state.currentAiEntry) {
-      state.currentAiEntry = addEntry('ai', '');
-    }
-
-    for (const part of serverContent.modelTurn.parts) {
-      if (part.inlineData && part.inlineData.data) playGeminiAudio(part.inlineData.data);
-      if (part.text) {
-        state.currentAiEntry.body.textContent += part.text;
-        state.currentAiEntry.data.text = state.currentAiEntry.body.textContent;
-        dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
+      state.currentAiEntry = addEntry('ai', state._pendingAiText);
+      if (state._pendingAiText) {
+        if (state.currentAiEntry.body) state.currentAiEntry.body.textContent = state._pendingAiText;
+        state._pendingAiText = '';
+      }
+      // Reset the visible counsellor speech panel at the start of each new turn,
+      // but keep any pending text that was already buffered and applied above.
+      if (dom.counsellorSpeechText && !state.currentAiEntry.data.text) {
+        dom.counsellorSpeechText.textContent = '';
       }
     }
+
+    let hasAudio = false;
+    for (const part of serverContent.modelTurn.parts) {
+      if (part.inlineData && part.inlineData.data) {
+        playGeminiAudio(part.inlineData.data);
+        hasAudio = true;
+      }
+      if (part.text && state.currentAiEntry && state.currentAiEntry.body) {
+        state.currentAiEntry.body.textContent += part.text;
+        state.currentAiEntry.data.text = state.currentAiEntry.body.textContent;
+        if (dom.transcriptEl) dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
+      } else if (part.text && state.currentAiEntry) {
+        state.currentAiEntry.data.text = (state.currentAiEntry.data.text || '') + part.text;
+      }
+    }
+
+    // AI is speaking — light the Counsellor pill (and mark state.aiSpeaking
+    // so Stream B can gate outbound video frames).
+    if (hasAudio) setActiveSpeaker('ai');
   }
 
   if (serverContent.turnComplete) {
-    dom.orb.classList.remove('speaking');
     if (state.currentAiEntry) {
       state._lastAiEntry = state.currentAiEntry;
       state.currentAiEntry = null;
+    } else {
+      // Student turn completed — clear _lastAiEntry so outputTranscription
+      // for the upcoming counsellor turn doesn't append to the old AI entry.
+      state._lastAiEntry = null;
     }
     state.currentStudentEntry = null;
+    state.lastStudentTranscript = '';
+    setActiveSpeaker(null);
     setStatus('Listening...');
   }
 
   // Student input transcription — native Gemini Live transcription
   if (serverContent.inputTranscription && serverContent.inputTranscription.text) {
-    const txt = serverContent.inputTranscription.text.trim();
-    if (txt) {
+    // Keep the raw text (including leading spaces — Gemini uses them as word
+    // separators between sub-word chunks). addStudentTranscript already strips
+    // leading whitespace for the first chunk only.
+    const txt = serverContent.inputTranscription.text;
+    if (txt && txt.trim()) {
       addStudentTranscript(txt, 'gemini:native');
     }
   }
 
-  // Output transcription (counsellor) — final text for the AI turn.
-  // Only replace streamed text if transcription is longer (more complete).
+  // Output transcription (counsellor) — streamed delta chunks from Gemini.
+  // Append raw (Gemini's chunks carry their own spacing). We keep the hidden
+  // transcript entry up-to-date for end-of-session analysis AND mirror the
+  // running text into the visible counsellor-speech panel so the student can
+  // read what was said if they mishear.
   if (serverContent.outputTranscription && serverContent.outputTranscription.text) {
-    const txt = serverContent.outputTranscription.text.trim();
-    if (txt) {
+    const raw = serverContent.outputTranscription.text;
+    if (raw && raw.trim()) {
       const target = state.currentAiEntry || state._lastAiEntry;
       if (target) {
-        const existing = (target.data.text || '').trim();
-        if (txt.length >= existing.length) {
-          target.body.textContent = txt;
-          target.data.text = txt;
+        if (target.body) {
+          target.body.textContent += raw;
+          target.data.text = target.body.textContent;
+        } else {
+          target.data.text = (target.data.text || '') + raw;
         }
+      } else {
+        // outputTranscription arrived before the next modelTurn — buffer it.
+        // modelTurn handler will prepend this to the new entry when it fires.
+        state._pendingAiText = (state._pendingAiText || '') + raw;
       }
-      dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
+      if (dom.counsellorSpeechText) {
+        dom.counsellorSpeechText.textContent = (dom.counsellorSpeechText.textContent || '') + raw;
+      }
+      if (dom.transcriptEl) dom.transcriptEl.scrollTop = dom.transcriptEl.scrollHeight;
     }
   }
 }
@@ -336,15 +475,18 @@ export async function startGeminiSession(name, scenario) {
     state.geminiPlaybackTime = 0;
   }
 
+  // Tap AI audio output so we can mix it into the local recording
+  state.geminiAudioCaptureDest = state.geminiPlaybackCtx.createMediaStreamDestination();
+
   // Create mic capture context (16kHz for Gemini audio input)
   state.geminiAudioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
   const micSource = state.geminiAudioCtx.createMediaStreamSource(state.mediaStream);
-  const bufferSize = 4096;
+  const bufferSize = 512;
   state.geminiMicProcessor = state.geminiAudioCtx.createScriptProcessor(bufferSize, 1, 1);
 
   const wsProto = location.protocol === 'https:' ? 'wss:' : 'ws:';
   const wsLang = state.sessionMeta.lang || 'hinglish';
-  const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}&lang=${encodeURIComponent(wsLang)}&grade=${encodeURIComponent(state.sessionMeta.className || '')}&section=${encodeURIComponent(state.sessionMeta.section || '')}&school=${encodeURIComponent(state.sessionMeta.school || '')}&age=${encodeURIComponent(String(state.sessionMeta.age || 15))}`;
+  const wsUrl = `${wsProto}//${location.host}/api/gemini-ws?scenario=${encodeURIComponent(scenario)}&name=${encodeURIComponent(name)}&lang=${encodeURIComponent(wsLang)}&grade=${encodeURIComponent(state.sessionMeta.className || '')}&section=${encodeURIComponent(state.sessionMeta.section || '')}&school=${encodeURIComponent(state.sessionMeta.school || '')}&age=${encodeURIComponent(String(state.sessionMeta.age || 15))}&case_study_id=${encodeURIComponent(state.sessionMeta.caseStudyId || '')}`;
   state.geminiWs = new WebSocket(wsUrl);
   setConnectionState('CONNECTING');
 
@@ -400,15 +542,50 @@ export async function startGeminiSession(name, scenario) {
     const captureCanvas = document.createElement('canvas');
     const captureCtx = captureCanvas.getContext('2d');
     state.geminiVideoInterval = setInterval(() => {
+      // Skip frame while AI is speaking — no need to burn vision tokens
+      // while the counsellor is the one talking.
+      if (state.aiSpeaking) return;
       if (!state.geminiWs || state.geminiWs.readyState !== WebSocket.OPEN) return;
       if (dom.preview.videoWidth === 0) return;
-      captureCanvas.width = Math.min(dom.preview.videoWidth, 640);
+      captureCanvas.width = Math.min(dom.preview.videoWidth, 384);
       captureCanvas.height = Math.round(captureCanvas.width * (dom.preview.videoHeight / dom.preview.videoWidth));
       captureCtx.drawImage(dom.preview, 0, 0, captureCanvas.width, captureCanvas.height);
       const dataUrl = captureCanvas.toDataURL('image/jpeg', 0.6);
       const b64 = dataUrl.split(',')[1];
       state.geminiWs.send(JSON.stringify({ realtimeInput: { mediaChunks: [{ data: b64, mimeType: 'image/jpeg' }] } }));
     }, 10000); // 1 frame per 10s — reduces token usage, avoids 2-min A/V limit
+  }
+
+  // Start mixed recorder: counsellor video + mic + AI audio in one file
+  try {
+    state.mixedRecordingCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 48000 });
+    const mixDest = state.mixedRecordingCtx.createMediaStreamDestination();
+
+    // Counsellor mic → mix
+    const micMixSrc = state.mixedRecordingCtx.createMediaStreamSource(state.mediaStream);
+    micMixSrc.connect(mixDest);
+
+    // AI audio capture → mix
+    const aiMixSrc = state.mixedRecordingCtx.createMediaStreamSource(state.geminiAudioCaptureDest.stream);
+    aiMixSrc.connect(mixDest);
+
+    // Combine counsellor video track(s) with the mixed audio track
+    const videoTracks = state.mediaStream.getVideoTracks();
+    const mixedStream = new MediaStream([...videoTracks, ...mixDest.stream.getAudioTracks()]);
+
+    const mixMimeCandidates = videoTracks.length > 0
+      ? ['video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm']
+      : ['audio/webm;codecs=opus', 'audio/webm'];
+    const mixMime = mixMimeCandidates.find(t => MediaRecorder.isTypeSupported(t));
+
+    state.mixedRecordedChunks = [];
+    state.mixedRecorder = new MediaRecorder(mixedStream, mixMime ? { mimeType: mixMime } : {});
+    state.mixedRecorder.ondataavailable = e => { if (e.data && e.data.size > 0) state.mixedRecordedChunks.push(e.data); };
+    state.mixedRecorder.onerror = e => uiLog('WARN', '[mixed-rec] error: ' + e);
+    state.mixedRecorder.start(1000);
+    uiLog('OK', 'Mixed recorder started' + (mixMime ? ' (' + mixMime + ')' : ''));
+  } catch (e) {
+    uiLog('WARN', '[mixed-rec] Could not start mixed recorder: ' + e.message);
   }
 
   setDebug('Gemini: connected | Mic: active' + (hasVideo ? ' | Cam: active' : ''));

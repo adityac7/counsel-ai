@@ -5,18 +5,29 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>{% block title %}Dashboard{% endblock %} — CounselAI</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/dashboard.css">
 {% block head %}{% endblock %}
 </head>
 <body>
+<button class="nav-toggle" id="nav-toggle" aria-label="Open menu">&#9776;</button>
+<div class="nav-overlay" id="nav-overlay"></div>
 <div class="layout">
   <nav class="sidebar">
-    <div class="sidebar-brand">🌿 CounselAI</div>
-    <a href="/dashboard" class="nav-item {% if active_nav == 'overview' %}active{% endif %}">📊 Overview</a>
-    <a href="/api/v1/dashboard/counsellor" class="nav-item {% if active_nav == 'students' %}active{% endif %}">👤 Students</a>
-    <a href="/dashboard" class="nav-item {% if active_nav == 'schools' %}active{% endif %}">🏫 Schools</a>
-    <a href="/" class="nav-item {% if active_nav == 'session' %}active{% endif %}">🎤 New Session</a>
+    <div class="sidebar-brand">Counsel<span>AI</span></div>
+    <a href="/dashboard" class="nav-item {% if active_nav == 'overview' %}active{% endif %}">Overview</a>
+    <a href="/api/v1/dashboard/counsellor" class="nav-item {% if active_nav == 'students' %}active{% endif %}">Students</a>
+    <a href="/api/v1/dashboard/case-studies" class="nav-item {% if active_nav == 'case-studies' %}active{% endif %}">Case Studies</a>
+    {# Hidden temporarily until auth/login system is implemented #}
+    {# <a href="/api/v1/dashboard/tokens" class="nav-item {% if active_nav == 'tokens' %}active{% endif %}">Token Usage</a> #}
+    <a href="/session" class="nav-item {% if active_nav == 'session' %}active{% endif %}">New Session</a>
+    <div class="sidebar-footer">
+      CounselAI &middot; Counsellor Dashboard<br>
+      for students · schools · counsellors
+    </div>
   </nav>
   <main class="content">
     {% block breadcrumb %}{% endblock %}
@@ -24,5 +35,21 @@
   </main>
 </div>
 {% block scripts %}{% endblock %}
+<script>
+  (function() {
+    var btn = document.getElementById('nav-toggle');
+    var overlay = document.getElementById('nav-overlay');
+    var sidebar = document.querySelector('.sidebar');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      sidebar.classList.toggle('open');
+      overlay.classList.toggle('show');
+    });
+    overlay.addEventListener('click', function() {
+      sidebar.classList.remove('open');
+      overlay.classList.remove('show');
+    });
+  })();
+</script>
 </body>
 </html>

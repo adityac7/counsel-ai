@@ -7,19 +7,20 @@ or counsellor ends it.
 """
 
 import asyncio
-import json
 import logging
 import time
+import uuid
 from datetime import datetime, timezone
 
 from fastapi import APIRouter
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from google.genai import types as gt
 
-from counselai.storage.db import get_session_factory
+from counselai.analysis.dashboard_persistence import persist_session_usage
+from counselai.storage.db import get_session_factory, get_sync_session_factory
 from counselai.storage.models import SessionStatus
 
-from counselai.api.constants import COUNSELLOR_INSTRUCTIONS
+from counselai.api.constants import get_counsellor_instructions
 from counselai.api.gemini_client import (
     GEMINI_LIVE_MODEL,
     build_live_config,
@@ -29,6 +30,7 @@ from counselai.settings import settings
 from counselai.api.validators import validate_ws_params
 from counselai.api.websocket_handler import (
     TranscriptCollector,
+    UsageAccumulator,
     browser_to_gemini,
     gemini_to_browser,
     keepalive_ping,
@@ -46,10 +48,41 @@ router = APIRouter()
 MAX_RECONNECTS = 20  # ~200 minutes max (10min per connection)
 
 
-def generate_silent_audio(duration_ms: int = 100, sample_rate: int = 16000) -> bytes:
-    """Generate silent PCM16 audio for triggering initial greeting."""
-    n_samples = int(sample_rate * duration_ms / 1000)
-    return b"\x00\x00" * n_samples
+def _persist_usage_safely(session_id: str, usage_agg) -> None:
+    """Upsert the session's token usage row. Never raises.
+
+    Runs synchronously — ``persist_session_usage`` uses a sync SQLAlchemy
+    session. Called from the websocket handler at session-end; if anything
+    goes wrong we log and move on so the session finalizer still returns.
+    """
+    try:
+        sid = uuid.UUID(session_id)
+    except (ValueError, TypeError, AttributeError):
+        logger.warning("Usage persist skipped — bad session_id %r", session_id)
+        return
+    try:
+        factory = get_sync_session_factory()
+        db = factory()
+        try:
+            persist_session_usage(
+                db,
+                session_id=sid,
+                input_tokens=usage_agg.input_tokens,
+                output_tokens=usage_agg.output_tokens,
+                cached_tokens=usage_agg.cached_tokens,
+                total_tokens=usage_agg.total_tokens,
+                model=settings.gemini_live_model,
+                input_modality=usage_agg.input_modality or None,
+                output_modality=usage_agg.output_modality or None,
+            )
+            db.commit()
+        except Exception as exc:
+            db.rollback()
+            logger.warning("Failed to persist session usage for %s: %s", session_id, exc)
+        finally:
+            db.close()
+    except Exception as exc:
+        logger.warning("Failed to open sync session for usage persist: %s", exc)
 
 
 @router.websocket("/gemini-ws")
@@ -83,8 +116,11 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
         return
     resumption_state = {"handle": None, "go_away": False}
     transcript = TranscriptCollector()
+    usage_agg = UsageAccumulator()
     is_first_connection = True
     reconnect_count = 0
+    transient_error_count = 0
+    MAX_TRANSIENT_RETRIES = 3
     session_start = time.monotonic()
     live_session: LiveSessionHandle | None = None
     final_status = SessionStatus.completed
@@ -99,6 +135,7 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                 school_name=params["school"],
                 student_age=params["age"],
                 scenario=scenario,
+                case_study_id=params.get("case_study_id"),
                 language=language,
             )
     except Exception as exc:
@@ -123,11 +160,10 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
     except Exception:
         logger.warning("Failed to notify browser of session start", exc_info=True)
 
-    # Build system instruction once (sent in config, not as client_content)
-    system_instruction = COUNSELLOR_INSTRUCTIONS + (
-        f"\n\nStudent name: {student_name}\n"
-        f"Case study / scenario:\n{scenario}"
-    )
+    # System instruction is the shrunk counsellor persona only — no scenario,
+    # no student name. Per-session context is injected as the first user turn
+    # below so the system prompt can stay cache-friendly.
+    system_instruction = get_counsellor_instructions(language)
 
     while reconnect_count <= MAX_RECONNECTS:
         resumption_state["go_away"] = False
@@ -137,40 +173,60 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
             system_instruction=system_instruction if is_first_connection else "",
         )
 
+        _t_connect_start = time.monotonic()
         try:
             async with client.aio.live.connect(
                 model=GEMINI_LIVE_MODEL, config=config
             ) as session:
+                _t_connected = time.monotonic()
                 if is_first_connection:
-                    logger.info("Connected to Gemini Live: %s", GEMINI_LIVE_MODEL)
+                    logger.info(
+                        "⏱ [phase=connect] Gemini Live handshake: %.0fms (model=%s, system_prompt=YES)",
+                        (_t_connected - _t_connect_start) * 1000,
+                        GEMINI_LIVE_MODEL,
+                    )
                     await ws.send_json({"type": "setup_complete"})
 
-                    # Trigger Gemini to greet the student proactively.
-                    # Silent audio alone doesn't work — Gemini's VAD ignores it.
-                    # send_client_content with turn_complete=True forces Gemini's turn.
-                    silent = generate_silent_audio()
-                    await session.send_realtime_input(
-                        audio=gt.Blob(data=silent, mime_type="audio/pcm")
-                    )
+                    # Inject per-session context (student + scenario) as the
+                    # first user turn. turn_complete=True forces Gemini to
+                    # take the next turn — i.e. produce the greeting — without
+                    # needing a silent-audio hack.
+                    _t_content_send = time.monotonic()
                     await session.send_client_content(
                         turns=gt.Content(
                             role="user",
-                            parts=[gt.Part(text="Begin the session. Greet the student now.")],
+                            parts=[gt.Part(text=(
+                                f"Student: {student_name}\n\n"
+                                f"Scenario:\n{scenario}\n\n"
+                                "Greet the student and begin the interview."
+                            ))],
                         ),
                         turn_complete=True,
                     )
-                    logger.info("Greeting trigger sent to Gemini")
+                    logger.info(
+                        "⏱ [phase=greeting] Context+greeting sent (scenario_chars=%d, student=%r)",
+                        len(scenario), student_name,
+                    )
+                    logger.info(
+                        "⏱ [phase=greeting] send_client_content took: %.0fms",
+                        (time.monotonic() - _t_content_send) * 1000,
+                    )
 
                     await ws.send_json({"type": "connection_active"})
                     is_first_connection = False
                 else:
-                    logger.info("Reconnected to Gemini (attempt %d)", reconnect_count)
+                    logger.info(
+                        "⏱ [phase=reconnect] Reconnected to Gemini (attempt %d, handshake=%.0fms, system_prompt=NO, resumption=%s)",
+                        reconnect_count,
+                        (_t_connected - _t_connect_start) * 1000,
+                        bool(resumption_state.get("handle")),
+                    )
                     await ws.send_json({"type": "reconnected"})
 
                 # Run bidirectional pipeline + session timer
                 b2g = asyncio.create_task(browser_to_gemini(ws, session, transcript))
                 g2b = asyncio.create_task(
-                    gemini_to_browser(ws, session, resumption_state, transcript)
+                    gemini_to_browser(ws, session, resumption_state, transcript, language, usage_agg)
                 )
                 ping = asyncio.create_task(keepalive_ping(ws))
 
@@ -179,7 +235,7 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                 remaining = max(0, settings.max_session_duration_seconds - elapsed)
                 wrapup = min(settings.session_wrapup_seconds, remaining)
                 timer = asyncio.create_task(
-                    session_timer(ws, session, transcript, int(remaining), int(wrapup))
+                    session_timer(ws, session, transcript, int(remaining), int(wrapup), language)
                 )
 
                 done, pending = await asyncio.wait(
@@ -200,9 +256,51 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                     task.cancel()
                 await asyncio.gather(*pending, return_exceptions=True)
 
-                # Handle explicit end_session from browser
+                # Handle explicit end_session or transient error from browser→gemini
                 if b2g in done and not b2g.cancelled() and b2g.exception() is None:
                     result = b2g.result()
+                    if result == "transient_error":
+                        transient_error_count += 1
+                        backoff = min(2 ** transient_error_count, 8)
+                        has_handle = bool(resumption_state.get("handle"))
+                        logger.warning(
+                            "⏱ [phase=retry] Gemini transient error %d/%d — retrying in %ds "
+                            "(resumption=%s, turns_so_far=%d)",
+                            transient_error_count, MAX_TRANSIENT_RETRIES, backoff,
+                            has_handle, len(transcript.turns),
+                        )
+                        if transient_error_count <= MAX_TRANSIENT_RETRIES:
+                            # Keep the resumption handle if we have one — session resumption
+                            # is designed exactly for unexpected drops like 1011 errors.
+                            # Only if there's no handle (crashed before one was issued) do we
+                            # need to re-bootstrap from scratch via is_first_connection.
+                            if not has_handle:
+                                logger.warning(
+                                    "⏱ No resumption handle — will re-bootstrap with system prompt + greeting"
+                                )
+                                is_first_connection = True
+                            await asyncio.sleep(backoff)
+                            try:
+                                await ws.send_json({
+                                    "type": "reconnecting",
+                                    "attempt": transient_error_count,
+                                    "maxAttempts": MAX_TRANSIENT_RETRIES,
+                                })
+                            except Exception:
+                                pass
+                            continue
+                        else:
+                            logger.error("⏱ Transient error limit reached — giving up")
+                            final_status = SessionStatus.failed
+                            try:
+                                await ws.send_json({
+                                    "type": "error",
+                                    "message": "Gemini service is temporarily unavailable. Please try again.",
+                                    "reconnect_failed": True,
+                                })
+                            except Exception:
+                                pass
+                            break
                     if result == "end_session":
                         logger.info("Graceful end_session — finalizing now")
                         transcript.flush()
@@ -219,6 +317,7 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                                         ended_at=datetime.now(timezone.utc),
                                     )
                                 if saved_session_id:
+                                    _persist_usage_safely(saved_session_id, usage_agg)
                                     try:
                                         await ws.send_json({"type": "session_saved", "session_id": saved_session_id})
                                     except Exception:
@@ -252,7 +351,30 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                 break
 
         except Exception as exc:
-            logger.error("Gemini session error: %s", exc)
+            exc_str = str(exc)
+            is_transient = "1011" in exc_str or "internal error" in exc_str.lower()
+            if is_transient and transient_error_count < MAX_TRANSIENT_RETRIES:
+                transient_error_count += 1
+                backoff = min(2 ** transient_error_count, 8)
+                has_handle = bool(resumption_state.get("handle"))
+                logger.warning(
+                    "⏱ [phase=retry] Gemini transient error (outer) %d/%d — retrying in %ds "
+                    "(resumption=%s): %s",
+                    transient_error_count, MAX_TRANSIENT_RETRIES, backoff, has_handle, exc,
+                )
+                if not has_handle:
+                    is_first_connection = True
+                await asyncio.sleep(backoff)
+                try:
+                    await ws.send_json({
+                        "type": "reconnecting",
+                        "attempt": transient_error_count,
+                        "maxAttempts": MAX_TRANSIENT_RETRIES,
+                    })
+                except Exception:
+                    pass
+                continue
+            logger.error("⏱ Gemini session error (fatal): %s", exc)
             final_status = SessionStatus.failed
             transcript.flush()
             try:
@@ -283,6 +405,9 @@ async def gemini_ws_proxy(ws: WebSocket) -> None:
                 )
         except Exception as exc:
             logger.error("Failed to finalize live session %s: %s", live_session.session_id, exc, exc_info=True)
+
+    if saved_session_id:
+        _persist_usage_safely(saved_session_id, usage_agg)
 
     # Best-effort compatibility event for older clients that still listen for it.
     if saved_session_id:

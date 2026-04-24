@@ -22,6 +22,7 @@ const state = {
   // Transcript
   currentAiEntry: null,
   _lastAiEntry: null,
+  _pendingAiText: '',  // buffers outputTranscription that arrives before its modelTurn
   transcriptEntries: [],
   currentStudentEntry: null,
   studentTranscriptTimer: null,
@@ -50,6 +51,12 @@ const state = {
   geminiConnectionState: 'CLOSED',
   audioChunksPlayed: 0,
 
+  // Mixed recording (counsellor mic + AI audio + video)
+  geminiAudioCaptureDest: null,
+  mixedRecordingCtx: null,
+  mixedRecorder: null,
+  mixedRecordedChunks: [],
+
   // Event tracking
   eventTypeCounts: {},
 
@@ -68,7 +75,6 @@ export const dom = {
   statusDot: document.getElementById('status-dot'),
   timerEl: document.getElementById('timer'),
   transcriptEl: document.getElementById('transcript'),
-  orb: document.getElementById('orb'),
   preview: document.getElementById('preview'),
   previewWrap: document.getElementById('preview-wrap'),
   aiAudio: document.getElementById('ai-audio'),
@@ -76,13 +82,8 @@ export const dom = {
   rtcDebug: document.getElementById('rtc-debug'),
   toast: document.getElementById('toast'),
   caseStudyText: document.getElementById('case-study-text'),
-  profileMetrics: document.getElementById('profile-metrics'),
-  personalitySection: document.getElementById('personality-section'),
-  cognitiveSection: document.getElementById('cognitive-section'),
-  emotionalSection: document.getElementById('emotional-section'),
-  behavioralSection: document.getElementById('behavioral-section'),
-  conversationSection: document.getElementById('conversation-section'),
-  recommendationsEl: document.getElementById('recommendations'),
+  counsellorSpeech: document.getElementById('counsellor-speech'),
+  counsellorSpeechText: document.getElementById('counsellor-speech-text'),
 };
 
 // ============================================================
@@ -91,6 +92,7 @@ export const dom = {
 
 const screens = {
   welcome: document.getElementById('welcome'),
+  reading: document.getElementById('reading'),
   live: document.getElementById('live'),
   summary: document.getElementById('summary'),
 };

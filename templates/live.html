@@ -4,27 +4,59 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1" />
 <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
-<title>CounselAI Live</title>
+<title>CounselAI — Student Intelligence Platform</title>
 <link rel="icon" type="image/svg+xml" href="/static/favicon.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=Outfit:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/tokens.css">
 <link rel="stylesheet" href="/static/live/live.css">
+<link rel="stylesheet" href="/static/report.css">
 </head>
 <body>
 <div class="app">
+
+  <!-- ===== TOPBAR ===== -->
   <div class="topbar">
-    <div class="brand">&#x1f33f; <span style="color: var(--brand);">Counsel</span>AI</div>
-    <a href="/dashboard">&#x1f4ca; Sessions Dashboard</a>
+    <div class="brand">Counsel<span>AI</span></div>
+    <div class="topbar-right">
+      <a href="/dashboard">Sessions Dashboard</a>
+    </div>
   </div>
+
+  <!-- ===== JOURNEY PROGRESS BAR ===== -->
+  <nav class="journey-bar" aria-label="Session progress">
+    <div class="journey-steps">
+      <div class="step" data-step="1">
+        <div class="step-bubble">1</div>
+        <div class="step-label">Your Profile</div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" data-step="2">
+        <div class="step-bubble">2</div>
+        <div class="step-label">Read Scenario</div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" data-step="3">
+        <div class="step-bubble">3</div>
+        <div class="step-label">Interview</div>
+      </div>
+      <div class="step-connector"></div>
+      <div class="step" data-step="4">
+        <div class="step-bubble">4</div>
+        <div class="step-label">Analysis</div>
+      </div>
+    </div>
+  </nav>
 
   <!-- ===== WELCOME SCREEN ===== -->
   <section id="welcome" class="glass welcome-card">
     <div class="welcome-header">
-      <span class="welcome-emoji">&#x1f393;</span>
-      <h1>Start your session</h1>
-      <p>A safe space to explore, reflect, and grow</p>
+      <span class="eyebrow">Behavioural Intelligence Assessment</span>
+      <h1>Discover Your <span>Strengths</span></h1>
+      <p>Answer questions about an ethical scenario and our AI will help you understand your behavioural patterns, strengths, and areas for growth.</p>
     </div>
+
     <div class="grid grid-2">
       <div>
         <label for="student-name">Your name</label>
@@ -60,14 +92,38 @@
         </select>
       </div>
     </div>
-    <label for="case-study">Case study</label>
+
+    <label for="case-study">Case study scenario</label>
     <select id="case-study"></select>
-    <div class="consent-row">
+
+    <div class="consent-row" id="consent-row">
       <input type="checkbox" id="consent-cb" />
-      <label for="consent-cb" style="margin:0;">I understand this session will be recorded for analysis</label>
+      <label for="consent-cb">I understand this session will be recorded and analysed to generate my behavioural profile.</label>
     </div>
-    <div style="margin-top: 22px;">
-      <button id="start-btn" class="btn btn-primary" disabled>Start session</button>
+
+    <div style="margin-top: 24px;">
+      <button id="start-btn" class="btn btn-primary" disabled>Continue to Scenario &rarr;</button>
+    </div>
+  </section>
+
+  <!-- ===== READING SCREEN ===== -->
+  <section id="reading" class="glass reading-card hidden">
+    <div class="reading-header">
+      <span class="eyebrow">Step 2 &mdash; Read the Scenario</span>
+      <h2>Take Your Time</h2>
+      <p>Read the scenario below carefully before your interview. There is no rush.</p>
+    </div>
+
+    <div id="reading-scenario-text" class="reading-scenario"></div>
+
+    <div class="reading-meta">
+      <span id="reading-student-name"></span>
+      <span id="reading-case-title"></span>
+    </div>
+
+    <div class="reading-actions">
+      <button id="back-btn" class="btn btn-ghost">&larr; Back</button>
+      <button id="ready-btn" class="btn btn-primary">I'm ready to begin &rarr;</button>
     </div>
   </section>
 
@@ -85,7 +141,7 @@
     </div>
 
     <div id="reconnect-banner" class="reconnect-banner">
-      &#x23f3; Reconnecting to counsellor &mdash; please wait
+      Reconnecting to your counsellor &mdash; please wait a moment
     </div>
 
     <div class="live-grid">
@@ -94,7 +150,7 @@
           <video id="preview" autoplay muted playsinline></video>
         </div>
         <div class="case-card">
-          <h3>&#x1f4cb; Case study</h3>
+          <h3>Case Study</h3>
           <div id="case-study-text" class="case-text">Select a case study to view the full text.</div>
         </div>
       </div>
@@ -103,100 +159,138 @@
         <canvas id="waveform-canvas"></canvas>
       </div>
 
-      <div class="transcript" id="transcript"></div>
-      <div id="speaking-indicator" style="display:none;padding:6px 12px;color:var(--text-muted,#888);font-size:0.85rem;font-style:italic;opacity:0.8;">Student is speaking...</div>
+      <!-- Transcript kept in DOM (hidden) so dom.transcriptEl references in
+           app.js / analysis.js remain valid; entries still accumulate into
+           state.transcriptEntries for end-of-session analysis. -->
+      <div class="transcript" id="transcript" hidden></div>
+
+      <div class="live-status">
+        <div class="speaker-indicator">
+          <span class="pill pill-student" id="pill-student">Student</span>
+          <span class="pill pill-ai" id="pill-ai">Counsellor</span>
+        </div>
+        <div class="session-timer" id="session-timer">00:00</div>
+        <div class="counsellor-speech" id="counsellor-speech" aria-live="polite">
+          <div class="counsellor-speech-label">Counsellor</div>
+          <div class="counsellor-speech-text" id="counsellor-speech-text">Waiting to begin...</div>
+        </div>
+      </div>
 
       <div class="bottom-row">
-        <div class="orb-wrap"><div id="orb" class="orb"></div></div>
-        <button id="mute-btn" class="btn btn-ghost" title="Mute/unmute microphone">&#x1f3a4; Mic On</button>
-        <button id="enable-audio-btn" class="btn btn-ghost">&#x1f50a; Enable counsellor audio</button>
-        <button id="end-btn" class="btn btn-danger">End session</button>
+        <button id="mute-btn" class="btn btn-ghost" title="Mute/unmute microphone">Mic On</button>
+        <button id="enable-audio-btn" class="btn btn-ghost">Enable Audio</button>
+        <button id="end-btn" class="btn btn-danger">End Session</button>
       </div>
     </div>
   </section>
 
-  <!-- ===== EVENT LOG (dev tools panel) ===== -->
-  <section id="event-log-panel" class="event-log-panel" style="margin-top: 16px;">
-    <div class="event-log-header">
-      <h3>&#x1f50d; Event log</h3>
-      <div class="event-log-actions">
-        <button class="btn-tiny" onclick="document.getElementById('event-log').textContent=''">Clear</button>
-        <button class="btn-tiny" onclick="navigator.clipboard.writeText(document.getElementById('event-log').textContent)">Copy</button>
-      </div>
-    </div>
-    <pre id="event-log"></pre>
-  </section>
+  <pre id="event-log" hidden></pre>
 
-  <!-- ===== SUMMARY SCREEN ===== -->
-  <section id="summary" class="glass summary-card hidden">
-    <h2>Session summary</h2>
+  <!-- ===== SUMMARY / REPORT SCREEN ===== -->
+  <section id="summary" class="summary-card hidden">
     <div class="summary-grid">
-      <div class="summary-section">
-        <strong>Session info</strong>
+
+      <!-- Hero -->
+      <div class="summary-hero">
+        <div class="summary-complete-badge">Session Complete</div>
+        <h2>Assessment Report</h2>
         <div class="meta" id="summary-meta"></div>
       </div>
-      <div class="summary-section">
-        <strong>Score metrics</strong>
-        <div class="metrics" id="profile-metrics" style="margin-top: 8px;"></div>
+
+      <!-- Metadata Strip -->
+      <div class="rpt-meta-strip" id="rpt-meta-strip">
+        <div class="rpt-meta-item"><span class="rpt-meta-label">Duration</span><span class="rpt-meta-value" id="rpt-duration"></span></div>
+        <div class="rpt-meta-item"><span class="rpt-meta-label">Turns</span><span class="rpt-meta-value" id="rpt-turns"></span></div>
+        <div class="rpt-meta-item"><span class="rpt-meta-label">Session Depth</span><span class="rpt-depth-pill" id="rpt-depth"></span></div>
       </div>
-      <div class="summary-section">
-        <strong>&#x1f9e0; Personality snapshot</strong>
-        <div class="meta" id="personality-section"></div>
+
+      <!-- Counsellor Snapshot -->
+      <div class="rpt-snapshot" id="rpt-snapshot">
+        <div class="rpt-snapshot-label">Counsellor Snapshot</div>
+        <p class="rpt-snapshot-text" id="rpt-snapshot-text">Generating analysis...</p>
       </div>
-      <div class="summary-section">
-        <strong>&#x1f4a1; Cognitive profile</strong>
-        <div class="meta" id="cognitive-section"></div>
+
+      <!-- Risk Flags Bar -->
+      <div class="rpt-flags green" id="rpt-flags-bar">
+        <span class="rpt-flag-dot"></span>
+        <span id="rpt-flags-text">Checking risk flags...</span>
       </div>
-      <div class="summary-section">
-        <strong>&#x1f497; Emotional profile</strong>
-        <div class="meta" id="emotional-section"></div>
+
+      <!-- Overview: Radar + Callouts -->
+      <div class="rpt-overview">
+        <div class="rpt-radar-card">
+          <div class="rpt-section-label">Assessment Profile</div>
+          <svg id="rpt-radar" viewBox="0 0 340 340" style="width:100%;max-width:340px;"></svg>
+        </div>
+        <div class="rpt-callouts" id="rpt-callouts"></div>
       </div>
-      <div class="summary-section">
-        <strong>&#x1f3af; Behavioral insights</strong>
-        <div class="meta" id="behavioral-section"></div>
+
+      <!-- 9 Dimension Cards -->
+      <div class="rpt-section-label">9 Dimensions Assessment</div>
+      <div class="rpt-dim-grid" id="rpt-dim-grid"></div>
+
+      <!-- Key Moments -->
+      <div class="rpt-moments-card">
+        <div class="rpt-section-label">Key Moments</div>
+        <div class="rpt-moments-grid" id="rpt-moments-grid"></div>
       </div>
-      <div class="summary-section summary-full">
-        <strong>&#x1f4ac; Conversation analysis</strong>
-        <div class="meta" id="conversation-section"></div>
+
+      <!-- Strengths & Growth -->
+      <div class="rpt-sg" id="rpt-sg-section"></div>
+
+      <!-- Next Session Recommendation -->
+      <div class="rpt-next-session" id="rpt-next-session">
+        <span class="rpt-next-icon">&rarr;</span>
+        <span class="rpt-next-text" id="rpt-next-text"></span>
       </div>
-      <div class="summary-section summary-full">
-        <strong>&#x1f4cc; Recommendations</strong>
-        <div id="recommendations" class="meta"></div>
+
+      <!-- Career Aptitude Signals -->
+      <div class="rpt-career" id="rpt-career-section">
+        <div class="rpt-career-header">
+          <div class="rpt-section-label" style="margin-bottom:0">Career Aptitude Signals</div>
+          <span class="rpt-career-badge">6-Stage Pipeline &middot; <span id="rpt-career-count"></span></span>
+        </div>
+        <div class="rpt-career-subtitle" id="rpt-career-subtitle"></div>
+        <div class="rpt-section-label" style="font-size:0.62rem;margin-bottom:6px;">Detected Skill Synergies</div>
+        <div class="rpt-synergy-row" id="rpt-synergy-row"></div>
+        <div class="rpt-career-rank-list" id="rpt-career-rank-list"></div>
+        <div style="display:flex;gap:16px;align-items:center;margin-top:4px;">
+          <button class="rpt-method-toggle" id="rpt-method-toggle-btn">How we scored this</button>
+          <button class="rpt-career-expand-btn" id="rpt-career-expand-btn">Show all careers</button>
+        </div>
+        <div class="rpt-method-panel" id="rpt-method-panel"></div>
+        <div class="rpt-career-full" id="rpt-career-full">
+          <div class="rpt-career-full-grid" id="rpt-career-full-grid"></div>
+        </div>
+        <div class="rpt-stream-section">
+          <div class="rpt-section-label" style="font-size:0.62rem;margin-bottom:6px;" id="rpt-stream-title">Stream Alignment</div>
+          <div class="rpt-stream-row" id="rpt-stream-row"></div>
+        </div>
+        <div class="rpt-career-caveat">Career aptitude signals are based on behavioral patterns in a structured ethical scenario discussion. They indicate natural reasoning tendencies but do not account for academic aptitude, technical skills, or student interests. Professional career counselling is recommended.</div>
       </div>
-      <div class="summary-section summary-full">
-        <strong>&#x2b50; Key moments</strong>
-        <div class="meta" id="key-moments-section"></div>
-      </div>
-      <div class="summary-section summary-full">
-        <strong>&#x1f6a9; Red flags</strong>
-        <div class="meta" id="red-flags-section"></div>
-      </div>
-      <div class="summary-section summary-full">
-        <strong>Summary</strong>
-        <div class="meta" id="summary-text"></div>
-      </div>
-      <div class="summary-section summary-full">
-        <strong>&#x1f3ad; Face analysis</strong>
-        <div class="meta" id="face-analysis-section">Waiting for analysis...</div>
-      </div>
-      <div class="summary-section summary-full">
-        <strong>&#x1f3a4; Voice analysis</strong>
-        <div class="meta" id="voice-analysis-section">Waiting for analysis...</div>
-      </div>
-      <div class="summary-section summary-full">
-        <strong>Full transcript</strong>
-        <div class="meta" id="summary-transcript" style="white-space: pre-wrap;"></div>
-      </div>
-    </div>
-    <div style="margin-top: 22px;">
-      <button id="new-btn" class="btn btn-primary">New session</button>
+
+      <!-- Full Transcript (collapsible) -->
+      <details class="transcript-details">
+        <summary class="transcript-summary-toggle">
+          Full Transcript
+          <span class="transcript-expand-icon">&#9660;</span>
+        </summary>
+        <div id="summary-transcript" class="transcript-content" style="white-space: pre-wrap;"></div>
+      </details>
+
+    </div><!-- /.summary-grid -->
+
+    <div class="summary-actions">
+      <button id="new-btn" class="btn btn-primary">Start a New Session &rarr;</button>
     </div>
   </section>
-</div>
+
+</div><!-- /.app -->
 
 <audio id="ai-audio" autoplay playsinline></audio>
 <div class="toast" id="toast"></div>
 
+<script src="/static/report-renderer.js"></script>
 <script type="module" src="/static/live/app.js"></script>
 </body>
 </html>

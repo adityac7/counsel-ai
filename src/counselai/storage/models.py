@@ -219,6 +219,25 @@ class Hypothesis(Base):
     )
 
 
+class CaseStudy(Base):
+    """Custom case studies created via the dashboard (supplements the built-in static list)."""
+    __tablename__ = "case_studies"
+
+    id: Mapped[str] = mapped_column(String(100), primary_key=True)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    category: Mapped[str] = mapped_column(String(100), nullable=False)
+    target_class: Mapped[str] = mapped_column(String(20), nullable=False)
+    scenario_text: Mapped[str] = mapped_column(Text, nullable=False)
+    scenario_text_hi: Mapped[str | None] = mapped_column(Text)
+    probing_angles: Mapped[list | None] = mapped_column(JSONType, default=list)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    __table_args__ = (
+        Index("ix_case_studies_category", "category"),
+        Index("ix_case_studies_target_class", "target_class"),
+    )
+
+
 class Profile(Base):
     __tablename__ = "profiles"
 
@@ -237,4 +256,35 @@ class Profile(Base):
 
     __table_args__ = (
         Index("ix_profiles_session_id", "session_id"),
+    )
+
+
+class SessionTokenUsage(Base):
+    """Per-session Gemini token usage — populated at session teardown.
+
+    One row per session (unique on ``session_id``). Token counts only; cost
+    calculation is intentionally deferred to read-time / external reporting
+    so model pricing changes don't require DB migrations.
+    """
+    __tablename__ = "session_token_usage"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUIDType, primary_key=True, default=_new_uuid)
+    session_id: Mapped[uuid.UUID] = mapped_column(
+        UUIDType, ForeignKey("sessions.id"), nullable=False, unique=True
+    )
+    model: Mapped[str] = mapped_column(String(100), nullable=False)
+    input_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    output_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    cached_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Modality breakdown for live session (JSON: {"TEXT": N, "AUDIO": N, "VIDEO": N})
+    input_modality_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    output_modality_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Tokens from the post-session Gemini analysis call
+    analysis_input_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    analysis_output_tokens: Mapped[int] = mapped_column(Integer, default=0, nullable=False, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=_utcnow)
+
+    __table_args__ = (
+        Index("ix_session_token_usage_session_id", "session_id"),
     )

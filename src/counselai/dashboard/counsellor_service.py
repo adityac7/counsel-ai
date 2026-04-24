@@ -42,16 +42,50 @@ def _count_by_key(items: list[dict], key: str) -> dict[str, int]:
     return counts
 
 
+def _normalize_score(score) -> float | None:
+    """Coerce a score to the 0–1 range the template expects.
+
+    Gemini sometimes returns scores as 0–100 integers instead of 0–1 floats.
+    Any value > 1 is divided by 100; values already in 0–1 are kept as-is.
+    """
+    if score is None:
+        return None
+    try:
+        v = float(score)
+    except (TypeError, ValueError):
+        return None
+    if v > 1.0:
+        v = v / 100.0
+    return max(0.0, min(1.0, v))
+
+
 def normalize_profile_for_dashboard(profile: dict | None) -> dict | None:
     """Normalize a profile dict for counsellor dashboard rendering.
 
     Handles both the legacy profile_generator format and the new
-    unified_analyzer format. Returns the profile as-is if already normalized.
+    unified_analyzer format. Ensures all construct/hypothesis scores are
+    in the 0–1 range so the template's ``score * 100`` produces valid %.
     """
     if not isinstance(profile, dict) or not profile:
         return None
-    if "counsellor_view" in profile or "constructs" in profile:
-        return profile
+
+    # Normalize scores inside counsellor_view.constructs
+    cv = profile.get("counsellor_view")
+    if isinstance(cv, dict):
+        for c in cv.get("constructs") or []:
+            if isinstance(c, dict):
+                c["score"] = _normalize_score(c.get("score"))
+
+    # Normalize scores at top-level constructs (alternate shape)
+    for c in profile.get("constructs") or []:
+        if isinstance(c, dict):
+            c["score"] = _normalize_score(c.get("score"))
+
+    # Normalize hypothesis scores
+    for h in profile.get("hypotheses") or []:
+        if isinstance(h, dict):
+            h["score"] = _normalize_score(h.get("score"))
+
     return profile
 
 
@@ -320,7 +354,7 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
             "id": str(h.id),
             "construct_key": h.construct_key,
             "label": h.label,
-            "score": h.score,
+            "score": _normalize_score(h.score),
             "status": _enum_val(h.status),
             "evidence_summary": h.evidence_summary,
             "evidence_refs": h.evidence_refs_json or {},
@@ -341,6 +375,24 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
                 "confidence": obs.get("confidence", 0),
                 "value": {"detail": obs.get("detail", "")},
             })
+
+    # Parse the full 9-dimension report blob from SessionRecord.report so
+    # the counsellor dashboard can render the same radar + dimension cards
+    # + career signals that the student sees at end of session.
+    report_data = None
+    if session.report:
+        try:
+            parsed = json.loads(session.report) if isinstance(session.report, str) else session.report
+            # The persisted blob may be wrapped ({"profile": ..., "profile_raw": ...}) from
+            # an older format, or the direct report payload. Pick whichever looks like the
+            # report (presence of "dimensions" key).
+            if isinstance(parsed, dict):
+                if parsed.get("dimensions"):
+                    report_data = parsed
+                elif isinstance(parsed.get("profile"), dict) and parsed["profile"].get("dimensions"):
+                    report_data = parsed["profile"]
+        except (ValueError, TypeError, AttributeError):
+            report_data = None
 
     return {
         "session": {
@@ -365,6 +417,7 @@ def get_session_review(db: Session, session_id: uuid.UUID) -> dict[str, Any] | N
         "hypotheses": hypotheses_data,
         "signal_windows": signal_windows,
         "observations": obs_by_modality,
+        "report_data": report_data,
     }
 
 

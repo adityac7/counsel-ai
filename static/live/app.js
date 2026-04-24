@@ -90,32 +90,169 @@ export function logRealtimeEvent(msg) {
   const type = msg && msg.type ? msg.type : 'unknown';
   state.eventTypeCounts[type] = (state.eventTypeCounts[type] || 0) + 1;
   console.log(`[CounselAI] Event #${state.eventCount}: ${type}`, msg);
-  if (/(transcript|input|user)/i.test(type)) {
-    try { console.log(`[CounselAI] Event payload (${type}):\n${JSON.stringify(msg, null, 2)}`); } catch {}
-  }
   updateDebugSnapshot();
 }
 
 // ============================================================
-// APP — initialization, event listeners, case study loading
+// APP — case studies, filtering, validation, session screens
 // ============================================================
 
 import { setupMedia, setupRecorder } from './media.js';
 import { startGeminiSession } from './session.js';
 import { endSession } from './analysis.js';
 
-// --- Start session ---
+// Module-level store of all case studies from the API
+let allCaseStudies = [];
 
-async function startSession() {
+// ── Case study helpers ────────────────────────────────────────
+
+/** Return scenario text in the selected language. */
+function getScenarioDisplay(cs, lang) {
+  if (lang === 'hi' && cs.scenario_text_hi) return cs.scenario_text_hi;
+  return cs.scenario_text;
+}
+
+/** Return the group for a given class value ("8"→"8-10", "11"→"11-12"). */
+function classToGroup(classVal) {
+  return (classVal === '8' || classVal === '9' || classVal === '10') ? '8-10' : '11-12';
+}
+
+/** Repopulate the case study dropdown based on current class + language. */
+function filterAndPopulateCaseStudies() {
+  const classVal = document.getElementById('class-name').value;
+  const lang = document.getElementById('session-lang').value;
+  const group = classToGroup(classVal);
+  const sel = document.getElementById('case-study');
+  const prevId = sel.value;
+
+  sel.innerHTML = '';
+  const filtered = allCaseStudies.filter(cs => cs.target_class === group);
+  filtered.forEach(cs => {
+    const o = document.createElement('option');
+    o.value = cs.id;
+    o.textContent = `${cs.title} (${cs.category})`;
+    sel.appendChild(o);
+  });
+
+  // Preserve selection if still valid
+  if (prevId && filtered.find(cs => cs.id === prevId)) {
+    sel.value = prevId;
+  }
+
+  // Update scenario preview text
+  const selected = filtered.find(cs => cs.id === sel.value);
+  if (selected && dom.caseStudyText) {
+    dom.caseStudyText.textContent = getScenarioDisplay(selected, lang);
+  }
+
+  checkValidity();
+}
+
+// ── Form validation ───────────────────────────────────────────
+
+function showFieldError(fieldId, message) {
+  const field = document.getElementById(fieldId);
+  if (!field) return;
+  field.classList.add('input-error');
+  const existing = field.parentElement.querySelector('.field-error');
+  if (existing) existing.remove();
+  const err = document.createElement('span');
+  err.className = 'field-error';
+  err.textContent = message;
+  field.parentElement.appendChild(err);
+}
+
+function clearFieldError(fieldId) {
+  const field = document.getElementById(fieldId);
+  if (!field) return;
+  field.classList.remove('input-error');
+  const err = field.parentElement.querySelector('.field-error');
+  if (err) err.remove();
+}
+
+/** Check validity and update button state — no error UI changes. */
+function checkValidity() {
+  const name = document.getElementById('student-name').value.trim();
+  const school = document.getElementById('school-name').value.trim();
+  const caseStudy = document.getElementById('case-study').value;
+  const consent = document.getElementById('consent-cb').checked;
+  const valid = !!(name && school && caseStudy && consent);
+  document.getElementById('start-btn').disabled = !valid;
+  return valid;
+}
+
+/** Show all errors — called only on submit attempt. */
+function validateForm() {
+  const name = document.getElementById('student-name').value.trim();
+  const school = document.getElementById('school-name').value.trim();
+  const caseStudy = document.getElementById('case-study').value;
+  const consent = document.getElementById('consent-cb').checked;
+
+  let valid = true;
+
+  if (!name) { showFieldError('student-name', 'Please enter your name'); valid = false; }
+  else clearFieldError('student-name');
+
+  if (!school) { showFieldError('school-name', 'Please enter your school name'); valid = false; }
+  else clearFieldError('school-name');
+
+  if (!caseStudy) { showFieldError('case-study', 'Please select a case study'); valid = false; }
+  else clearFieldError('case-study');
+
+  const consentRow = document.getElementById('consent-row');
+  const consentErr = consentRow ? consentRow.querySelector('.field-error') : null;
+  if (!consent) {
+    if (consentRow && !consentErr) {
+      const err = document.createElement('span');
+      err.className = 'field-error';
+      err.textContent = 'Please give consent to proceed';
+      consentRow.appendChild(err);
+    }
+    valid = false;
+  } else {
+    if (consentErr) consentErr.remove();
+  }
+
+  document.getElementById('start-btn').disabled = !valid;
+  return valid;
+}
+
+// ── Session phases ────────────────────────────────────────────
+
+/** Phase 1: validate form → populate reading screen → show it. */
+function prepareSession() {
+  if (!validateForm()) return;
+
   const name = document.getElementById('student-name').value.trim() || 'Student';
-  const className = document.getElementById('class-name').value.trim() || 'Class';
+  const className = document.getElementById('class-name').value.trim() || '9';
   const section = document.getElementById('section-name').value.trim();
   const school = document.getElementById('school-name').value.trim();
-  const age = Number(document.getElementById('student-age').value || 15);
-  const scenario = document.getElementById('case-study').value;
+  const age = Number(document.getElementById('student-age').value) || 15;
   const lang = document.getElementById('session-lang').value || 'hinglish';
+  const caseStudyId = document.getElementById('case-study').value;
+  const selectedCs = allCaseStudies.find(cs => cs.id === caseStudyId);
 
-  state.sessionMeta = { name, className, section, school, age, scenario, lang, start: new Date() };
+  // Always use English scenario for backend/Gemini
+  const scenarioForBackend = selectedCs ? selectedCs.scenario_text : '';
+  // Show language-appropriate text on reading screen
+  const scenarioForDisplay = selectedCs ? getScenarioDisplay(selectedCs, lang) : '';
+
+  state.sessionMeta = { name, className, section, school, age, lang,
+    scenario: scenarioForBackend, caseStudyId, start: new Date() };
+
+  // Populate reading screen
+  document.getElementById('reading-scenario-text').textContent = scenarioForDisplay || 'No scenario loaded.';
+  document.getElementById('reading-student-name').textContent = name;
+  document.getElementById('reading-case-title').textContent = selectedCs ? selectedCs.title : '';
+
+  showScreen('reading');
+}
+
+/** Phase 2: actually start media + Gemini session (called from reading screen). */
+async function beginLiveSession() {
+  const { name, scenario } = state.sessionMeta;
+
+  // Reset session state
   state.recordedChunks = [];
   state.transcriptEntries = [];
   state.currentAiEntry = null;
@@ -125,6 +262,11 @@ async function startSession() {
   state.savedSessionId = null;
   state.pendingTranscriptFlush = null;
   state.intentionalSessionEnd = false;
+  state.geminiAudioCaptureDest = null;
+  state.mixedRecordingCtx = null;
+  state.mixedRecorder = null;
+  state.mixedRecordedChunks = [];
+
   dom.transcriptEl.innerHTML = '';
   dom.enableAudioBtn.style.display = 'none';
   dom.aiAudio.srcObject = null;
@@ -132,12 +274,11 @@ async function startSession() {
   showScreen('live');
   setStatus('Connecting...');
   setDebug('Gemini: connecting');
-  dom.caseStudyText.textContent = scenario || 'No case study loaded.';
+  if (dom.caseStudyText) dom.caseStudyText.textContent = scenario || 'No case study loaded.';
 
   const hasVideoTrack = await setupMedia();
   setupRecorder(hasVideoTrack);
 
-  // Playback context is created inside startGeminiSession
   await startGeminiSession(name, scenario);
 
   state.timerStart = Date.now();
@@ -148,10 +289,18 @@ async function startSession() {
   updateDebugSnapshot();
 }
 
-// --- Event listeners ---
+// ── Event listeners ───────────────────────────────────────────
 
 document.getElementById('start-btn').addEventListener('click', () => {
-  startSession().catch(err => { showToast(err.message); showScreen('welcome'); });
+  prepareSession();
+});
+
+document.getElementById('ready-btn').addEventListener('click', () => {
+  beginLiveSession().catch(err => { showToast(err.message); showScreen('welcome'); });
+});
+
+document.getElementById('back-btn').addEventListener('click', () => {
+  showScreen('welcome');
 });
 
 document.getElementById('end-btn').addEventListener('click', endSession);
@@ -165,34 +314,48 @@ if (muteBtn) {
     state.isMuted = !state.isMuted;
     muteBtn.innerHTML = state.isMuted ? '&#x1f507; Mic Off' : '&#x1f3a4; Mic On';
     muteBtn.classList.toggle('btn-warning', state.isMuted);
-    uiLog('INFO', state.isMuted ? 'Microphone muted — audio stopped to Gemini' : 'Microphone unmuted — audio resumed');
+    uiLog('INFO', state.isMuted ? 'Microphone muted' : 'Microphone unmuted');
   });
 }
 
-// Consent checkbox gates the start button
-const consentCb = document.getElementById('consent-cb');
-const startBtn = document.getElementById('start-btn');
-if (consentCb && startBtn) {
-  startBtn.disabled = true;
-  consentCb.addEventListener('change', () => { startBtn.disabled = !consentCb.checked; });
-}
+// Validation listeners — update button state on input, show errors only on blur
+['student-name', 'school-name'].forEach(id => {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.addEventListener('input', () => { clearFieldError(id); checkValidity(); });
+  el.addEventListener('blur', () => {
+    if (!el.value.trim()) showFieldError(id, id === 'student-name' ? 'Please enter your name' : 'Please enter your school name');
+    checkValidity();
+  });
+});
+document.getElementById('case-study').addEventListener('change', () => { clearFieldError('case-study'); checkValidity(); });
+document.getElementById('consent-cb').addEventListener('change', () => {
+  const consentRow = document.getElementById('consent-row');
+  const consentErr = consentRow ? consentRow.querySelector('.field-error') : null;
+  if (consentErr) consentErr.remove();
+  checkValidity();
+});
 
-// --- Load case studies ---
+// Class + language change → re-filter case studies
+document.getElementById('class-name').addEventListener('change', filterAndPopulateCaseStudies);
+document.getElementById('session-lang').addEventListener('change', filterAndPopulateCaseStudies);
+
+// Update case study preview on dropdown change
+document.getElementById('case-study').addEventListener('change', () => {
+  const lang = document.getElementById('session-lang').value;
+  const id = document.getElementById('case-study').value;
+  const cs = allCaseStudies.find(c => c.id === id);
+  if (cs && dom.caseStudyText) dom.caseStudyText.textContent = getScenarioDisplay(cs, lang);
+});
+
+// ── Load case studies on page load ───────────────────────────
 
 (async () => {
   try {
     const r = await fetch('/api/case-studies');
     const d = await r.json();
-    const sel = document.getElementById('case-study');
-    sel.innerHTML = '';
-    d.case_studies.forEach(cs => {
-      const o = document.createElement('option');
-      o.value = cs.scenario_text;
-      o.textContent = cs.id + ' \u2022 ' + cs.title + ' (' + cs.target_class + ')';
-      sel.appendChild(o);
-    });
-    if (sel.value) dom.caseStudyText.textContent = sel.value;
-    sel.addEventListener('change', () => { dom.caseStudyText.textContent = sel.value; });
+    allCaseStudies = d.case_studies;
+    filterAndPopulateCaseStudies();
   } catch {
     showToast('Failed to load case studies');
   }

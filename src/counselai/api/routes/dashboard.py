@@ -4,14 +4,28 @@ from __future__ import annotations
 
 import uuid
 from datetime import date
+from typing import List
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import HTMLResponse, JSONResponse
+from fastapi import APIRouter, Depends, Form, HTTPException, Query, Request
+from fastapi.responses import HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 from pathlib import Path
 from sqlalchemy.orm import Session
 
 from counselai.storage.db import get_sync_db
+from counselai.storage.models import (
+    CaseStudy as CaseStudyRow,
+    SessionRecord,
+    SessionTokenUsage,
+    Student,
+)
+from counselai.case_studies import (
+    CATEGORY_PREFIXES,
+    generate_case_study_id,
+    get_all_case_studies,
+    get_case_study_by_id,
+    is_builtin,
+)
 from counselai.dashboard.counsellor_service import (
     QueueFilters,
     get_available_grades,
@@ -20,8 +34,6 @@ from counselai.dashboard.counsellor_service import (
     get_session_evidence,
     get_session_review,
 )
-from counselai.dashboard.school import SchoolAnalyticsService
-from counselai.dashboard.student import build_student_dashboard
 
 _PROJECT_ROOT = Path(__file__).resolve().parents[4]
 templates = Jinja2Templates(directory=str(_PROJECT_ROOT / "templates"))
@@ -40,8 +52,8 @@ def counsellor_workbench(request: Request, db: Session = Depends(get_sync_db)):
     schools = get_available_schools(db)
     grades = get_available_grades(db)
     return templates.TemplateResponse(
-        "dashboard/counsellor.html",
-        {"request": request, "schools": schools, "grades": grades},
+        request=request, name="dashboard/counsellor.html",
+        context={"schools": schools, "grades": grades},
     )
 
 
@@ -61,9 +73,16 @@ def counsellor_session_detail_page(
     if data is None:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    case_study_title = None
+    cs_id = data["session"].get("case_study_id")
+    if cs_id:
+        cs = get_case_study_by_id(cs_id, db)
+        if cs:
+            case_study_title = cs["title"]
+
     return templates.TemplateResponse(
-        "dashboard/counsellor_session.html",
-        {"request": request, "data": data},
+        request=request, name="dashboard/counsellor_session.html",
+        context={"data": data, "case_study_title": case_study_title},
     )
 
 
@@ -136,54 +155,247 @@ def counsellor_session_evidence(
 
 
 # ---------------------------------------------------------------------------
-# Student API (Task 13)
+# Token Usage — HTML page
 # ---------------------------------------------------------------------------
 
-@router.get("/students/{student_id}/insights", response_class=HTMLResponse)
-def student_insights_page(
-    student_id: str,
-    request: Request,
-    db: Session = Depends(get_sync_db),
-):
-    """Student-facing insights page — strengths, interests, growth."""
-    try:
-        sid = uuid.UUID(student_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid student ID format")
 
-    data = build_student_dashboard(db, sid)
-    if data is None:
-        raise HTTPException(status_code=404, detail="Student not found")
+@router.get("/tokens", response_class=HTMLResponse)
+def token_usage_page(request: Request, db: Session = Depends(get_sync_db)):
+    """Per-session Gemini token usage overview."""
+    rows_q = (
+        db.query(SessionTokenUsage, SessionRecord, Student)
+        .join(SessionRecord, SessionTokenUsage.session_id == SessionRecord.id)
+        .outerjoin(Student, SessionRecord.student_id == Student.id)
+        .order_by(SessionTokenUsage.created_at.desc())
+        .limit(50)
+        .all()
+    )
+
+    rows = []
+    import json as _json
+    total_input = total_output = total_cached = total_total = 0
+    for usage, session, student in rows_q:
+        live_in = usage.input_tokens or 0
+        live_out = usage.output_tokens or 0
+        ana_in = usage.analysis_input_tokens or 0
+        ana_out = usage.analysis_output_tokens or 0
+        grand_total = live_in + live_out + ana_in + ana_out
+
+        total_input += live_in + ana_in
+        total_output += live_out + ana_out
+        total_cached += usage.cached_tokens or 0
+        total_total += grand_total
+
+        try:
+            in_mod = _json.loads(usage.input_modality_json) if usage.input_modality_json else {}
+        except Exception:
+            in_mod = {}
+        try:
+            out_mod = _json.loads(usage.output_modality_json) if usage.output_modality_json else {}
+        except Exception:
+            out_mod = {}
+
+        rows.append({
+            "created_at": usage.created_at,
+            "student_name": student.full_name if student else "—",
+            "student_grade": student.grade if student else None,
+            "model": usage.model,
+            "input_tokens": live_in,
+            "output_tokens": live_out,
+            "cached_tokens": usage.cached_tokens or 0,
+            "total_tokens": usage.total_tokens or 0,
+            "input_modality": in_mod,
+            "output_modality": out_mod,
+            "analysis_input_tokens": ana_in,
+            "analysis_output_tokens": ana_out,
+            "grand_total": grand_total,
+            "session_id": str(session.id) if session else None,
+        })
+
+    totals = {
+        "sessions": len(rows),
+        "input_tokens": total_input,
+        "output_tokens": total_output,
+        "cached_tokens": total_cached,
+        "total_tokens": total_total,
+    }
 
     return templates.TemplateResponse(
-        "dashboard/student.html",
-        {"request": request, "data": data},
+        request=request, name="dashboard/tokens.html",
+        context={"rows": rows, "totals": totals},
     )
 
 
 # ---------------------------------------------------------------------------
-# School Analytics HTML page
+# Case Studies — HTML pages + create/list
 # ---------------------------------------------------------------------------
 
-@router.get("/schools/{school_id}/dashboard", response_class=HTMLResponse)
-def school_dashboard_page(
+
+@router.get("/case-studies", response_class=HTMLResponse)
+def case_studies_list(request: Request, db: Session = Depends(get_sync_db)):
+    """All case studies (built-in + custom) in a browseable list."""
+    all_cs = get_all_case_studies(db)
+    categories = sorted(set(cs["category"] for cs in all_cs))
+    return templates.TemplateResponse(
+        request=request, name="dashboard/case_studies.html",
+        context={"case_studies": all_cs, "categories": categories},
+    )
+
+
+@router.get("/case-studies/new", response_class=HTMLResponse)
+def case_study_new_form(request: Request, db: Session = Depends(get_sync_db)):
+    """Blank form to create a new case study."""
+    categories = list(CATEGORY_PREFIXES.keys())
+    return templates.TemplateResponse(
+        request=request, name="dashboard/case_study_new.html",
+        context={"categories": categories, "error": None},
+    )
+
+
+@router.post("/case-studies")
+def case_study_create(
     request: Request,
-    school_id: str,
+    title: str = Form(...),
+    category: str = Form(...),
+    target_class: str = Form(...),
+    scenario_text: str = Form(...),
+    scenario_text_hi: str = Form(""),
+    probing_angle: List[str] = Form(default=[]),
     db: Session = Depends(get_sync_db),
 ):
-    """Render the school analytics dashboard HTML page."""
-    try:
-        sid = uuid.UUID(school_id)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="Invalid school_id format")
+    """Save a new custom case study and redirect to the list."""
+    # Filter out blank probing angles
+    angles = [a.strip() for a in probing_angle if a.strip()]
 
-    svc = SchoolAnalyticsService(db)
-    data = svc.full_analytics(sid)
+    # Validate required fields
+    if not title.strip() or not scenario_text.strip():
+        categories = list(CATEGORY_PREFIXES.keys())
+        return templates.TemplateResponse(
+            request=request, name="dashboard/case_study_new.html",
+            context={
+                "categories": categories,
+                "error": "Title and scenario text are required.",
+                "form": {
+                    "title": title, "category": category,
+                    "target_class": target_class,
+                    "scenario_text": scenario_text,
+                    "scenario_text_hi": scenario_text_hi,
+                    "probing_angles": angles,
+                },
+            },
+            status_code=422,
+        )
 
-    if not data:
-        raise HTTPException(status_code=404, detail="School not found")
-
-    return templates.TemplateResponse(
-        "dashboard/school.html",
-        {"request": request, "school": data},
+    cs_id = generate_case_study_id(category, db)
+    row = CaseStudyRow(
+        id=cs_id,
+        title=title.strip(),
+        category=category,
+        target_class=target_class,
+        scenario_text=scenario_text.strip(),
+        scenario_text_hi=scenario_text_hi.strip() or None,
+        probing_angles=angles,
     )
+    db.add(row)
+    db.commit()
+
+    return RedirectResponse(
+        url="/api/v1/dashboard/case-studies",
+        status_code=303,
+    )
+
+
+@router.get("/case-studies/{cs_id}/edit", response_class=HTMLResponse)
+def case_study_edit_form(
+    request: Request,
+    cs_id: str,
+    db: Session = Depends(get_sync_db),
+):
+    """Pre-filled edit form for an existing case study."""
+    cs = get_case_study_by_id(cs_id, db)
+    if cs is None:
+        raise HTTPException(status_code=404, detail="Case study not found")
+    categories = list(CATEGORY_PREFIXES.keys())
+    return templates.TemplateResponse(
+        request=request, name="dashboard/case_study_edit.html",
+        context={
+            "cs": cs,
+            "categories": categories,
+            "is_builtin": is_builtin(cs_id),
+            "error": None,
+        },
+    )
+
+
+@router.post("/case-studies/{cs_id}/edit")
+def case_study_update(
+    request: Request,
+    cs_id: str,
+    title: str = Form(...),
+    category: str = Form(...),
+    target_class: str = Form(...),
+    scenario_text: str = Form(...),
+    scenario_text_hi: str = Form(""),
+    probing_angle: List[str] = Form(default=[]),
+    db: Session = Depends(get_sync_db),
+):
+    """Update (upsert) a case study. Built-ins get a DB override row."""
+    angles = [a.strip() for a in probing_angle if a.strip()]
+
+    if not title.strip() or not scenario_text.strip():
+        cs = get_case_study_by_id(cs_id, db)
+        categories = list(CATEGORY_PREFIXES.keys())
+        return templates.TemplateResponse(
+            request=request, name="dashboard/case_study_edit.html",
+            context={
+                "cs": cs,
+                "categories": categories,
+                "is_builtin": is_builtin(cs_id),
+                "error": "Title and scenario text are required.",
+                "form": {
+                    "title": title, "category": category,
+                    "target_class": target_class,
+                    "scenario_text": scenario_text,
+                    "scenario_text_hi": scenario_text_hi,
+                    "probing_angles": angles,
+                },
+            },
+            status_code=422,
+        )
+
+    row = db.query(CaseStudyRow).filter(CaseStudyRow.id == cs_id).first()
+    if row is None:
+        # Built-in being edited for the first time — create a DB override
+        row = CaseStudyRow(id=cs_id)
+        db.add(row)
+
+    row.title = title.strip()
+    row.category = category
+    row.target_class = target_class
+    row.scenario_text = scenario_text.strip()
+    row.scenario_text_hi = scenario_text_hi.strip() or None
+    row.probing_angles = angles
+    db.commit()
+
+    return RedirectResponse(
+        url="/api/v1/dashboard/case-studies",
+        status_code=303,
+    )
+
+
+@router.post("/case-studies/{cs_id}/delete")
+def case_study_delete(
+    cs_id: str,
+    db: Session = Depends(get_sync_db),
+):
+    """Delete a DB-stored case study. For built-in overrides this restores the original."""
+    row = db.query(CaseStudyRow).filter(CaseStudyRow.id == cs_id).first()
+    if row is None:
+        raise HTTPException(status_code=404, detail="Case study not found in database")
+    db.delete(row)
+    db.commit()
+    return RedirectResponse(
+        url="/api/v1/dashboard/case-studies",
+        status_code=303,
+    )
+

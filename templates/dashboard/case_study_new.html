@@ -1,0 +1,736 @@
+{% extends "dashboard/base.html" %}
+{% set active_nav = "case-studies" %}
+
+{% block title %}New Case Study{% endblock %}
+
+{% block head %}
+<style>
+/* ── New Case Study form ───────────────────────────────────────────────── */
+.form-layout {
+  display: grid;
+  grid-template-columns: 1fr 380px;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ── Form card ─────────────────────────────────────────────────────────── */
+.form-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-slate-200);
+  border-radius: var(--radius-lg);
+  padding: 32px 36px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+.form-card::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  background: var(--brand-gradient);
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+
+.form-card h2 {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--c-slate-900);
+  margin-bottom: 24px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--c-slate-100);
+  letter-spacing: -0.025em;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+/* ── Field groups ──────────────────────────────────────────────────────── */
+.field-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+}
+
+.field-group {
+  margin-bottom: 22px;
+}
+.field-group:last-child { margin-bottom: 0; }
+
+.field-label {
+  display: block;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--c-indigo-700);
+  margin-bottom: 7px;
+}
+.field-label .required {
+  color: var(--c-rose-500);
+  margin-left: 2px;
+}
+.field-hint {
+  font-size: 0.76rem;
+  color: var(--c-slate-400);
+  margin-top: 5px;
+  font-style: italic;
+  font-weight: 400;
+}
+
+/* ── Inputs ────────────────────────────────────────────────────────────── */
+.form-input,
+.form-select,
+.form-textarea {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: var(--radius-md);
+  border: 1.5px solid var(--c-slate-200);
+  background: var(--c-slate-50);
+  color: var(--c-slate-900);
+  font-family: var(--font-body);
+  font-size: 0.92rem;
+  transition: all 0.2s ease;
+  outline: none;
+  appearance: none;
+}
+.form-input::placeholder,
+.form-textarea::placeholder { color: var(--c-slate-400); }
+.form-input:hover,
+.form-select:hover,
+.form-textarea:hover { border-color: var(--c-slate-300); }
+.form-input:focus,
+.form-select:focus,
+.form-textarea:focus {
+  border-color: var(--c-indigo-500);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+  background: #fff;
+}
+.form-input.error,
+.form-select.error,
+.form-textarea.error {
+  border-color: var(--c-rose-400);
+  box-shadow: 0 0 0 3px rgba(244,63,94,.1);
+}
+
+.form-textarea {
+  resize: vertical;
+  line-height: 1.65;
+  min-height: 160px;
+}
+.form-textarea.tall { min-height: 220px; }
+
+/* ── ID preview ─────────────────────────────────────────────────────────  */
+.id-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 14px;
+  border-radius: var(--radius-md);
+  border: 1.5px dashed var(--c-indigo-300);
+  background: var(--c-indigo-50);
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--c-indigo-700);
+  letter-spacing: 0.04em;
+}
+.id-preview-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--c-indigo-400);
+  font-family: var(--font-body);
+}
+
+/* ── Class toggle ───────────────────────────────────────────────────────  */
+.toggle-group {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid var(--c-slate-200);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--c-slate-50);
+}
+.toggle-group input[type="radio"] { display: none; }
+.toggle-group label {
+  flex: 1;
+  text-align: center;
+  padding: 9px 16px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--c-slate-500);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border-right: 1px solid var(--c-slate-200);
+  font-family: var(--font-body);
+}
+.toggle-group label:last-of-type { border-right: none; }
+.toggle-group input[type="radio"]:checked + label {
+  background: var(--brand-gradient);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(79,70,229,.3);
+}
+
+/* ── Probing angles ─────────────────────────────────────────────────────  */
+.angles-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.angle-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.angle-num {
+  width: 24px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--c-indigo-400);
+  font-family: var(--font-mono);
+  padding-top: 2px;
+}
+
+.angle-row .form-input { flex: 1; }
+
+.angle-remove {
+  width: 36px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--c-slate-200);
+  border-radius: var(--radius-sm);
+  background: var(--c-slate-50);
+  color: var(--c-slate-400);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+.angle-remove:hover {
+  border-color: var(--c-rose-300);
+  background: var(--c-rose-50);
+  color: var(--c-rose-500);
+}
+
+.btn-add-angle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 36px;
+  padding: 0 14px;
+  border-radius: var(--radius-full);
+  border: 1.5px dashed var(--c-indigo-300);
+  background: var(--c-indigo-50);
+  color: var(--c-indigo-600);
+  font-size: 0.78rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  margin-top: 8px;
+}
+.btn-add-angle:hover {
+  background: var(--c-indigo-100);
+  border-color: var(--c-indigo-400);
+}
+
+/* ── Sidebar card ───────────────────────────────────────────────────────  */
+.sidebar-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-slate-200);
+  border-radius: var(--radius-lg);
+  padding: 24px 26px;
+  box-shadow: var(--shadow-sm);
+  margin-bottom: 16px;
+  position: sticky;
+  top: 24px;
+}
+.sidebar-card h3 {
+  font-family: var(--font-body);
+  font-size: 0.68rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--c-indigo-700);
+  margin-bottom: 14px;
+}
+
+.preview-id {
+  font-family: var(--font-mono);
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--c-indigo-600);
+  letter-spacing: 0.04em;
+  margin-bottom: 4px;
+}
+.preview-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--c-slate-800);
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+  line-height: 1.3;
+}
+.preview-meta {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.preview-scenario {
+  font-size: 0.82rem;
+  color: var(--c-slate-500);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 5;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ── Guidelines ─────────────────────────────────────────────────────────  */
+.guide-list {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.guide-list li {
+  display: flex;
+  gap: 10px;
+  font-size: 0.8rem;
+  color: var(--c-slate-600);
+  line-height: 1.5;
+}
+.guide-icon {
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-gradient);
+  color: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+/* ── Form actions ───────────────────────────────────────────────────────  */
+.form-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-top: 28px;
+  padding-top: 24px;
+  border-top: 1px solid var(--c-slate-100);
+}
+
+/* ── Alert ──────────────────────────────────────────────────────────────  */
+.alert-error {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  border-radius: var(--radius-md);
+  background: var(--c-rose-50);
+  border: 1px solid rgba(225,29,72,.2);
+  color: var(--c-rose-700);
+  font-size: 0.86rem;
+  font-weight: 500;
+  margin-bottom: 24px;
+}
+
+/* ── Category chips (for live preview) ─────────────────────────────────  */
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
+}
+.cat-default    { background: var(--c-indigo-50); color: var(--c-indigo-700); border-color: rgba(79,70,229,.2); }
+.cat-class-chip { background: var(--c-slate-100); color: var(--c-slate-600);  border-color: var(--c-slate-200); }
+
+@media (max-width: 1024px) {
+  .form-layout { grid-template-columns: 1fr; }
+  .sidebar-card { position: static; }
+}
+@media (max-width: 720px) {
+  .field-row { grid-template-columns: 1fr; }
+  .form-card { padding: 24px 20px; }
+}
+@media (max-width: 540px) {
+  .toggle-group label { padding: 12px 16px; }
+}
+</style>
+{% endblock %}
+
+{% block breadcrumb %}
+<div class="breadcrumb">
+  <a href="/api/v1/dashboard/case-studies">Case Studies</a>
+  <span>›</span>
+  <span>New Case Study</span>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>New Case <em>Study</em></h1>
+  <div class="subtitle">Add a custom counselling scenario to the library. It will appear in the live session form immediately.</div>
+</div>
+
+{% if error %}
+<div class="alert-error">
+  <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v4M8 11h.01" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+  {{ error }}
+</div>
+{% endif %}
+
+<div class="form-layout">
+
+  <!-- ── Main form ─────────────────────────────────────────────────────── -->
+  <form method="post" action="/api/v1/dashboard/case-studies" id="cs-form">
+
+    <!-- ── Identity ───────────────────────────────────────────────────── -->
+    <div class="form-card">
+      <h2>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><rect x="1" y="1" width="14" height="14" rx="3" stroke="currentColor" stroke-width="1.5"/><path d="M4 5h8M4 8h5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Identity
+      </h2>
+
+      <div class="field-row">
+        <div class="field-group">
+          <label class="field-label" for="title">Title <span class="required">*</span></label>
+          <input
+            type="text"
+            id="title"
+            name="title"
+            class="form-input {% if error %}error{% endif %}"
+            placeholder="e.g. The Group Project Dilemma"
+            value="{{ form.title if form else '' }}"
+            required
+            oninput="updatePreview()"
+          >
+          <div class="field-hint">Short, evocative title for the scenario.</div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="category">Category <span class="required">*</span></label>
+          <select id="category" name="category" class="form-select" onchange="updatePreview()">
+            {% for cat in categories %}
+            <option value="{{ cat }}" {% if form and form.category == cat %}selected{% elif loop.first and not form %}selected{% endif %}>{{ cat }}</option>
+            {% endfor %}
+          </select>
+          <div class="field-hint">Determines the scenario's thematic area.</div>
+        </div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Target Class <span class="required">*</span></label>
+        <div class="toggle-group">
+          <input type="radio" id="class-8-10" name="target_class" value="8-10"
+            {% if form and form.target_class == '8-10' %}checked{% elif not form %}checked{% endif %}>
+          <label for="class-8-10">Class 8–10</label>
+          <input type="radio" id="class-11-12" name="target_class" value="11-12"
+            {% if form and form.target_class == '11-12' %}checked{% endif %}>
+          <label for="class-11-12">Class 11–12</label>
+        </div>
+        <div class="field-hint">Which grade range this scenario is most suitable for.</div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label">Auto-generated ID</label>
+        <div class="id-preview">
+          <span class="id-preview-label">ID</span>
+          <span id="id-preview-value">—</span>
+        </div>
+        <div class="field-hint">Generated from the category prefix + next sequence number. You cannot edit this.</div>
+      </div>
+    </div>
+
+    <!-- ── Scenario text ──────────────────────────────────────────────── -->
+    <div class="form-card">
+      <h2>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M2 4h12M2 7h9M2 10h6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Scenario Text
+      </h2>
+
+      <div class="field-group">
+        <label class="field-label" for="scenario_text">English <span class="required">*</span></label>
+        <textarea
+          id="scenario_text"
+          name="scenario_text"
+          class="form-textarea tall {% if error %}error{% endif %}"
+          placeholder="Write the full scenario here. Introduce the characters, describe the conflict or dilemma, and set up the situation the student needs to think through…"
+          required
+          oninput="updatePreview()"
+        >{{ form.scenario_text if form else '' }}</textarea>
+        <div class="field-hint">300–600 words works well. Use two line-breaks between paragraphs.</div>
+      </div>
+
+      <div class="field-group">
+        <label class="field-label" for="scenario_text_hi">Hindi (optional)</label>
+        <textarea
+          id="scenario_text_hi"
+          name="scenario_text_hi"
+          class="form-textarea"
+          placeholder="यदि आप हिंदी भाषा में परिदृश्य प्रदान करना चाहते हैं, तो यहाँ लिखें…"
+        >{{ form.scenario_text_hi if form else '' }}</textarea>
+        <div class="field-hint">Shown when the counsellor selects Hindi mode in the live session form.</div>
+      </div>
+    </div>
+
+    <!-- ── Probing angles ─────────────────────────────────────────────── -->
+    <div class="form-card">
+      <h2>
+        <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v1.5M8 7.5c0 1 1.5 1.5 1.5 2.5H6.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Probing Angles
+      </h2>
+
+      <p style="font-size:0.84rem;color:var(--c-slate-500);margin-bottom:18px;line-height:1.6;">
+        3–5 open-ended reflection questions that guide the AI counsellor. These are not shown directly to the student but shape the session's focus.
+      </p>
+
+      <div class="angles-list" id="angles-list">
+        {% set angles = form.probing_angles if form and form.probing_angles else ['', '', ''] %}
+        {% for angle in angles %}
+        <div class="angle-row" data-index="{{ loop.index }}">
+          <div class="angle-num">{{ loop.index }}</div>
+          <input
+            type="text"
+            name="probing_angle"
+            class="form-input"
+            placeholder="e.g. What does fairness mean to the student in this moment?"
+            value="{{ angle }}"
+          >
+          {% if loop.index > 1 %}
+          <button type="button" class="angle-remove" onclick="removeAngle(this)" title="Remove">
+            <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+          </button>
+          {% else %}
+          <div style="width:36px;flex-shrink:0;"></div>
+          {% endif %}
+        </div>
+        {% endfor %}
+      </div>
+
+      <button type="button" class="btn-add-angle" onclick="addAngle()">
+        <svg width="12" height="12" viewBox="0 0 12 12" fill="none"><path d="M6 1v10M1 6h10" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+        Add angle
+      </button>
+    </div>
+
+    <!-- ── Actions ────────────────────────────────────────────────────── -->
+    <div class="form-actions">
+      <button type="submit" class="btn btn-primary" id="submit-btn">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l4 4 6-6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        Save Case Study
+      </button>
+      <a href="/api/v1/dashboard/case-studies" class="btn">Cancel</a>
+      <span id="saving-indicator" style="display:none;font-size:0.8rem;color:var(--c-slate-400);">Saving…</span>
+    </div>
+
+  </form>
+
+  <!-- ── Sidebar ───────────────────────────────────────────────────────── -->
+  <div>
+
+    <!-- Live preview -->
+    <div class="sidebar-card">
+      <h3>Live Preview</h3>
+      <div class="preview-id" id="prev-id">—</div>
+      <div class="preview-title" id="prev-title" style="color:var(--c-slate-400);font-style:italic;font-weight:400;">Enter a title above…</div>
+      <div class="preview-meta">
+        <span class="cat-chip cat-default" id="prev-category">Category</span>
+        <span class="cat-chip cat-class-chip" id="prev-class">Class 8–10</span>
+      </div>
+      <div class="preview-scenario" id="prev-scenario" style="color:var(--c-slate-400);font-style:italic;">Scenario preview will appear here as you type…</div>
+    </div>
+
+    <!-- Writing guide -->
+    <div class="sidebar-card">
+      <h3>Writing Guide</h3>
+      <ul class="guide-list">
+        <li>
+          <span class="guide-icon">1</span>
+          <span><strong>Name characters</strong> — Indian first names (Rahul, Priya, Arjun) make the scenario feel authentic and relatable.</span>
+        </li>
+        <li>
+          <span class="guide-icon">2</span>
+          <span><strong>Set up a real tension</strong> — The student should face a genuine dilemma, not an obvious right answer.</span>
+        </li>
+        <li>
+          <span class="guide-icon">3</span>
+          <span><strong>Show, don't tell</strong> — Describe what happens and what characters say; let the student infer feelings.</span>
+        </li>
+        <li>
+          <span class="guide-icon">4</span>
+          <span><strong>End mid-dilemma</strong> — Stop before the resolution so the AI can explore possibilities with the student.</span>
+        </li>
+        <li>
+          <span class="guide-icon">5</span>
+          <span><strong>Probing angles</strong> — Ask about values, fears, relationships, and consequences — not just facts.</span>
+        </li>
+      </ul>
+    </div>
+
+    <!-- Category reference -->
+    <div class="sidebar-card">
+      <h3>Categories</h3>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:var(--c-slate-600);">
+          <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--c-indigo-500);font-weight:700;min-width:28px;">ED</span>
+          Ethical Dilemmas
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:var(--c-slate-600);">
+          <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--c-amber-600);font-weight:700;min-width:28px;">SP</span>
+          Social Pressure
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:var(--c-slate-600);">
+          <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--c-rose-600);font-weight:700;min-width:28px;">FC</span>
+          Family Conflicts
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:var(--c-slate-600);">
+          <span style="font-family:var(--font-mono);font-size:0.7rem;color:#0E7490;font-weight:700;min-width:28px;">DE</span>
+          Digital Ethics
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:var(--c-slate-600);">
+          <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--c-emerald-700);font-weight:700;min-width:28px;">AP</span>
+          Achievement Pressure
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;font-size:0.8rem;color:var(--c-slate-600);">
+          <span style="font-family:var(--font-mono);font-size:0.7rem;color:var(--c-violet-600);font-weight:700;min-width:28px;">LD</span>
+          Leadership
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+// ── Category → prefix map (mirrors Python CATEGORY_PREFIXES) ────────────
+const CATEGORY_PREFIXES = {
+  "Ethical Dilemmas":     "ED",
+  "Social Pressure":      "SP",
+  "Family Conflicts":     "FC",
+  "Digital Ethics":       "DE",
+  "Achievement Pressure": "AP",
+  "Leadership":           "LD",
+};
+
+// ── Update the live preview panel ───────────────────────────────────────
+function updatePreview() {
+  const title    = document.getElementById('title').value.trim();
+  const category = document.getElementById('category').value;
+  const cls      = document.querySelector('input[name="target_class"]:checked')?.value || '8-10';
+  const scenario = document.getElementById('scenario_text').value.trim();
+
+  const prefix = CATEGORY_PREFIXES[category] || 'CS';
+
+  document.getElementById('prev-id').textContent      = prefix + '-XX';
+  document.getElementById('id-preview-value').textContent = prefix + '-XX';
+
+  const titleEl = document.getElementById('prev-title');
+  if (title) {
+    titleEl.textContent = title;
+    titleEl.style.color = '';
+    titleEl.style.fontStyle = '';
+    titleEl.style.fontWeight = '700';
+  } else {
+    titleEl.textContent = 'Enter a title above…';
+    titleEl.style.color = 'var(--c-slate-400)';
+    titleEl.style.fontStyle = 'italic';
+    titleEl.style.fontWeight = '400';
+  }
+
+  document.getElementById('prev-category').textContent = category || 'Category';
+  document.getElementById('prev-class').textContent = 'Class ' + cls.replace('-', '–');
+
+  const scenarioEl = document.getElementById('prev-scenario');
+  if (scenario) {
+    const preview = scenario.length > 280 ? scenario.slice(0, 280) + '…' : scenario;
+    scenarioEl.textContent = preview;
+    scenarioEl.style.color = '';
+    scenarioEl.style.fontStyle = '';
+  } else {
+    scenarioEl.textContent = 'Scenario preview will appear here as you type…';
+    scenarioEl.style.color = 'var(--c-slate-400)';
+    scenarioEl.style.fontStyle = 'italic';
+  }
+}
+
+// ── Toggle class updates preview ────────────────────────────────────────
+document.querySelectorAll('input[name="target_class"]').forEach(r => {
+  r.addEventListener('change', updatePreview);
+});
+
+// ── Probing angles — add / remove ───────────────────────────────────────
+function renumberAngles() {
+  document.querySelectorAll('#angles-list .angle-row').forEach((row, i) => {
+    row.querySelector('.angle-num').textContent = i + 1;
+    row.dataset.index = i + 1;
+  });
+}
+
+function addAngle() {
+  const list  = document.getElementById('angles-list');
+  const count = list.querySelectorAll('.angle-row').length + 1;
+
+  const row = document.createElement('div');
+  row.className = 'angle-row';
+  row.dataset.index = count;
+  row.innerHTML = `
+    <div class="angle-num">${count}</div>
+    <input type="text" name="probing_angle" class="form-input"
+      placeholder="e.g. What does fairness mean to the student in this moment?">
+    <button type="button" class="angle-remove" onclick="removeAngle(this)" title="Remove">
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
+        <path d="M2 2l8 8M10 2l-8 8" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+      </svg>
+    </button>`;
+  list.appendChild(row);
+  row.querySelector('input').focus();
+}
+
+function removeAngle(btn) {
+  const row = btn.closest('.angle-row');
+  const list = document.getElementById('angles-list');
+  if (list.querySelectorAll('.angle-row').length <= 1) return; // keep at least 1
+  row.remove();
+  renumberAngles();
+}
+
+// ── Form submission — show saving state ─────────────────────────────────
+document.getElementById('cs-form').addEventListener('submit', function(e) {
+  const title    = document.getElementById('title').value.trim();
+  const scenario = document.getElementById('scenario_text').value.trim();
+  if (!title || !scenario) return; // let native validation handle it
+
+  document.getElementById('submit-btn').disabled = true;
+  document.getElementById('submit-btn').style.opacity = '0.7';
+  document.getElementById('saving-indicator').style.display = 'inline';
+});
+
+// ── Initial preview render ───────────────────────────────────────────────
+updatePreview();
+</script>
+{% endblock %}

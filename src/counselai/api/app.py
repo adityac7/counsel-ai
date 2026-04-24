@@ -5,12 +5,14 @@ Start with:
 """
 
 import logging
+import uuid
 from contextlib import asynccontextmanager
+from contextvars import ContextVar
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import HTMLResponse
+from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
@@ -19,6 +21,21 @@ from counselai.settings import settings
 from counselai.storage.db import init_db
 
 logger = logging.getLogger(__name__)
+
+# ---------------------------------------------------------------------------
+# Request-ID tracing
+# ---------------------------------------------------------------------------
+request_id_ctx: ContextVar[str] = ContextVar("request_id", default="")
+
+
+class _RequestIDFilter(logging.Filter):
+    """Inject request_id into all log records for structured logging."""
+    def filter(self, record):
+        record.request_id = request_id_ctx.get("")
+        return True
+
+
+logging.getLogger("counselai").addFilter(_RequestIDFilter())
 
 # Resolve project root (3 levels up: src/counselai/api/app.py)
 _PROJECT_ROOT = Path(__file__).resolve().parents[3]
@@ -55,10 +72,20 @@ async def lifespan(application: FastAPI):
 # ---------------------------------------------------------------------------
 # App creation
 # ---------------------------------------------------------------------------
-app = FastAPI(title="CounselAI", version="0.2.0", lifespan=lifespan)
+app = FastAPI(
+    title="CounselAI",
+    version="0.2.0",
+    lifespan=lifespan,
+    # Disable API docs in production — only show in debug mode
+    docs_url="/docs" if settings.debug else None,
+    redoc_url="/redoc" if settings.debug else None,
+    openapi_url="/openapi.json" if settings.debug else None,
+)
 
 # CORS — configurable via COUNSELAI_CORS_ORIGINS env var (comma-separated)
 _cors_origins = getattr(settings, "cors_origins", "")
+if not _cors_origins:
+    logger.warning("CORS: allowing all origins (*). Set COUNSELAI_CORS_ORIGINS for production.")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in _cors_origins.split(",") if o.strip()] if _cors_origins else ["*"],
@@ -69,12 +96,23 @@ app.add_middleware(
 
 
 @app.middleware("http")
-async def no_cache_js(request: Request, call_next):
-    """Prevent browser caching of JS modules during development."""
+async def request_id_middleware(request: Request, call_next):
+    """Assign a unique request ID for log correlation."""
+    rid = request.headers.get("X-Request-ID") or uuid.uuid4().hex[:8]
+    request_id_ctx.set(rid)
     response = await call_next(request)
-    if request.url.path.startswith("/static/live/") and request.url.path.endswith(".js"):
-        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    response.headers["X-Request-ID"] = rid
     return response
+
+
+if settings.debug:
+    @app.middleware("http")
+    async def no_cache_js(request: Request, call_next):
+        """Prevent browser caching of JS modules during development."""
+        response = await call_next(request)
+        if request.url.path.startswith("/static/live/") and request.url.path.endswith(".js"):
+            response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        return response
 
 # ---------------------------------------------------------------------------
 # Mount routers
@@ -96,21 +134,31 @@ if _STATIC_DIR.exists():
 # ---------------------------------------------------------------------------
 # Template-serving routes
 # ---------------------------------------------------------------------------
-@app.get("/", response_class=HTMLResponse)
-async def index(request: Request):
-    """Serve the main live counselling page."""
-    response = templates.TemplateResponse("live.html", {"request": request})
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
-    return response
+@app.get("/", response_class=RedirectResponse)
+async def index():
+    """Redirect root to the dashboard."""
+    return RedirectResponse(url="/dashboard", status_code=302)
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request):
     """Serve the dashboard overview page."""
     response = templates.TemplateResponse(
-        "dashboard/overview.html", {"request": request}
+        request=request, name="dashboard/overview.html"
     )
-    response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    if settings.debug:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+    return response
+
+
+@app.get("/session", response_class=HTMLResponse)
+async def new_session(request: Request):
+    """Serve the live counselling / new session page."""
+    response = templates.TemplateResponse(
+        request=request, name="live.html", context={"debug": settings.debug}
+    )
+    if settings.debug:
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
     return response
 
 

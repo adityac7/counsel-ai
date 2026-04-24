@@ -1,17 +1,21 @@
-version: "3.8"
-
 services:
   counselai:
     build: .
     ports:
       - "8501:8501"
+    env_file:
+      - .env
     environment:
-      - GEMINI_API_KEY=${GEMINI_API_KEY}
-      - COUNSELAI_DATABASE_URL=sqlite+aiosqlite:///counselai.db
+      - COUNSELAI_DATABASE_URL=sqlite+aiosqlite:///data/counselai.db
     volumes:
-      - ./artifacts:/app/artifacts
-      - db-data:/app/counselai.db
+      - counselai-data:/app/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8501/health')"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
 
 volumes:
-  db-data:
+  counselai-data:

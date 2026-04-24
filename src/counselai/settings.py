@@ -6,8 +6,7 @@ Import the singleton ``settings`` from anywhere in the codebase.
 
 from __future__ import annotations
 
-from pathlib import Path
-from pydantic import Field
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings
 
 
@@ -17,12 +16,23 @@ class Settings(BaseSettings):
     # ── Database ────────────────────────────────────────────────────────
     database_url: str = "sqlite+aiosqlite:///counselai.db"
 
-    # ── Artifact storage ────────────────────────────────────────────────
-    artifact_root: str = "artifacts"
+    # ── Gemini provider selection ───────────────────────────────────────
+    # Allowed: "ai_studio" (default) | "vertex"
+    gemini_provider: str = Field(default="ai_studio", validation_alias="GEMINI_PROVIDER")
 
-    # ── Provider API keys ───────────────────────────────────────────────
-    # Accepts both GEMINI_API_KEY and COUNSELAI_GEMINI_API_KEY
-    gemini_api_key: str = Field(default="", validation_alias="GEMINI_API_KEY")
+    # ── Google AI Studio credentials (gemini_provider=ai_studio) ────────
+    # Accepts GOOGLE_API_KEY or the legacy GEMINI_API_KEY
+    gemini_api_key: str = Field(
+        default="",
+        validation_alias=AliasChoices("GOOGLE_API_KEY", "GEMINI_API_KEY"),
+    )
+
+    # ── Vertex AI credentials (gemini_provider=vertex) ──────────────────
+    # Base64-encoded service account JSON — set GOOGLE_SERVICE_ACCOUNT_JSON_B64
+    # to the output of: base64 -w0 service-account.json
+    google_cloud_project: str = Field(default="", validation_alias="GOOGLE_CLOUD_PROJECT")
+    google_cloud_location: str = Field(default="us-central1", validation_alias="GOOGLE_CLOUD_LOCATION")
+    google_service_account_b64: str = Field(default="", validation_alias="GOOGLE_SERVICE_ACCOUNT_JSON_B64")
 
     # ── Gemini Live (real-time conversation) ────────────────────────────
     gemini_live_model: str = "gemini-2.5-flash-native-audio-preview-12-2025"
@@ -30,7 +40,7 @@ class Settings(BaseSettings):
     gemini_api_version: str = "v1beta"
 
     # ── Gemini Synthesis (post-session analysis / structured extraction) ─
-    gemini_synthesis_model: str = "gemini-3.1-flash-lite-preview"
+    gemini_synthesis_model: str = "gemini-2.5-flash"
     gemini_synthesis_temperature: float = 0.2
     gemini_synthesis_max_tokens: int = 8192
 
@@ -43,8 +53,8 @@ class Settings(BaseSettings):
     )
 
     # ── Session limits ──────────────────────────────────────────────────
-    max_session_duration_seconds: int = 420  # 7 min
-    session_wrapup_seconds: int = 90  # warn at 5:30
+    max_session_duration_seconds: int = 300  # 5 min
+    session_wrapup_seconds: int = 90  # warn at 3:30, hard timeout at 5:00
 
     # ── CORS ──────────────────────────────────────────────────────────
     cors_origins: str = ""  # comma-separated allowed origins; empty = "*"
@@ -58,10 +68,6 @@ class Settings(BaseSettings):
         "env_file": ".env",
         "extra": "ignore",
     }
-
-    @property
-    def artifact_path(self) -> Path:
-        return Path(self.artifact_root)
 
 
 # Module-level singleton — import this everywhere.

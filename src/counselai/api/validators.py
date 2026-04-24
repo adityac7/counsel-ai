@@ -50,6 +50,10 @@ def validate_ws_params(params: dict) -> dict:
     # Scenario: max 2000 chars
     cleaned["scenario"] = str(params.get("scenario", "General counselling session"))[:2000].strip()
 
+    # Case study ID: alphanumeric + hyphens, max 50 chars
+    cs_id = str(params.get("case_study_id", ""))[:50].strip()
+    cleaned["case_study_id"] = re.sub(r"[^\w\-]", "", cs_id) or None
+
     # Language: whitelist
     lang = str(params.get("lang", "hinglish"))
     cleaned["lang"] = lang if lang in ("hinglish", "en", "hi") else "hinglish"

@@ -10,60 +10,63 @@ import base64
 import collections
 import json
 import logging
-import re
-import struct
-import math
 import time
 from dataclasses import dataclass, field
 
 from starlette.websockets import WebSocket, WebSocketDisconnect
 from google.genai import types as gt
 
+from counselai.api.audio_utils import compute_audio_level
+
 logger = logging.getLogger(__name__)
-
-# ---------------------------------------------------------------------------
-# Devanagari → Roman fallback (safety net if ASR still sends Devanagari)
-# ---------------------------------------------------------------------------
-_DEVANAGARI_MAP = {
-    "अ": "a", "आ": "aa", "इ": "i", "ई": "ee", "उ": "u", "ऊ": "oo",
-    "ए": "e", "ऐ": "ai", "ओ": "o", "औ": "au",
-    "क": "ka", "ख": "kha", "ग": "ga", "घ": "gha", "ङ": "nga",
-    "च": "cha", "छ": "chha", "ज": "ja", "झ": "jha", "ञ": "nya",
-    "ट": "ta", "ठ": "tha", "ड": "da", "ढ": "dha", "ण": "na",
-    "त": "ta", "थ": "tha", "द": "da", "ध": "dha", "न": "na",
-    "प": "pa", "फ": "pha", "ब": "ba", "भ": "bha", "म": "ma",
-    "य": "ya", "र": "ra", "ल": "la", "व": "va", "श": "sha",
-    "ष": "sha", "स": "sa", "ह": "ha",
-    "ा": "aa", "ि": "i", "ी": "ee", "ु": "u", "ू": "oo",
-    "े": "e", "ै": "ai", "ो": "o", "ौ": "au",
-    "ं": "n", "ः": "h", "ँ": "n",
-    "्": "", "़": "",
-    "।": ".", "॥": ".",
-    "क़": "qa", "ख़": "kha", "ग़": "ga", "ज़": "za", "फ़": "fa",
-    "ड़": "da", "ढ़": "dha",
-}
-
-_DEVANAGARI_RE = re.compile(r"[\u0900-\u097F]")
-
-
-def _to_roman(text: str) -> str:
-    """Strip any Devanagari that slips through the ASR languageCodes config.
-
-    Primary fix is in gemini_client.py: AudioTranscriptionConfig(languageCodes=["hi-Latn"])
-    This is just a safety net fallback.
-    """
-    if not text or not _DEVANAGARI_RE.search(text):
-        return text
-    result = text
-    for dev, roman in sorted(_DEVANAGARI_MAP.items(), key=lambda x: -len(x[0])):
-        result = result.replace(dev, roman)
-    result = _DEVANAGARI_RE.sub("", result)
-    return result.strip()
 
 
 def _now_ms() -> int:
     """Current time in milliseconds (monotonic-ish wall clock for turn timing)."""
     return int(time.time() * 1000)
+
+
+def _normalize_transcript(text: str) -> str:
+    """Collapse all whitespace runs to single spaces.
+
+    Why: Gemini streams transcript text in chunks that may contain stray
+    newlines or double spaces. The live summary uses ``white-space: pre-wrap``
+    while the dashboard uses default ``white-space: normal``, so unnormalized
+    text renders inconsistently across the two views.
+    """
+    return " ".join(text.split())
+
+
+@dataclass
+class UsageAccumulator:
+    """Accumulates Gemini Live ``usage_metadata`` across turns.
+
+    Gemini Live emits a ``usage_metadata`` payload per response. Fields may
+    be ``None`` or missing; we treat those as 0 and keep a running total so
+    the route handler can persist one row at session end.
+    """
+    input_tokens: int = 0
+    output_tokens: int = 0
+    cached_tokens: int = 0
+    total_tokens: int = 0
+    input_modality: dict = field(default_factory=dict)
+    output_modality: dict = field(default_factory=dict)
+
+    def add(self, meta) -> None:
+        if meta is None:
+            return
+        self.input_tokens += int(getattr(meta, "prompt_token_count", 0) or 0)
+        self.output_tokens += int(getattr(meta, "response_token_count", 0) or 0)
+        self.cached_tokens += int(getattr(meta, "cached_content_token_count", 0) or 0)
+        self.total_tokens += int(getattr(meta, "total_token_count", 0) or 0)
+        for item in getattr(meta, "prompt_tokens_details", None) or []:
+            k = str(getattr(item, "modality", "")).upper()
+            if k:
+                self.input_modality[k] = self.input_modality.get(k, 0) + int(getattr(item, "token_count", 0) or 0)
+        for item in getattr(meta, "response_tokens_details", None) or []:
+            k = str(getattr(item, "modality", "")).upper()
+            if k:
+                self.output_modality[k] = self.output_modality.get(k, 0) + int(getattr(item, "token_count", 0) or 0)
 
 
 @dataclass
@@ -87,28 +90,30 @@ class TranscriptCollector:
         if self._current_counsellor:
             self.turns.append({
                 "role": "counsellor",
-                "text": self._current_counsellor.strip(),
+                "text": _normalize_transcript(self._current_counsellor),
                 "start_ms": self._turn_start_ms,
                 "end_ms": self._relative_ms(),
             })
             self._current_counsellor = ""
         if not self._current_student:
             self._turn_start_ms = self._relative_ms()
-        self._current_student += (" " if self._current_student else "") + text
+        # Concat raw — Gemini chunks carry their own spacing.
+        self._current_student += text
 
     def add_counsellor(self, text: str) -> None:
         # Flush student if switching roles
         if self._current_student:
             self.turns.append({
                 "role": "student",
-                "text": self._current_student.strip(),
+                "text": _normalize_transcript(self._current_student),
                 "start_ms": self._turn_start_ms,
                 "end_ms": self._relative_ms(),
             })
             self._current_student = ""
         if not self._current_counsellor:
             self._turn_start_ms = self._relative_ms()
-        self._current_counsellor += (" " if self._current_counsellor else "") + text
+        # Concat raw — Gemini chunks carry their own spacing.
+        self._current_counsellor += text
 
     def flush(self) -> None:
         """Flush any remaining partial turn."""
@@ -116,7 +121,7 @@ class TranscriptCollector:
         if self._current_student:
             self.turns.append({
                 "role": "student",
-                "text": self._current_student.strip(),
+                "text": _normalize_transcript(self._current_student),
                 "start_ms": self._turn_start_ms,
                 "end_ms": now,
             })
@@ -124,7 +129,7 @@ class TranscriptCollector:
         if self._current_counsellor:
             self.turns.append({
                 "role": "counsellor",
-                "text": self._current_counsellor.strip(),
+                "text": _normalize_transcript(self._current_counsellor),
                 "start_ms": self._turn_start_ms,
                 "end_ms": now,
             })
@@ -136,7 +141,7 @@ class TranscriptCollector:
         if self._current_counsellor:
             self.turns.append({
                 "role": "counsellor",
-                "text": self._current_counsellor.strip(),
+                "text": _normalize_transcript(self._current_counsellor),
                 "start_ms": self._turn_start_ms,
                 "end_ms": self._relative_ms(),
             })
@@ -200,16 +205,25 @@ async def browser_to_gemini(ws: WebSocket, session, transcript: TranscriptCollec
                 if mime.startswith("audio/"):
                     # Forward all audio to Gemini — it has its own VAD.
                     # Server-side gating causes Gemini to close the session.
+                    # MUST include sample rate in mime type, otherwise Gemini
+                    # misinterprets the PCM stream and transcription goes bad.
+                    # Browser captures at 16kHz (see session.js geminiAudioCtx).
                     await session.send_realtime_input(
-                        audio=gt.Blob(data=decoded, mime_type="audio/pcm")
+                        audio=gt.Blob(data=decoded, mime_type="audio/pcm;rate=16000")
                     )
 
                     # Send audio level to frontend periodically
                     chunk_count += 1
                     if chunk_count % 5 == 0:
-                        level = _compute_audio_level(decoded)
+                        level = compute_audio_level(decoded)
                         try:
-                            await ws.send_json(level)
+                            await ws.send_json({
+                                "type": "audioLevel",
+                                "rms": round(level.rms * 32768),
+                                "peak": max(1, round(level.peak * 32768)),
+                                "db": level.db,
+                                "isSpeech": level.is_speech,
+                            })
                         except Exception:
                             pass
 
@@ -223,29 +237,52 @@ async def browser_to_gemini(ws: WebSocket, session, transcript: TranscriptCollec
     except asyncio.CancelledError:
         pass
     except Exception as exc:
-        logger.error("browser→gemini error: %s", exc)
+        exc_str = str(exc)
+        # 1011 = Gemini internal error — transient, worth retrying at caller level
+        if "1011" in exc_str or "internal error" in exc_str.lower():
+            logger.warning("⏱ browser→gemini transient error (signalling retry): %s", exc)
+            return "transient_error"
+        logger.error("browser→gemini fatal error: %s", exc)
 
 
-async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | None = None, transcript: TranscriptCollector | None = None) -> None:
-    """Forward Gemini responses to browser WebSocket.
-
-    Key pattern from official docs: wrap session.receive() in while True.
-    Each receive() call yields one conversational turn. When the turn
-    completes (turnComplete), we loop back for the next turn.
-    The session stays alive across turns.
-
-    Also captures session_resumption_update handles for reconnection.
-    """
+async def gemini_to_browser(
+    ws: WebSocket,
+    session,
+    resumption_state: dict | None = None,
+    transcript: TranscriptCollector | None = None,
+    language: str = "hinglish",
+    usage_agg: UsageAccumulator | None = None,
+) -> None:
+    """Forward Gemini responses to browser WebSocket."""
     if resumption_state is None:
         resumption_state = {}
+
+    # One-per-turn latch: emit ai_speaking=true the first time a turn
+    # carries model audio, ai_speaking=false when turn_complete arrives.
+    speaking_flag = False
+
+    # Per-turn latency tracking
+    _t_input_transcription: float | None = None  # when student speech ended (VAD fired)
+    _t_first_audio: float | None = None           # when first AI audio chunk arrived
+    _t_turn_start: float | None = None            # when first model content packet arrived
+    _had_output_transcription: bool = False       # whether AI produced any transcript this turn
+    _turn_index: int = 0
 
     try:
         while True:
             try:
                 # Each receive() gives us one turn
                 async for response in session.receive():
+                    # Accumulate token usage (fields may be missing/None).
+                    if usage_agg is not None:
+                        try:
+                            usage_agg.add(getattr(response, "usage_metadata", None))
+                        except Exception as exc:
+                            logger.debug("usage_metadata capture skipped: %s", exc)
+
                     # Skip setup events
                     if response.setup_complete:
+                        logger.info("⏱ [turn=%d] setup_complete received", _turn_index)
                         continue
 
                     # Capture resumption handle for reconnection
@@ -257,16 +294,18 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
 
                     # Handle GoAway — Gemini tells us to reconnect
                     if response.go_away:
-                        logger.info("Received GoAway from Gemini — connection will be recycled")
+                        logger.info("⏱ [turn=%d] GoAway received — recycling connection", _turn_index)
                         try:
                             await ws.send_json({"type": "go_away"})
                         except Exception:
                             pass
-                        # Signal to the caller that we need to reconnect
                         resumption_state["go_away"] = True
-                        return  # Exit so caller can reconnect
+                        return
 
                     srv = response.server_content
+                    # Only start the turn timer once we have actual model content
+                    if srv and _t_turn_start is None:
+                        _t_turn_start = time.monotonic()
                     if not srv:
                         continue
 
@@ -274,6 +313,7 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                     sc = out["serverContent"]
 
                     # Model audio/text output
+                    has_inline_audio = False
                     if srv.model_turn and srv.model_turn.parts:
                         parts_out = []
                         for part in srv.model_turn.parts:
@@ -281,6 +321,22 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                             if getattr(part, "thought", False):
                                 continue
                             if part.inline_data and part.inline_data.data:
+                                has_inline_audio = True
+                                # Log first audio chunk latency
+                                if _t_first_audio is None:
+                                    _t_first_audio = time.monotonic()
+                                    if _t_input_transcription is not None:
+                                        vad_to_audio_ms = (_t_first_audio - _t_input_transcription) * 1000
+                                        logger.info(
+                                            "⏱ [turn=%d] VAD→first-audio: %.0fms",
+                                            _turn_index, vad_to_audio_ms,
+                                        )
+                                    else:
+                                        logger.info(
+                                            "⏱ [turn=%d] first-audio at +%.0fms (no VAD ref)",
+                                            _turn_index,
+                                            (_t_first_audio - (_t_turn_start or _t_first_audio)) * 1000,
+                                        )
                                 parts_out.append({
                                     "inlineData": {
                                         "data": base64.b64encode(
@@ -295,17 +351,56 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                         if parts_out:
                             sc["modelTurn"] = {"parts": parts_out}
 
+                    # Emit ai_speaking=true exactly once per turn, the first
+                    # time the model sends inline audio.
+                    if has_inline_audio and not speaking_flag:
+                        speaking_flag = True
+                        try:
+                            await ws.send_json({"type": "ai_speaking", "state": True})
+                        except Exception:
+                            return
+
                     # Turn complete
                     if srv.turn_complete:
                         sc["turnComplete"] = True
                         if transcript:
                             transcript.on_turn_complete()
+                        if speaking_flag:
+                            speaking_flag = False
+                            try:
+                                await ws.send_json({"type": "ai_speaking", "state": False})
+                            except Exception:
+                                return
+                        # Log turn outcome
+                        _elapsed = (time.monotonic() - _t_turn_start) * 1000 if _t_turn_start else 0
+                        if _t_first_audio is not None:
+                            stream_ms = (time.monotonic() - _t_first_audio) * 1000
+                            logger.info("⏱ [turn=%d] AI streaming duration: %.0fms", _turn_index, stream_ms)
+                        elif _had_output_transcription:
+                            # AI produced transcript but no audio (text-only response)
+                            logger.info("⏱ [turn=%d] AI text-only response at +%.0fms", _turn_index, _elapsed)
+                        elif _t_turn_start is not None:
+                            # No audio, no transcript — likely student input turn boundary
+                            # (Gemini signals student turn end before AI starts responding)
+                            logger.info(
+                                "⏱ [turn=%d] input-turn-boundary at +%.0fms "
+                                "(student turn end — AI response follows)",
+                                _turn_index, _elapsed,
+                            )
+                        # Reset per-turn state
+                        _turn_index += 1
+                        _t_input_transcription = None
+                        _t_first_audio = None
+                        _t_turn_start = None
+                        _had_output_transcription = False
 
-                    # Transcriptions
+                    # Transcriptions — pass through raw text from Gemini.
                     if srv.input_transcription:
                         t = getattr(srv.input_transcription, "text", "")
                         if t and t.strip():
-                            t = _to_roman(t.strip())
+                            # Each new inputTranscription chunk = VAD is active.
+                            # Last chunk before modelTurn = student finished speaking.
+                            _t_input_transcription = time.monotonic()
                             sc["inputTranscription"] = {"text": t}
                             if transcript:
                                 transcript.add_student(t)
@@ -313,7 +408,7 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                     if srv.output_transcription:
                         t = getattr(srv.output_transcription, "text", "")
                         if t and t.strip():
-                            t = _to_roman(t.strip())
+                            _had_output_transcription = True
                             sc["outputTranscription"] = {"text": t}
                             if transcript:
                                 transcript.add_counsellor(t)
@@ -326,17 +421,12 @@ async def gemini_to_browser(ws: WebSocket, session, resumption_state: dict | Non
                             return  # Browser gone
 
                 # receive() iterator ended — this is normal between turns.
-                # Wait briefly then loop back to receive the next turn.
-                logger.debug("Turn completed, waiting for next turn...")
-                await asyncio.sleep(0.1)
+                logger.debug("⏱ [turn=%d] receive() exhausted — looping", _turn_index)
+                await asyncio.sleep(0)
 
             except asyncio.CancelledError:
-                raise  # Propagate cancellation — session is ending
+                raise
             except Exception as inner_exc:
-                # Gemini receive raised (e.g., connection hiccup).
-                # Do NOT exit — wait and retry. Only GoAway or cancellation
-                # should end this loop. Browser disconnect is handled by
-                # browser_to_gemini exiting, which cancels us.
                 logger.warning("gemini→browser receive error (retrying): %s", inner_exc)
                 await asyncio.sleep(0.5)
 
@@ -353,28 +443,27 @@ async def session_timer(
     ws: WebSocket,
     session,
     transcript: TranscriptCollector,
-    max_sec: int = 420,
+    max_sec: int = 300,
     wrapup_sec: int = 90,
+    language: str = "hinglish",
 ) -> None:
     """Enforce session time limit with AI-guided wrap-up.
 
     At max_sec - wrapup_sec: inject wrapup prompt to Gemini + warn browser.
     At max_sec: send timeout to browser and return.
     """
+    from counselai.api.constants import WRAPUP_PROMPTS
+
     wrapup_at = max_sec - wrapup_sec
     try:
         await asyncio.sleep(wrapup_at)
         # Tell Gemini to wrap up naturally
         try:
+            prompt = WRAPUP_PROMPTS.get(language, WRAPUP_PROMPTS["hinglish"])
+            remaining_min = max(1, wrapup_sec // 60)
             await session.send_client_content(
                 turns=gt.Content(parts=[gt.Part(
-                    text=(
-                        "TIME CHECK: The session is ending in about 1 minute. "
-                        "This is your signal to wrap up. Start closing naturally — "
-                        "briefly acknowledge what you discussed (2-3 sentences, not a full summary), "
-                        "thank the student warmly, and say goodbye. "
-                        "End with something like: 'Accha beta, bahut acchi baat ki tumne aaj. Take care.'"
-                    )
+                    text=prompt.format(minutes=remaining_min),
                 )]),
                 turn_complete=True,
             )
@@ -417,22 +506,3 @@ async def keepalive_ping(ws: WebSocket) -> None:
         pass
 
 
-def _compute_audio_level(pcm_data: bytes) -> dict:
-    """Compute RMS audio level from PCM16 data."""
-    if len(pcm_data) < 2:
-        return {"type": "audioLevel", "rms": 0, "peak": 0, "db": -100, "isSpeech": False}
-
-    n_samples = len(pcm_data) // 2
-    samples = struct.unpack(f"<{n_samples}h", pcm_data[: n_samples * 2])
-
-    rms = math.sqrt(sum(s * s for s in samples) / n_samples)
-    peak = max(abs(s) for s in samples) if samples else 0
-    db = 20 * math.log10(rms / 32768) if rms > 0 else -100
-
-    return {
-        "type": "audioLevel",
-        "rms": round(rms),
-        "peak": peak,
-        "db": round(db, 1),
-        "isSpeech": rms > 300,
-    }

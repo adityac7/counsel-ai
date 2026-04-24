@@ -191,3 +191,24 @@ export function finalizeRecording() {
     state.recorder.stop();
   });
 }
+
+export function finalizeMixedRecording() {
+  return new Promise(resolve => {
+    const buildBlob = () => {
+      if (!state.mixedRecordedChunks.length) return null;
+      const mime = state.mixedRecorder?.mimeType || 'video/webm';
+      return new Blob(state.mixedRecordedChunks, { type: mime });
+    };
+    if (!state.mixedRecorder || state.mixedRecorder.state === 'inactive') return resolve(buildBlob());
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      resolve(buildBlob());
+    };
+    try { state.mixedRecorder.requestData(); } catch {}
+    const timer = setTimeout(finish, 3000);
+    state.mixedRecorder.onstop = () => { clearTimeout(timer); finish(); };
+    state.mixedRecorder.stop();
+  });
+}

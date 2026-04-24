@@ -1,0 +1,400 @@
+{% extends "dashboard/base.html" %}
+{% set active_nav = "case-studies" %}
+
+{% block title %}Case Studies{% endblock %}
+
+{% block head %}
+<style>
+/* ── Case Studies list ─────────────────────────────────────────────────── */
+.cs-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 28px;
+  flex-wrap: wrap;
+}
+
+.cs-filter-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cs-filter-row select,
+.cs-filter-row input {
+  padding: 8px 14px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--c-slate-200);
+  background: var(--c-slate-50);
+  color: var(--c-slate-900);
+  font-family: var(--font-body);
+  font-size: 0.88rem;
+  min-height: 44px;
+  min-width: 160px;
+  transition: all 0.2s ease;
+  appearance: none;
+  outline: none;
+}
+.cs-filter-row select:focus,
+.cs-filter-row input:focus {
+  border-color: var(--c-indigo-500);
+  box-shadow: 0 0 0 3px rgba(99,102,241,.12);
+  background: #fff;
+}
+
+.cs-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr));
+  gap: 20px;
+}
+
+.cs-card {
+  background: var(--c-surface);
+  border: 1px solid var(--c-slate-200);
+  border-radius: var(--radius-lg);
+  padding: 24px 26px;
+  box-shadow: var(--shadow-sm);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.cs-card::after {
+  content: "";
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 3px;
+  border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+}
+.cs-card[data-category="Ethical Dilemmas"]::after    { background: var(--brand-gradient); }
+.cs-card[data-category="Social Pressure"]::after     { background: linear-gradient(135deg,#F59E0B,#EA580C); }
+.cs-card[data-category="Family Conflicts"]::after    { background: linear-gradient(135deg,#F43F5E,#E11D48); }
+.cs-card[data-category="Digital Ethics"]::after      { background: linear-gradient(135deg,#06B6D4,#0891B2); }
+.cs-card[data-category="Achievement Pressure"]::after{ background: linear-gradient(135deg,#10B981,#059669); }
+.cs-card[data-category="Leadership"]::after          { background: linear-gradient(135deg,#7C3AED,#6D28D9); }
+
+.cs-card:hover { transform: translateY(-3px); box-shadow: var(--shadow-md); }
+
+.cs-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.cs-card-id {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--c-indigo-600);
+  background: var(--c-indigo-50);
+  border: 1px solid rgba(79,70,229,.15);
+  padding: 3px 9px;
+  border-radius: var(--radius-sm);
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+.cs-card-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--c-slate-900);
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  flex: 1;
+}
+
+.cs-card-meta {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.cs-card-scenario {
+  font-size: 0.84rem;
+  color: var(--c-slate-600);
+  line-height: 1.55;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  flex: 1;
+}
+
+.cs-card-angles {
+  border-top: 1px solid var(--c-slate-100);
+  padding-top: 12px;
+}
+
+.cs-card-angles-label {
+  font-size: 0.62rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.09em;
+  color: var(--c-indigo-700);
+  margin-bottom: 8px;
+}
+
+.cs-card-angles ul {
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.cs-card-angles li {
+  font-size: 0.8rem;
+  color: var(--c-slate-600);
+  padding-left: 14px;
+  position: relative;
+  line-height: 1.4;
+}
+.cs-card-angles li::before {
+  content: "›";
+  position: absolute;
+  left: 0;
+  color: var(--c-indigo-400);
+  font-weight: 700;
+}
+
+.cs-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-slate-100);
+  gap: 8px;
+}
+
+.cs-edit-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 10px 16px;
+  min-height: 44px;
+  border-radius: var(--radius-full);
+  border: 1.5px solid var(--c-slate-200);
+  background: var(--c-surface);
+  color: var(--c-slate-600);
+  font-size: 0.72rem;
+  font-weight: 600;
+  font-family: var(--font-body);
+  letter-spacing: 0.01em;
+  text-decoration: none;
+  transition: all 0.2s ease;
+  cursor: pointer;
+}
+.cs-edit-btn:hover {
+  border-color: var(--c-indigo-400);
+  background: var(--c-indigo-50);
+  color: var(--c-indigo-700);
+  transform: translateY(-1px);
+  box-shadow: var(--shadow-sm);
+}
+
+.cs-custom-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--c-emerald-50);
+  color: var(--c-emerald-700);
+  border: 1px solid rgba(16,185,129,.2);
+}
+
+.cs-modified-badge {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  padding: 2px 7px;
+  border-radius: var(--radius-full);
+  background: var(--c-amber-50);
+  color: var(--c-amber-700);
+  border: 1px solid rgba(245,158,11,.25);
+}
+
+.cs-empty { display: none; }
+.cs-empty-visible { display: block; }
+
+/* Category colour map for chips */
+.cat-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border: 1px solid transparent;
+}
+.cat-Ethical-Dilemmas    { background: var(--c-indigo-50);  color: var(--c-indigo-700); border-color: rgba(79,70,229,.2); }
+.cat-Social-Pressure     { background: var(--c-amber-50);   color: var(--c-amber-700);  border-color: rgba(245,158,11,.25); }
+.cat-Family-Conflicts    { background: var(--c-rose-50);    color: var(--c-rose-700);   border-color: rgba(225,29,72,.2); }
+.cat-Digital-Ethics      { background: #ECFEFF;             color: #0E7490;             border-color: rgba(6,182,212,.2); }
+.cat-Achievement-Pressure{ background: var(--c-emerald-50); color: var(--c-emerald-700);border-color: rgba(16,185,129,.2); }
+.cat-Leadership          { background: #F5F3FF;             color: var(--c-violet-600); border-color: rgba(124,58,237,.2); }
+.cat-class               { background: var(--c-slate-100);  color: var(--c-slate-600);  border-color: var(--c-slate-200); }
+
+@media (max-width: 900px) {
+  .cs-toolbar { flex-direction: column; align-items: stretch; }
+}
+@media (max-width: 640px) {
+  .cs-filter-row { flex-direction: column; }
+  .cs-filter-row select,
+  .cs-filter-row input { min-width: 0; width: 100%; }
+}
+</style>
+{% endblock %}
+
+{% block content %}
+<div class="page-header">
+  <h1>Case <em>Studies</em></h1>
+  <div class="subtitle">Browse all counselling scenarios — built-in and custom. Use these as starting points for live sessions.</div>
+</div>
+
+<div class="cs-toolbar">
+  <div class="cs-filter-row">
+    <select id="filter-category" onchange="applyFilters()">
+      <option value="">All categories</option>
+      {% for cat in categories %}
+      <option value="{{ cat }}">{{ cat }}</option>
+      {% endfor %}
+    </select>
+    <select id="filter-class" onchange="applyFilters()">
+      <option value="">All classes</option>
+      <option value="8-10">Class 8–10</option>
+      <option value="11-12">Class 11–12</option>
+    </select>
+    <input type="search" id="filter-search" placeholder="Search title or scenario…" oninput="applyFilters()">
+  </div>
+  <a href="/api/v1/dashboard/case-studies/new" class="btn btn-primary">
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <path d="M7 1v12M1 7h12" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+    New Case Study
+  </a>
+</div>
+
+<div id="cs-count" style="font-size:0.82rem;color:var(--c-slate-500);margin-bottom:18px;font-weight:500;">
+  {{ case_studies|length }} case {{ 'study' if case_studies|length == 1 else 'studies' }}
+</div>
+
+{% if case_studies %}
+<div class="cs-grid" id="cs-grid">
+  {% for cs in case_studies %}
+  {% set in_db = cs.get('_in_db', False) %}
+  {% set builtin_ids = ['ED-01','ED-02','SP-01','SP-02','FC-01','FC-02','DE-01','DE-02','AP-01','AP-02','LD-01','LD-02'] %}
+  {% set is_builtin_cs = cs.id in builtin_ids %}
+  <div class="cs-card"
+       data-category="{{ cs.category }}"
+       data-class="{{ cs.target_class }}"
+       data-title="{{ cs.title | lower }}"
+       data-scenario="{{ (cs.scenario_text or '') | lower | truncate(200) }}"
+  >
+    <div class="cs-card-header">
+      <div>
+        <div class="cs-card-title">{{ cs.title }}</div>
+      </div>
+      <span class="cs-card-id">{{ cs.id }}</span>
+    </div>
+
+    <div class="cs-card-meta">
+      <span class="cat-chip cat-{{ cs.category | replace(' ', '-') }}">{{ cs.category }}</span>
+      <span class="cat-chip cat-class">Class {{ cs.target_class }}</span>
+      {% if in_db and is_builtin_cs %}
+        <span class="cs-modified-badge">Modified</span>
+      {% elif in_db %}
+        <span class="cs-custom-badge">Custom</span>
+      {% endif %}
+    </div>
+
+    <div class="cs-card-scenario">{{ cs.scenario_text }}</div>
+
+    {% if cs.probing_angles %}
+    <div class="cs-card-angles">
+      <div class="cs-card-angles-label">Probing angles</div>
+      <ul>
+        {% for angle in cs.probing_angles[:3] %}
+        <li>{{ angle }}</li>
+        {% endfor %}
+        {% if cs.probing_angles | length > 3 %}
+        <li style="color:var(--c-slate-400);font-style:italic;">+{{ cs.probing_angles | length - 3 }} more…</li>
+        {% endif %}
+      </ul>
+    </div>
+    {% endif %}
+
+    <div class="cs-card-footer">
+      <span></span>
+      <a href="/api/v1/dashboard/case-studies/{{ cs.id }}/edit" class="cs-edit-btn">
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none">
+          <path d="M7.5 1.5l2 2L3 10H1V8L7.5 1.5z" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/>
+        </svg>
+        Edit
+      </a>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="empty-state" id="cs-empty">
+  <div class="icon">📋</div>
+  <div class="title">No case studies yet</div>
+  <div class="desc">Create the first one using the button above.</div>
+</div>
+{% endif %}
+
+<div class="empty-state cs-empty" id="no-results" style="display:none;">
+  <div class="icon">🔍</div>
+  <div class="title">No matches</div>
+  <div class="desc">Try adjusting the filters or search query.</div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+function applyFilters() {
+  const catFilter   = document.getElementById('filter-category').value.toLowerCase();
+  const classFilter = document.getElementById('filter-class').value.toLowerCase();
+  const searchVal   = document.getElementById('filter-search').value.toLowerCase().trim();
+
+  const cards = document.querySelectorAll('#cs-grid .cs-card');
+  let visible = 0;
+
+  cards.forEach(card => {
+    const cat      = card.dataset.category.toLowerCase();
+    const cls      = card.dataset.class.toLowerCase();
+    const title    = card.dataset.title;
+    const scenario = card.dataset.scenario;
+
+    const matchCat    = !catFilter   || cat === catFilter;
+    const matchClass  = !classFilter || cls === classFilter;
+    const matchSearch = !searchVal   || title.includes(searchVal) || scenario.includes(searchVal);
+
+    const show = matchCat && matchClass && matchSearch;
+    card.style.display = show ? '' : 'none';
+    if (show) visible++;
+  });
+
+  const countEl = document.getElementById('cs-count');
+  const total = cards.length;
+  countEl.textContent = visible === total
+    ? `${total} case ${total === 1 ? 'study' : 'studies'}`
+    : `${visible} of ${total} case ${total === 1 ? 'study' : 'studies'}`;
+
+  const noResults = document.getElementById('no-results');
+  if (noResults) noResults.style.display = visible === 0 ? 'block' : 'none';
+}
+</script>
+{% endblock %}
